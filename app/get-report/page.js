@@ -61,7 +61,7 @@ export default function GetReport() {
     }, 2000);
 
     try {
-      const res = await fetch("/api/generate-report", {
+      const res = await fetch("/api/generate-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
