@@ -5,9 +5,25 @@ import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
+const loadingMessages = [
+  "Mapping planetary positions at your birth time...",
+  "Calculating Rashi and Lagna from coordinates...",
+  "Analyzing Nakshatra and Pada placement...",
+  "Evaluating Vimshottari Mahadasha periods...",
+  "Checking for Manglik and Kaal Sarp Dosha...",
+  "Interpreting house lords and aspects...",
+  "Generating career and finance predictions...",
+  "Analyzing marriage and compatibility yogas...",
+  "Computing lucky numbers, colors, and gems...",
+  "Preparing your personalized 20-page report...",
+  "Almost done — finalizing predictions...",
+];
+
 export default function GetReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -26,6 +42,23 @@ export default function GetReport() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setLoadingProgress(0);
+
+    // Start cycling through loading messages
+    let msgIndex = 0;
+    setLoadingMsg(loadingMessages[0]);
+    const msgInterval = setInterval(() => {
+      msgIndex = (msgIndex + 1) % loadingMessages.length;
+      setLoadingMsg(loadingMessages[msgIndex]);
+    }, 3500);
+
+    // Simulate progress bar
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return 90; // Don't go past 90 until actually done
+        return prev + Math.random() * 8;
+      });
+    }, 2000);
 
     try {
       const res = await fetch("/api/generate-report", {
@@ -36,20 +69,89 @@ export default function GetReport() {
 
       const data = await res.json();
 
+      clearInterval(msgInterval);
+      clearInterval(progressInterval);
+
       if (!res.ok) {
         throw new Error(data.error || "Something went wrong. Please try again.");
       }
 
+      setLoadingProgress(100);
+      setLoadingMsg("Report ready! Redirecting...");
+
       // Store report data in sessionStorage and redirect to preview
       sessionStorage.setItem("reportData", JSON.stringify(data));
       sessionStorage.setItem("userData", JSON.stringify(formData));
-      router.push("/report/preview");
+
+      // Small delay to show 100% before redirect
+      setTimeout(() => {
+        router.push("/report/preview");
+      }, 800);
     } catch (err) {
+      clearInterval(msgInterval);
+      clearInterval(progressInterval);
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
+
+  // Full-page loading screen
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="flex-1 pt-24 pb-16 flex items-center justify-center min-h-screen">
+          <div className="max-w-md mx-auto px-6 text-center">
+            {/* Animated cosmic circle */}
+            <div className="relative w-32 h-32 mx-auto mb-8">
+              {/* Outer rotating ring */}
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-[spin_8s_linear_infinite]">
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full"></div>
+              </div>
+              {/* Middle rotating ring */}
+              <div className="absolute inset-3 rounded-full border-4 border-accent/20 animate-[spin_5s_linear_infinite_reverse]">
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-accent rounded-full"></div>
+              </div>
+              {/* Inner pulsing core */}
+              <div className="absolute inset-8 rounded-full bg-primary/20 animate-pulse flex items-center justify-center">
+                <span className="text-3xl">🔮</span>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-2xl font-bold mb-2">Generating Your Report</h2>
+            <p className="text-muted text-sm mb-6">
+              Our AI is analyzing planetary positions for <span className="text-foreground font-medium">{formData.name}</span>
+            </p>
+
+            {/* Progress bar */}
+            <div className="w-full bg-surface border border-border rounded-full h-3 mb-4 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${Math.min(loadingProgress, 100)}%` }}
+              ></div>
+            </div>
+
+            {/* Progress percentage */}
+            <p className="text-sm text-muted mb-4">{Math.round(Math.min(loadingProgress, 100))}% complete</p>
+
+            {/* Rotating messages */}
+            <div className="bg-surface border border-border rounded-xl p-4 min-h-[60px] flex items-center justify-center">
+              <p className="text-primary-light text-sm animate-pulse">
+                {loadingMsg}
+              </p>
+            </div>
+
+            {/* Time estimate */}
+            <p className="text-muted text-xs mt-6">
+              This usually takes 30-60 seconds. Please don&apos;t close this page.
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
