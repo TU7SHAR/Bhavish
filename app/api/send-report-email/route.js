@@ -1,8 +1,6 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request) {
   try {
     const { email, name, reportId, sections, summary } = await request.json();
@@ -13,6 +11,10 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    // Initialize Resend inside the handler (not at module level)
+    // so it doesn't crash during build when env vars aren't available
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     // Build email HTML
     const reportHtml = `
@@ -31,7 +33,7 @@ export async function POST(request) {
       </head>
       <body>
         <div class="header">
-          <h1>&#x2728; BhavishAI</h1>
+          <h1>✨ BhavishAI</h1>
           <p style="color: #d1d5db; margin-top: 8px;">Your Complete Vedic Astrology Report</p>
         </div>
         
@@ -60,7 +62,7 @@ export async function POST(request) {
       </html>
     `;
 
-    const fromEmail = process.env.RESEND_FROM_EMAIL || "reports@bhavishai.in";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
     const { data, error } = await resend.emails.send({
       from: `BhavishAI <${fromEmail}>`,
