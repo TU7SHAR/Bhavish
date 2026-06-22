@@ -183,7 +183,7 @@ export default function ReportPreview() {
               <span className="bg-green-500/20 text-green-400 text-xs font-bold px-3 py-1 rounded-full">FREE PREVIEW</span>
               <span className="text-muted text-sm">Page 1 of 20</span>
             </div>
-            <h2 className="text-2xl font-bold mb-4">{firstSection.title}</h2>
+            <h2 className="text-2xl font-bold mb-4">{firstSection.title.replace(/^\d+\.\s*/, "")}</h2>
             <div className="text-muted leading-relaxed whitespace-pre-line">
               {firstSection.content}
             </div>
@@ -203,7 +203,7 @@ export default function ReportPreview() {
                     </svg>
                     <span className="text-muted text-sm">Locked - Page {i + 2} of 20</span>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">{section.title}</h3>
+                  <h3 className="text-xl font-bold mb-2">{section.title.replace(/^\d+\.\s*/, "")}</h3>
                   <p className="text-muted line-clamp-2">{section.content.substring(0, 150)}...</p>
                 </div>
               ))}
@@ -253,7 +253,7 @@ export default function ReportPreview() {
                     </svg>
                   )}
                   <span className={i === 0 ? "text-foreground" : "text-muted"}>
-                    {i + 1}. {section.title}
+                    {i + 1}. {section.title.replace(/^\d+\.\s*/, "")}
                   </span>
                 </div>
               ))}

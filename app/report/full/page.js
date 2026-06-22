@@ -96,7 +96,7 @@ export default function FullReport() {
                   className="flex items-center gap-2 text-sm text-muted hover:text-primary-light transition-colors py-1"
                 >
                   <span className="text-primary font-mono text-xs w-6">{String(i + 1).padStart(2, "0")}</span>
-                  {section.title}
+                  {section.title.replace(/^\d+\.\s*/, "")}
                 </a>
               ))}
             </div>
@@ -114,7 +114,7 @@ export default function FullReport() {
                   <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
                     {i + 1}
                   </span>
-                  <h2 className="text-xl md:text-2xl font-bold">{section.title}</h2>
+                  <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
                 </div>
                 <div className="text-muted leading-relaxed whitespace-pre-line">
                   {section.content}
