@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 
 export default function ReportPreview() {
   const router = useRouter();
@@ -195,6 +196,22 @@ export default function ReportPreview() {
           <div className="bg-surface border border-border rounded-2xl p-6 mb-8">
             <p className="text-muted italic text-lg leading-relaxed">&ldquo;{reportData.summary}&rdquo;</p>
           </div>
+
+          {/* Kundli Chart Preview (free - shown before paywall) */}
+          {reportData.chartData && (
+            <div className="bg-surface border border-border rounded-2xl p-6 mb-6">
+              <h3 className="text-lg font-bold mb-4 text-primary-light text-center">📊 Your Kundli Chart</h3>
+              <div className="flex justify-center">
+                <NorthIndianChart
+                  planets={reportData.chartData.planets}
+                  ascendant={reportData.chartData.ascendant}
+                  title="Rashi Chart (D1 - Lagna)"
+                />
+              </div>
+              {/* Planet table */}
+              <PlanetTable planets={reportData.chartData.planets} ascendant={reportData.chartData.ascendant} />
+            </div>
+          )}
 
           {/* FREE First Section */}
           <div className="bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6">

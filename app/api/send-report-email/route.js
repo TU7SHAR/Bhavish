@@ -41,7 +41,7 @@ function buildReportHtml({ name, reportId, summary, sections }) {
   
   <div class="footer">
     <p>&copy; ${new Date().getFullYear()} BhavishAI | bhavishai.in</p>
-    <p>This report is generated using AI-powered Vedic astrology analysis. For entertainment purposes.</p>
+    <p>This report is generated using AI-powered Vedic astrology analysis based on Swiss Ephemeris calculations.</p>
     <p>For major life decisions, consult with qualified professionals.</p>
   </div>
 </body>
