@@ -31,15 +31,27 @@ export async function POST(request) {
     if (!parseResult.success) {
       return NextResponse.json(
         { error: "Invalid input: " + parseResult.error.issues[0].message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const { reportId, paymentId, name, gender, dateOfBirth, timeOfBirth, placeOfBirth, chartData } = parseResult.data;
+    const {
+      reportId,
+      paymentId,
+      name,
+      gender,
+      dateOfBirth,
+      timeOfBirth,
+      placeOfBirth,
+      chartData,
+    } = parseResult.data;
 
     // Format planetary data for prompt
     const planetaryTable = Object.entries(chartData.planets)
-      .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | ${data.dignity}`)
+      .map(
+        ([planet, data]) =>
+          `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | ${data.dignity}`,
+      )
       .join("\n");
 
     const dashaTable = (chartData.dasha || [])
@@ -47,7 +59,7 @@ export async function POST(request) {
       .join("\n");
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
     const fullPrompt = `You are an expert Vedic astrologer (Jyotishi) with 30+ years of practice.
 I have EXACT planetary positions calculated via Swiss Ephemeris (Lahiri Ayanamsa).
@@ -115,14 +127,14 @@ Return ONLY valid JSON.`;
       console.error("Parse error:", parseError.message);
       return NextResponse.json(
         { error: "Failed to generate full report. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!reportData.sections || reportData.sections.length < 15) {
       return NextResponse.json(
         { error: "Incomplete report. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -137,7 +149,7 @@ Return ONLY valid JSON.`;
     console.error("Full report generation error:", error);
     return NextResponse.json(
       { error: "Failed to generate report. Please try again." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

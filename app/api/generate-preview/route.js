@@ -1,13 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { calculateBirthChart, generateKundliSVG } from "../../../lib/vedic-calculator.js";
+import {
+  calculateBirthChart,
+  generateKundliSVG,
+} from "../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../lib/geocode.js";
 
 // Fix #6: Input validation with Zod
 const inputSchema = z.object({
   name: z.string().min(2).max(100).trim(),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   timeOfBirth: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
   placeOfBirth: z.string().min(2).max(200).trim(),
   gender: z.enum(["male", "female", "other"]),
@@ -23,11 +28,12 @@ export async function POST(request) {
     if (!parseResult.success) {
       return NextResponse.json(
         { error: "Invalid input: " + parseResult.error.issues[0].message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender } = parseResult.data;
+    const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender } =
+      parseResult.data;
 
     // Step 1: Geocode the birth place
     const location = await geocodePlace(placeOfBirth);
@@ -46,11 +52,13 @@ export async function POST(request) {
     // Step 4: PHASE 1 — Generate ONLY the preview (1-2 sections, not all 20)
     // This saves ~90% of token costs for users who don't pay
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
     // Format planetary data
     const planetaryTable = Object.entries(chartData.planets)
-      .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | ${data.dignity}`)
+      .map(
+        ([planet, data]) =>
+          `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | ${data.dignity}`,
+      )
       .join("\n");
 
     const previewPrompt = `You are an expert Vedic astrologer. Using the EXACT calculated planetary data below, generate a SHORT preview report (2 sections only).
@@ -95,17 +103,20 @@ Return ONLY valid JSON.`;
       reportData = JSON.parse(match[0]);
     } catch (parseError) {
       console.error("Failed to parse Gemini response:", parseError.message);
-      console.error("Raw response (first 300 chars):", responseText.substring(0, 300));
+      console.error(
+        "Raw response (first 300 chars):",
+        responseText.substring(0, 300),
+      );
       return NextResponse.json(
         { error: "Failed to generate report. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!reportData.sections || reportData.sections.length < 1) {
       return NextResponse.json(
         { error: "Incomplete report generated. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -124,8 +135,11 @@ Return ONLY valid JSON.`;
   } catch (error) {
     console.error("Preview generation error:", error);
     return NextResponse.json(
-      { error: "Failed to generate report. Please check your details and try again." },
-      { status: 500 }
+      {
+        error:
+          "Failed to generate report. Please check your details and try again.",
+      },
+      { status: 500 },
     );
   }
 }
