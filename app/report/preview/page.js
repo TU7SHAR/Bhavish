@@ -131,6 +131,17 @@ export default function ReportPreview() {
         theme: {
           color: "#8b5cf6",
         },
+        // Fix C: Push UPI Intent first for zero-friction payments
+        config: {
+          display: {
+            blocks: {
+              upi: { name: "Pay via UPI", instruments: [{ method: "upi", flows: ["intent", "collect", "qr"] }] },
+              other: { name: "Other Methods", instruments: [{ method: "card" }, { method: "netbanking" }, { method: "wallet" }] },
+            },
+            sequence: ["block.upi", "block.other"],
+            preferences: { show_default_blocks: false },
+          },
+        },
         modal: {
           ondismiss: function () {
             setPaymentLoading(false);
@@ -192,9 +203,39 @@ export default function ReportPreview() {
           </div>
 
           {/* Summary */}
-          <div className="bg-surface border border-border rounded-2xl p-6 mb-8">
+          <div className="bg-surface border border-border rounded-2xl p-6 mb-6">
             <p className="text-muted italic text-lg leading-relaxed">&ldquo;{reportData.summary}&rdquo;</p>
           </div>
+
+          {/* Fix A: Past Validation — "How did it know that?" moment */}
+          {reportData.pastValidation && (
+            <div className="bg-accent/10 border border-accent/30 rounded-2xl p-6 mb-6">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚡</span>
+                <div>
+                  <h3 className="font-bold text-accent mb-2">Your Recent Past (2024-2025)</h3>
+                  <p className="text-foreground leading-relaxed">{reportData.pastValidation}</p>
+                  <p className="text-muted text-xs mt-3 italic">Based on Saturn and Rahu transits through your natal houses.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fix B: Personal Insight — Information Gap (cut mid-sentence) */}
+          {reportData.personalInsight && reportData.personalInsight !== "null" && (
+            <div className="bg-primary/10 border border-primary/30 rounded-2xl p-6 mb-6 relative overflow-hidden">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🔮</span>
+                <div>
+                  <h3 className="font-bold text-primary-light mb-2">Regarding: &ldquo;{userData.personalQuestion || "Your Personal Concern"}&rdquo;</h3>
+                  <p className="text-foreground leading-relaxed">{reportData.personalInsight}</p>
+                  {/* Fade out effect — sentence cuts off */}
+                  <div className="h-8 bg-gradient-to-b from-transparent to-primary/10 -mb-6"></div>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[#1a1a2e] to-transparent"></div>
+            </div>
+          )}
 
           {/* FREE First Section */}
           <div className="bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6">
@@ -234,7 +275,10 @@ export default function ReportPreview() {
                 <div className="text-4xl mb-4">🔒</div>
                 <h3 className="text-2xl font-bold mb-2">Unlock Your Complete Report</h3>
                 <p className="text-muted mb-6">
-                  19 more sections including career, marriage, health, doshas, remedies, and 2026-2027 predictions.
+                  {userData.personalQuestion
+                    ? `Get the full analysis of "${userData.personalQuestion.substring(0, 60)}${userData.personalQuestion.length > 60 ? '...' : ''}" plus 19 more sections including career, marriage, health, and remedies.`
+                    : "19 more sections including career, marriage, health, doshas, remedies, and 2026-2027 predictions."
+                  }
                 </p>
                 <div className="mb-6">
                   <span className="text-4xl font-bold">&#x20B9;199</span>

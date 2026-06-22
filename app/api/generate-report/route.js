@@ -86,6 +86,8 @@ Do NOT invent positions — use what's calculated above.
 Format as JSON:
 {
   "summary": "2-3 sentences summarizing the chart with specific positions mentioned",
+  "pastValidation": "A 2-3 sentence statement about a difficult period the user likely experienced in the last 18-24 months (2024-2025) based on Saturn/Rahu transit through their houses. Be specific about the AREA of life affected (career, health, relationships, finances). Use phrases like 'You likely experienced...' or 'The period between [month] and [month] was particularly challenging for...' This MUST resonate emotionally.",
+  "personalInsight": "${personalQuestion ? `A single powerful opening sentence that directly addresses their question: '${personalQuestion}'. Start answering it with precision referencing a specific planet/house, then STOP mid-thought after 1-2 sentences. Leave it unresolved. Example: 'Your 10th lord ${chartData.planets.Saturn?.sign || "Saturn"} in house ${chartData.planets.Saturn?.house || "X"} indicates a clear shift in career trajectory arriving in—' (cut off here). This creates an irresistible information gap.` : "null"}",
   "sections": [
     { "title": "Section title", "content": "250-350 words of detailed interpretation" }
   ]
@@ -149,6 +151,8 @@ Return ONLY valid JSON. No markdown. No code blocks.`;
     return NextResponse.json({
       reportId,
       summary: reportData.summary,
+      pastValidation: reportData.pastValidation || null,
+      personalInsight: reportData.personalInsight || null,
       sections: reportData.sections,
       chartData, // Send calculated chart data to frontend
       kundliSVG, // Send SVG chart
