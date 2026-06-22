@@ -212,7 +212,7 @@ export default function ReportPreview() {
             {/* CTA Overlay */}
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
-                <div className="text-4xl mb-4">&#x1F512;</div>
+                <div className="text-4xl mb-4">🔒</div>
                 <h3 className="text-2xl font-bold mb-2">Unlock Your Complete Report</h3>
                 <p className="text-muted mb-6">
                   19 more sections including career, marriage, health, doshas, remedies, and 2026-2027 predictions.
@@ -229,9 +229,9 @@ export default function ReportPreview() {
                   {paymentLoading ? "Processing..." : "Unlock Full Report \u2192"}
                 </button>
                 <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
-                  <span>&#x1F512; Secure UPI/Card</span>
-                  <span>&#x26A1; Instant access</span>
-                  <span>&#x1F4E7; Email copy</span>
+                  <span>🔒 Secure UPI/Card</span>
+                  <span>⚡ Instant access</span>
+                  <span>📧 Email copy</span>
                 </div>
               </div>
             </div>
