@@ -115,7 +115,7 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-surface border border-border rounded-full px-4 py-2 mb-8">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              <span className="text-sm text-muted">10,000+ reports generated</span>
+              <span className="text-sm text-muted">✨ 10,000+ reports generated</span>
             </div>
 
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6">
@@ -180,19 +180,19 @@ export default function Home() {
               {[
                 {
                   step: "1",
-                  icon: "&#x1F4DD;",
+                  icon: "📝",
                   title: "Enter Birth Details",
                   desc: "Provide your name, date of birth, exact birth time, and place of birth.",
                 },
                 {
                   step: "2",
-                  icon: "&#x1F916;",
+                  icon: "🤖",
                   title: "AI Generates Report",
                   desc: "Our AI analyzes planetary positions and generates your personalized 20-page report in 60 seconds.",
                 },
                 {
                   step: "3",
-                  icon: "&#x1F4D6;",
+                  icon: "📖",
                   title: "Read & Unlock",
                   desc: "Preview the first page free. Pay just Rs 199 to unlock your complete life report instantly.",
                 },
@@ -227,15 +227,15 @@ export default function Home() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { icon: "&#x2600;&#xFE0F;", title: "Rashi & Lagna Analysis", desc: "Your Sun sign, Moon sign, and Ascendant with detailed personality insights" },
-                { icon: "&#x1F48D;", title: "Marriage & Love", desc: "Relationship compatibility, ideal partner traits, and marriage timing predictions" },
-                { icon: "&#x1F4BC;", title: "Career & Finance", desc: "Best career paths, wealth yogas, and financial growth periods in your chart" },
-                { icon: "&#x1F3E5;", title: "Health & Wellness", desc: "Physical and mental health tendencies based on planetary placements" },
-                { icon: "&#x1F52E;", title: "Mahadasha & Timing", desc: "Current and upcoming Dasha periods with predictions for the next 10 years" },
-                { icon: "&#x1F3AF;", title: "Lucky Factors", desc: "Lucky numbers, colors, gemstones, mantras, and favorable days personalized for you" },
-                { icon: "&#x1F31F;", title: "Nakshatra Details", desc: "Your birth star analysis with character traits and life path guidance" },
-                { icon: "&#x1F4AB;", title: "Doshas & Remedies", desc: "Manglik dosha, Kaal Sarp, and other yoga analysis with practical remedies" },
-                { icon: "&#x1F4C5;", title: "2026-2027 Forecast", desc: "Month-by-month predictions for the coming year based on planetary transits" },
+                { icon: "☀️", title: "Rashi & Lagna Analysis", desc: "Your Sun sign, Moon sign, and Ascendant with detailed personality insights" },
+                { icon: "💍", title: "Marriage & Love", desc: "Relationship compatibility, ideal partner traits, and marriage timing predictions" },
+                { icon: "💼", title: "Career & Finance", desc: "Best career paths, wealth yogas, and financial growth periods in your chart" },
+                { icon: "🏥", title: "Health & Wellness", desc: "Physical and mental health tendencies based on planetary placements" },
+                { icon: "🔮", title: "Mahadasha & Timing", desc: "Current and upcoming Dasha periods with predictions for the next 10 years" },
+                { icon: "🎯", title: "Lucky Factors", desc: "Lucky numbers, colors, gemstones, mantras, and favorable days personalized for you" },
+                { icon: "🌟", title: "Nakshatra Details", desc: "Your birth star analysis with character traits and life path guidance" },
+                { icon: "💫", title: "Doshas & Remedies", desc: "Manglik dosha, Kaal Sarp, and other yoga analysis with practical remedies" },
+                { icon: "📅", title: "2026-2027 Forecast", desc: "Month-by-month predictions for the coming year based on planetary transits" },
               ].map((feature) => (
                 <div
                   key={feature.title}
