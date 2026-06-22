@@ -32,7 +32,7 @@ export async function POST(request) {
 
     // Step 4: Build detailed prompt with REAL calculated data for Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
     // Format planetary data for the prompt
     const planetaryTable = Object.entries(chartData.planets)
