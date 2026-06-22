@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
     "next": "16.2.9",
     "nodemailer": "^9.0.1",
     "razorpay": "^2.9.6",

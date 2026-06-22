@@ -83,6 +83,24 @@ export default function GetReport() {
       sessionStorage.setItem("reportData", JSON.stringify(data));
       sessionStorage.setItem("userData", JSON.stringify(formData));
 
+      // Save report to DB as "unpaid" (captures email for future reference)
+      fetch("/api/save-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportId: data.reportId,
+          name: formData.name,
+          email: formData.email,
+          dateOfBirth: formData.dateOfBirth,
+          timeOfBirth: formData.timeOfBirth,
+          placeOfBirth: formData.placeOfBirth,
+          gender: formData.gender,
+          summary: data.summary,
+          sections: data.sections,
+          paymentStatus: "unpaid",
+        }),
+      }).catch(console.error);
+
       // Small delay to show 100% before redirect
       setTimeout(() => {
         router.push("/report/preview");

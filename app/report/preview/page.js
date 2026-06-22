@@ -75,6 +75,25 @@ export default function ReportPreview() {
             sessionStorage.setItem("paymentVerified", "true");
             sessionStorage.setItem("paymentId", response.razorpay_payment_id);
 
+            // Save report to database (mark as paid)
+            fetch("/api/save-report", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                reportId: reportData.reportId,
+                name: userData.name,
+                email: userData.email,
+                dateOfBirth: userData.dateOfBirth,
+                timeOfBirth: userData.timeOfBirth,
+                placeOfBirth: userData.placeOfBirth,
+                gender: userData.gender,
+                summary: reportData.summary,
+                sections: reportData.sections,
+                paymentId: response.razorpay_payment_id,
+                paymentStatus: "paid",
+              }),
+            }).catch(console.error);
+
             // Fire Meta Pixel Purchase event
             if (typeof window !== "undefined" && window.fbq) {
               window.fbq("track", "Purchase", {
