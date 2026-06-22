@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import ConstellationBackground from "./components/ConstellationBackground";
 
 export const metadata = {
   title: "BhavishAI - AI-Powered Vedic Astrology Reports | Janam Kundli Online",
@@ -108,7 +109,8 @@ export default function Home() {
       <main className="flex flex-col min-h-screen">
         {/* Hero Section */}
         <section className="relative pt-24 pb-20 md:pt-32 md:pb-28 overflow-hidden">
-          <div className="absolute inset-0 stars-bg opacity-30"></div>
+          {/* Constellation shader (high-end) or CSS stars (low-end) */}
+          <ConstellationBackground />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0a0f]/50 to-[#0a0a0f]"></div>
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
