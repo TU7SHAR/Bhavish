@@ -32,6 +32,7 @@ export default function GetReport() {
     placeOfBirth: "",
     gender: "male",
     email: "",
+    personalQuestion: "",
   });
 
   const handleChange = (e) => {
@@ -297,6 +298,26 @@ export default function GetReport() {
                 />
                 <p className="text-muted text-xs mt-1">
                   Optional. We&apos;ll email a backup copy of your report after purchase.
+                </p>
+              </div>
+
+              {/* Personal Question */}
+              <div>
+                <label htmlFor="personalQuestion" className="block text-sm font-medium text-foreground mb-2">
+                  What&apos;s your biggest life concern right now? (Optional)
+                </label>
+                <textarea
+                  id="personalQuestion"
+                  name="personalQuestion"
+                  rows={3}
+                  placeholder="e.g., Will my career improve in 2027? When will I get married? Should I start this business? Is going abroad in my destiny?"
+                  value={formData.personalQuestion}
+                  onChange={handleChange}
+                  maxLength={500}
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none"
+                />
+                <p className="text-muted text-xs mt-1">
+                  Optional. If provided, your report will include a dedicated section analyzing this specific concern using your birth chart.
                 </p>
               </div>
             </div>
