@@ -61,7 +61,7 @@ export default function GetReport() {
     }, 2000);
 
     try {
-      const res = await fetch("/api/generate-report", {
+      const res = await fetch("/api/generate-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -84,6 +84,7 @@ export default function GetReport() {
       sessionStorage.setItem("userData", JSON.stringify(formData));
 
       // Save report to DB as "unpaid" (captures email for future reference)
+      // Non-blocking — failure here must NOT break the flow
       fetch("/api/save-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,7 +97,7 @@ export default function GetReport() {
           placeOfBirth: formData.placeOfBirth,
           gender: formData.gender,
           summary: data.summary,
-          sections: data.sections,
+          sections: data.sections || data.previewSections || [],
           paymentStatus: "unpaid",
         }),
       }).catch(console.error);
