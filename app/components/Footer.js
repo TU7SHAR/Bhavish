@@ -46,7 +46,7 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} BhavishAI. All rights reserved.
           </p>
           <p className="text-muted text-xs">
-            For entertainment purposes. Consult professionals for major life decisions.
+            For guidance purposes. Consult qualified professionals for major life decisions.
           </p>
         </div>
       </div>
