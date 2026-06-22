@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 
 export default function ReportPreview() {
   const router = useRouter();

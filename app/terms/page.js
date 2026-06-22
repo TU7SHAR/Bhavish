@@ -33,7 +33,7 @@ export default function TermsOfService() {
 
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">3. Entertainment Disclaimer</h2>
-              <p className="font-medium text-accent">IMPORTANT: BhavishAI reports are provided for entertainment and informational purposes only.</p>
+              <p className="font-medium text-accent">IMPORTANT: BhavishAI reports are generated using precise astronomical calculations (Swiss Ephemeris) combined with classical Vedic astrology principles.</p>
               <p className="mt-2">Our AI-generated astrology reports should NOT be used as a substitute for professional advice including but not limited to:</p>
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>Medical or health decisions</li>

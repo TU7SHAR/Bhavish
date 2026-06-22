@@ -5,7 +5,7 @@ import { geocodePlace } from "../../../lib/geocode.js";
 
 export async function POST(request) {
   try {
-    const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender } =
+    const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender, personalQuestion } =
       await request.json();
 
     // Validate inputs
@@ -114,6 +114,7 @@ The 20 sections:
 18. Lucky Factors — Numbers, colors, gems, days based on Lagna lord and Moon lord
 19. Monthly Predictions for 2026-2027 — Based on current Jupiter/Saturn/Rahu transit
 20. Life Purpose & Spiritual Path — 9th, 12th house + Atmakaraka
+${personalQuestion ? `\n21. PERSONAL CONCERN ANALYSIS — The user has asked: "${personalQuestion}". Identify which houses, planets, and transits are directly relevant to this question. Provide a focused 300-400 word analysis answering their concern using their specific chart data. Reference exact planetary positions, current Dasha period, and upcoming transits that affect this area. Be specific about timing. If the question relates to career, focus on 10th house/lord. If marriage, focus on 7th house/Venus/Navamsha. If education, 4th/5th house. If health, 6th/8th. If finance, 2nd/11th. Map the concern to the correct astrological domain and deliver a precise, personalized answer.` : ""}
 
 TONE: Warm, professional, use ${name}'s name, mix Hindi/Sanskrit terms with English explanations.
 Return ONLY valid JSON. No markdown. No code blocks.`;
@@ -157,7 +158,7 @@ Return ONLY valid JSON. No markdown. No code blocks.`;
       chartData, // Send calculated chart data to frontend
       kundliSVG, // Send SVG chart
       generatedAt: new Date().toISOString(),
-      birthDetails: { name, dateOfBirth, timeOfBirth, placeOfBirth, gender },
+      birthDetails: { name, dateOfBirth, timeOfBirth, placeOfBirth, gender, personalQuestion: personalQuestion || "" },
     });
   } catch (error) {
     console.error("Report generation error:", error);
