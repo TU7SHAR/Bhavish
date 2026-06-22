@@ -8,7 +8,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl">&#x2728;</span>
+              <span className="text-2xl">✨</span>
               <span className="text-xl font-bold gradient-text">BhavishAI</span>
             </div>
             <p className="text-muted text-sm max-w-md">

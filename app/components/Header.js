@@ -12,7 +12,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">&#x2728;</span>
+            <span className="text-2xl">✨</span>
             <span className="text-xl font-bold gradient-text">BhavishAI</span>
           </Link>
 

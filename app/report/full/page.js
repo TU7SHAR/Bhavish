@@ -55,7 +55,7 @@ export default function FullReport() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Success Banner */}
           <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6 mb-8 text-center">
-            <div className="text-3xl mb-2">&#x2705;</div>
+            <div className="text-3xl mb-2">✅</div>
             <h2 className="text-xl font-bold text-green-400 mb-1">Payment Successful!</h2>
             <p className="text-muted text-sm">
               Your complete report is ready below.
@@ -65,7 +65,7 @@ export default function FullReport() {
 
           {/* Report Header */}
           <div className="bg-surface border border-border rounded-2xl p-8 mb-8 text-center">
-            <div className="text-4xl mb-3">&#x2728;</div>
+            <div className="text-4xl mb-3">✨</div>
             <h1 className="text-3xl md:text-4xl font-bold mb-2">
               {userData.name}&apos;s Complete Vedic Astrology Report
             </h1>
@@ -134,13 +134,13 @@ export default function FullReport() {
                 onClick={() => window.print()}
                 className="bg-surface-light hover:bg-border text-foreground px-6 py-2 rounded-full text-sm font-medium transition-all border border-border"
               >
-                &#x1F5A8;&#xFE0F; Print Report
+                🖨️ Print Report
               </button>
               <a
                 href="mailto:?subject=Check out BhavishAI - AI Astrology&body=I just got my Vedic astrology report from BhavishAI. Check it out: https://bhavishai.in"
                 className="bg-surface-light hover:bg-border text-foreground px-6 py-2 rounded-full text-sm font-medium transition-all border border-border"
               >
-                &#x1F4E8; Share with Friends
+                📨 Share with Friends
               </a>
             </div>
           </div>
