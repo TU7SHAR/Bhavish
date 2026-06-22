@@ -17,7 +17,7 @@ export async function POST(request) {
     // Initialize inside handler (not at module level)
     // so it doesn't crash during build when env vars aren't available
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Generate the full report prompt
     const prompt = `You are an expert Vedic astrologer (Jyotishi) with 30 years of experience. Generate a detailed, personalized Vedic astrology report based on the following birth details:
