@@ -17,7 +17,7 @@ export async function POST(request) {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    const amount = parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "199") * 100; // Amount in paise
+    const amount = parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "299") * 100; // Amount in paise
 
     const order = await razorpay.orders.create({
       amount,
