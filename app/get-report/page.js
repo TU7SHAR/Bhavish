@@ -268,7 +268,7 @@ export default function GetReport() {
                   min="1920-01-01"
                   value={formData.dateOfBirth}
                   onChange={handleChange}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 h-12 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark] appearance-none"
                 />
               </div>
 
@@ -284,7 +284,7 @@ export default function GetReport() {
                   required
                   value={formData.timeOfBirth}
                   onChange={handleChange}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 h-12 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark] appearance-none"
                 />
                 <p className="text-muted text-xs mt-1">
                   Check your birth certificate for exact time. Even a few minutes matter!
