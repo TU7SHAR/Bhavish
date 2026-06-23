@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  metadataBase: new URL("https://bhavishai.in"),
+  metadataBase: new URL("https://www.bhavishai.in"),
   title: {
-    default: "BhavishAI - AI-Powered Vedic Astrology Reports",
+    default: "BhavishAI - AI-Powered Vedic Astrology Reports | Janam Kundli Online",
     template: "%s | BhavishAI",
   },
   description:
-    "Get your personalized 20-page Vedic astrology report in 60 seconds. AI-powered Janam Kundli, career predictions, marriage compatibility, and life guidance.",
+    "Get your personalized 20-page Vedic astrology report in 60 seconds. AI-powered Janam Kundli, career predictions, marriage compatibility, and life guidance based on Swiss Ephemeris calculations.",
   keywords: [
     "kundli",
     "janam kundli",
@@ -33,6 +33,14 @@ export const metadata = {
     "horoscope",
     "kundli online",
     "free kundli",
+    "kundli matching",
+    "career astrology",
+    "marriage prediction",
+    "AI kundli",
+    "vedic horoscope",
+    "janam patrika",
+    "dasha prediction",
+    "nakshatra analysis",
   ],
   authors: [{ name: "BhavishAI" }],
   creator: "BhavishAI",
@@ -49,20 +57,54 @@ export const metadata = {
     },
   },
   verification: {
-    // Add your verification codes here when ready
-    // google: "your-google-verification-code",
+    google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION || "",
+  },
+  alternates: {
+    canonical: "https://www.bhavishai.in",
+  },
+  openGraph: {
+    title: "BhavishAI - Your Future, Revealed by AI",
+    description: "Get a personalized 20-page Vedic astrology report in 60 seconds. Career, love, health & spiritual guidance based on Swiss Ephemeris calculations.",
+    url: "https://www.bhavishai.in",
+    siteName: "BhavishAI",
+    type: "website",
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BhavishAI - AI-Powered Vedic Astrology Reports",
+    description: "Your personalized 20-page birth chart report in 60 seconds. Career, love, health & spiritual guidance.",
   },
 };
 
 export default function RootLayout({ children }) {
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
 
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
     >
       <head>
+        {/* Google Analytics */}
+        {gaId && gaId !== "your_ga_id_here" && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${gaId}');
+              `}
+            </Script>
+          </>
+        )}
         {/* Meta Pixel Code */}
         {pixelId && pixelId !== "your_meta_pixel_id_here" && (
           <>
