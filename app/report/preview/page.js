@@ -105,7 +105,7 @@ export default function ReportPreview() {
               });
             }
 
-            // Send email in background (don't block redirect)
+            // Send email to customer in background
             if (userData.email) {
               fetch("/api/send-report-email", {
                 method: "POST",
@@ -119,6 +119,21 @@ export default function ReportPreview() {
                 }),
               }).catch(console.error);
             }
+
+            // Notify YOU (owner) about the sale
+            fetch("/api/notify-sale", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                reportId: reportData.reportId,
+                customerName: userData.name,
+                customerEmail: userData.email,
+                paymentId: response.razorpay_payment_id,
+                amount: process.env.NEXT_PUBLIC_REPORT_PRICE || "299",
+                placeOfBirth: userData.placeOfBirth,
+                dateOfBirth: userData.dateOfBirth,
+              }),
+            }).catch(console.error);
 
             router.push("/report/full");
           } else {
