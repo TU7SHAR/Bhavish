@@ -55,7 +55,7 @@ const faqSchema = {
       name: "How much does a full astrology report cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "A complete 20-page personalized Vedic astrology report costs just Rs 199. You get a free preview of the first page before purchasing the full report.",
+        text: "A complete 20-page personalized Vedic astrology report costs just Rs 299. You get a free preview of the first page before purchasing the full report.",
       },
     },
     {
@@ -85,7 +85,7 @@ const productSchema = {
   brand: { "@type": "Brand", name: "BhavishAI" },
   offers: {
     "@type": "Offer",
-    price: "199",
+    price: "299",
     priceCurrency: "INR",
     availability: "https://schema.org/InStock",
     url: "https://bhavishai.in/get-report",
@@ -196,7 +196,7 @@ export default function Home() {
                   step: "3",
                   icon: "📖",
                   title: "Read & Unlock",
-                  desc: "Preview the first page free. Pay just Rs 199 to unlock your complete life report instantly.",
+                  desc: "Preview the first page free. Pay just Rs 299 to unlock your complete life report instantly.",
                 },
               ].map((item) => (
                 <div
@@ -330,7 +330,7 @@ export default function Home() {
                 <p className="text-muted mb-6">20-page personalized Vedic astrology report</p>
                 
                 <div className="mb-6">
-                  <span className="text-5xl font-bold text-foreground">&#x20B9;199</span>
+                  <span className="text-5xl font-bold text-foreground">&#x20B9;299</span>
                   <span className="text-muted ml-2">one-time</span>
                 </div>
 
@@ -380,7 +380,7 @@ export default function Home() {
                 </div>
                 <div className="bg-surface border-2 border-primary rounded-xl p-4">
                   <p className="text-primary-light mb-1 font-medium">BhavishAI</p>
-                  <p className="text-foreground font-bold">&#x20B9;199</p>
+                  <p className="text-foreground font-bold">&#x20B9;299</p>
                   <p className="text-muted text-xs mt-1">Ready in 60 sec</p>
                 </div>
                 <div className="bg-surface border border-border rounded-xl p-4">
@@ -418,7 +418,7 @@ export default function Home() {
                 },
                 {
                   q: "Is the first page really free?",
-                  a: "Yes! You can generate your report and view the complete first page (Rashi & personality overview) absolutely free. No payment details required. You only pay Rs 199 if you want to unlock the remaining 19 pages.",
+                  a: "Yes! You can generate your report and view the complete first page (Rashi & personality overview) absolutely free. No payment details required. You only pay Rs 299 if you want to unlock the remaining 19 pages.",
                 },
                 {
                   q: "What payment methods are accepted?",

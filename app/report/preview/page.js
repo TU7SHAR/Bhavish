@@ -184,6 +184,16 @@ export default function ReportPreview() {
               }),
             }).catch(console.error);
 
+            // Fire Meta Pixel Purchase event
+            if (typeof window !== "undefined" && window.fbq) {
+              window.fbq("track", "Purchase", {
+                value: parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "299"),
+                currency: "INR",
+                content_type: "product",
+                content_ids: [reportData.reportId],
+              });
+            }
+
             // Send email in background (don't block redirect)
             if (userData.email) {
               fetch("/api/send-report-email", {
@@ -433,7 +443,7 @@ export default function ReportPreview() {
                     : "19 more sections including career, marriage, health, doshas, remedies, and 2026-2027 predictions."}
                 </p>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold">&#x20B9;199</span>
+                  <span className="text-4xl font-bold">&#x20B9;299</span>
                   <span className="text-muted ml-2">one-time</span>
                 </div>
                 <button
