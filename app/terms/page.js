@@ -47,7 +47,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">4. Payment & Pricing</h2>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>The complete report is available for a one-time payment of ₹199 (or as displayed at the time of purchase)</li>
+                <li>The complete report is available for a one-time payment of ₹299 (or as displayed at the time of purchase)</li>
                 <li>Payments are processed securely through Razorpay</li>
                 <li>Prices may change without prior notice for future purchases</li>
                 <li>All prices are inclusive of applicable taxes</li>

@@ -108,6 +108,7 @@ export default function GetReport() {
       localStorage.setItem("userData_backup", JSON.stringify(formData));
 
       // Save report to DB as "unpaid" (captures email for future reference)
+      // Non-blocking — failure here must NOT break the flow
       fetch("/api/save-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,7 +121,7 @@ export default function GetReport() {
           placeOfBirth: formData.placeOfBirth,
           gender: formData.gender,
           summary: data.summary,
-          sections: data.sections,
+          sections: data.sections || data.previewSections || [],
           paymentStatus: "unpaid",
         }),
       }).catch(console.error);
