@@ -94,6 +94,8 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
