@@ -15,8 +15,13 @@ export default function ReportPreview() {
   const [paymentLoading, setPaymentLoading] = useState(false);
 
   useEffect(() => {
-    const storedReport = sessionStorage.getItem("reportData");
-    const storedUser = sessionStorage.getItem("userData");
+    // Try sessionStorage first, then localStorage backup
+    let storedReport = sessionStorage.getItem("reportData");
+    let storedUser = sessionStorage.getItem("userData");
+
+    // Fallback to localStorage if sessionStorage is empty (page refresh)
+    if (!storedReport) storedReport = localStorage.getItem("reportData_backup");
+    if (!storedUser) storedUser = localStorage.getItem("userData_backup");
 
     if (!storedReport || !storedUser) {
       router.push("/get-report");
@@ -29,6 +34,8 @@ export default function ReportPreview() {
   }, [router]);
 
   const handlePayment = async () => {
+    // Double-click protection
+    if (paymentLoading) return;
     setPaymentLoading(true);
 
     try {
@@ -74,6 +81,7 @@ export default function ReportPreview() {
           if (verifyData.success) {
             // Mark as paid in session
             sessionStorage.setItem("paymentVerified", "true");
+            localStorage.setItem("paymentVerified_backup", "true");
             sessionStorage.setItem("paymentId", response.razorpay_payment_id);
 
             // Save report to database (mark as paid)

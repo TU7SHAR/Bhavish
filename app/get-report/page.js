@@ -41,6 +41,27 @@ export default function GetReport() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Double-click protection
+    if (loading) return;
+    
+    // Input sanitization — strip HTML tags
+    const sanitize = (str) => str.replace(/<[^>]*>/g, "").trim();
+    const cleanData = {
+      ...formData,
+      name: sanitize(formData.name),
+      placeOfBirth: sanitize(formData.placeOfBirth),
+      personalQuestion: sanitize(formData.personalQuestion || ""),
+    };
+
+    // Validate date is not in future and not too old
+    const dob = new Date(cleanData.dateOfBirth);
+    const now = new Date();
+    if (dob > now || dob.getFullYear() < 1920) {
+      setError("Please enter a valid date of birth.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setLoadingProgress(0);
@@ -80,9 +101,11 @@ export default function GetReport() {
       setLoadingProgress(100);
       setLoadingMsg("Report ready! Redirecting...");
 
-      // Store report data in sessionStorage and redirect to preview
+      // Store report data in sessionStorage AND localStorage (backup)
       sessionStorage.setItem("reportData", JSON.stringify(data));
       sessionStorage.setItem("userData", JSON.stringify(formData));
+      localStorage.setItem("reportData_backup", JSON.stringify(data));
+      localStorage.setItem("userData_backup", JSON.stringify(formData));
 
       // Save report to DB as "unpaid" (captures email for future reference)
       fetch("/api/save-report", {
@@ -240,9 +263,11 @@ export default function GetReport() {
                   id="dateOfBirth"
                   name="dateOfBirth"
                   required
+                  max={new Date().toISOString().split("T")[0]}
+                  min="1920-01-01"
                   value={formData.dateOfBirth}
                   onChange={handleChange}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
                 />
               </div>
 
@@ -258,7 +283,7 @@ export default function GetReport() {
                   required
                   value={formData.timeOfBirth}
                   onChange={handleChange}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
                 />
                 <p className="text-muted text-xs mt-1">
                   Check your birth certificate for exact time. Even a few minutes matter!

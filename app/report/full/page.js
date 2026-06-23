@@ -13,9 +13,13 @@ export default function FullReport() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedReport = sessionStorage.getItem("reportData");
-    const storedUser = sessionStorage.getItem("userData");
-    const paymentVerified = sessionStorage.getItem("paymentVerified");
+    // Try sessionStorage first, then localStorage backup
+    let storedReport = sessionStorage.getItem("reportData");
+    let storedUser = sessionStorage.getItem("userData");
+    const paymentVerified = sessionStorage.getItem("paymentVerified") || localStorage.getItem("paymentVerified_backup");
+
+    if (!storedReport) storedReport = localStorage.getItem("reportData_backup");
+    if (!storedUser) storedUser = localStorage.getItem("userData_backup");
 
     if (!storedReport || !storedUser) {
       router.push("/get-report");
