@@ -1,7 +1,23 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { calculateBirthChart, generateKundliSVG } from "../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../lib/geocode.js";
+
+// Allow up to 30 seconds for preview generation on Vercel
+export const maxDuration = 30;
+
+// Fix #6: Input validation with Zod
+const inputSchema = z.object({
+  name: z.string().min(2).max(100).trim(),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  timeOfBirth: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  placeOfBirth: z.string().min(2).max(200).trim(),
+  gender: z.enum(["male", "female", "other"]),
+  email: z.string().email().optional().or(z.literal("")),
+});
 
 export async function POST(request) {
   try {
