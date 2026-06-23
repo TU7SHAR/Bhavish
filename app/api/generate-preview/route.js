@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  calculateBirthChart,
-  generateKundliSVG,
-} from "../../../lib/vedic-calculator.js";
+import { calculateBirthChart, generateKundliSVG } from "../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../lib/geocode.js";
+
+// Allow up to 30 seconds for preview generation on Vercel
+export const maxDuration = 30;
 
 // Fix #6: Input validation with Zod
 const inputSchema = z.object({

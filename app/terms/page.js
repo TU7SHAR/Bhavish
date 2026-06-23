@@ -93,7 +93,7 @@ export default function TermsOfService() {
 
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">10. Governing Law</h2>
-              <p>These Terms are governed by the laws of India. Any disputes shall be resolved in the courts of [Your City], India.</p>
+              <p>These Terms are governed by the laws of India. Any disputes shall be resolved in the courts of Chandigarh, India.</p>
             </section>
 
             <section>

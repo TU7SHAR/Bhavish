@@ -1,5 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+
+// Fix #1: Allow up to 60 seconds for full report generation on Vercel
+export const maxDuration = 60;
 import { z } from "zod";
 
 // Fix #2: This is PHASE 2 — only called AFTER payment is verified
