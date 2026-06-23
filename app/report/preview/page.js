@@ -7,6 +7,52 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 
+const previewLoadingMessages = [
+  "Aligning Swiss Ephemeris data...",
+  "Calculating D1 and Navamsha charts...",
+  "Mapping planetary house placements...",
+  "Analyzing planetary transits for 2024-2026...",
+  "Cross-referencing Vimshottari Dasha periods...",
+  "Extracting timeline for your personal query...",
+  "Rendering your birth chart visualization...",
+];
+
+function LoadingState() {
+  const [msgIndex, setMsgIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % previewLoadingMessages.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <>
+      <Header />
+      <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-6">
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-[spin_3s_linear_infinite]">
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-primary rounded-full"></div>
+            </div>
+            <div className="absolute inset-4 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-2xl">🔮</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">Preparing Your Report</h3>
+          <div className="bg-surface border border-border rounded-xl p-4 min-h-[50px] flex items-center justify-center">
+            <p className="text-primary-light text-sm animate-pulse">
+              {previewLoadingMessages[msgIndex]}
+            </p>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
 export default function ReportPreview() {
   const router = useRouter();
   const [reportData, setReportData] = useState(null);
@@ -72,11 +118,54 @@ export default function ReportPreview() {
           const verifyData = await verifyRes.json();
 
           if (verifyData.success) {
-            // Mark as paid in session
+            // Fire Meta Pixel Purchase event
+            if (typeof window !== "undefined" && window.fbq) {
+              window.fbq("track", "Purchase", {
+                value: parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "199"),
+                currency: "INR",
+                content_type: "product",
+                content_ids: [reportData.reportId],
+              });
+            }
+
+            // PHASE 2: Now generate the FULL 20-section report (only after payment)
+            setPaymentLoading(true);
+            let fullData = null;
+            try {
+              const fullRes = await fetch("/api/generate-full-report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  reportId: reportData.reportId,
+                  name: userData.name,
+                  gender: userData.gender,
+                  dateOfBirth: userData.dateOfBirth,
+                  timeOfBirth: userData.timeOfBirth,
+                  placeOfBirth: userData.placeOfBirth,
+                  chartData: reportData.chartData,
+                  personalQuestion: userData.personalQuestion || "",
+                }),
+              });
+              fullData = await fullRes.json();
+            } catch (e) {
+              console.error("Full report generation failed:", e);
+            }
+
+            // Use full report if generated, otherwise fall back to preview sections
+            const finalSections = (fullData && fullData.sections) ? fullData.sections : reportData.sections;
+            const finalSummary = (fullData && fullData.summary) ? fullData.summary : reportData.summary;
+
+            // Build the full report object and store it
+            const fullReport = {
+              ...reportData,
+              sections: finalSections,
+              summary: finalSummary,
+            };
+            sessionStorage.setItem("reportData", JSON.stringify(fullReport));
             sessionStorage.setItem("paymentVerified", "true");
             sessionStorage.setItem("paymentId", response.razorpay_payment_id);
 
-            // Save report to database (mark as paid)
+            // Save full report to database (mark as paid)
             fetch("/api/save-report", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -88,8 +177,8 @@ export default function ReportPreview() {
                 timeOfBirth: userData.timeOfBirth,
                 placeOfBirth: userData.placeOfBirth,
                 gender: userData.gender,
-                summary: reportData.summary,
-                sections: reportData.sections,
+                summary: finalSummary,
+                sections: finalSections,
                 paymentId: response.razorpay_payment_id,
                 paymentStatus: "paid",
               }),
@@ -114,8 +203,8 @@ export default function ReportPreview() {
                   email: userData.email,
                   name: userData.name,
                   reportId: reportData.reportId,
-                  sections: reportData.sections,
-                  summary: reportData.summary,
+                  sections: finalSections,
+                  summary: finalSummary,
                 }),
               }).catch(console.error);
             }
@@ -173,23 +262,35 @@ export default function ReportPreview() {
 
   if (loading) {
     return (
+      <LoadingState />
+    );
+  }
+
+  if (!reportData) return null;
+
+  const allSections = reportData.sections || reportData.previewSections || [];
+  const firstSection = allSections[0];
+  const lockedSections = allSections.slice(1);
+
+  // Guard: if no sections generated, show error state
+  if (!firstSection) {
+    return (
       <>
         <Header />
         <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted">Loading your report...</p>
+          <div className="text-center max-w-md mx-auto px-6">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold mb-2">Report Generation Issue</h2>
+            <p className="text-muted mb-6">Something went wrong generating your report. Please try again.</p>
+            <a href="/get-report" className="inline-block bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-full font-medium transition-all">
+              Try Again
+            </a>
           </div>
         </main>
         <Footer />
       </>
     );
   }
-
-  if (!reportData) return null;
-  const firstSection = (reportData.previewSections || reportData.sections)?.[0];
-  const lockedSections =
-    (reportData.sections || reportData.previewSections)?.slice(1) || [];
 
   return (
     <>
@@ -369,7 +470,7 @@ export default function ReportPreview() {
               Your Full Report Includes:
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {reportData.sections.map((section, i) => (
+              {allSections.map((section, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
                   {i === 0 ? (
                     <svg
