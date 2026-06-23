@@ -7,6 +7,52 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 
+const previewLoadingMessages = [
+  "Aligning Swiss Ephemeris data...",
+  "Calculating D1 and Navamsha charts...",
+  "Mapping planetary house placements...",
+  "Analyzing planetary transits for 2024-2026...",
+  "Cross-referencing Vimshottari Dasha periods...",
+  "Extracting timeline for your personal query...",
+  "Rendering your birth chart visualization...",
+];
+
+function LoadingState() {
+  const [msgIndex, setMsgIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % previewLoadingMessages.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <>
+      <Header />
+      <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-6">
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-[spin_3s_linear_infinite]">
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-primary rounded-full"></div>
+            </div>
+            <div className="absolute inset-4 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-2xl">🔮</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">Preparing Your Report</h3>
+          <div className="bg-surface border border-border rounded-xl p-4 min-h-[50px] flex items-center justify-center">
+            <p className="text-primary-light text-sm animate-pulse">
+              {previewLoadingMessages[msgIndex]}
+            </p>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
 export default function ReportPreview() {
   const router = useRouter();
   const [reportData, setReportData] = useState(null);
@@ -206,16 +252,7 @@ export default function ReportPreview() {
 
   if (loading) {
     return (
-      <>
-        <Header />
-        <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted">Loading your report...</p>
-          </div>
-        </main>
-        <Footer />
-      </>
+      <LoadingState />
     );
   }
 
