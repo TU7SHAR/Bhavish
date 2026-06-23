@@ -96,6 +96,8 @@ export default function RootLayout({ children }) {
         <Analytics />
         <SpeedInsights />
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
