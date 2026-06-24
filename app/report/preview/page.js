@@ -78,12 +78,37 @@ export default function ReportPreview() {
     setReportData(JSON.parse(storedReport));
     setUserData(JSON.parse(storedUser));
     setLoading(false);
+
+    // 🔥 TRACKING: Preview page viewed (report generated successfully)
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "ViewContent", { content_name: "preview_generated", content_category: "report" });
+    }
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "view_item", { event_category: "funnel", event_label: "preview_generated" });
+    }
   }, [router]);
 
   const handlePayment = async () => {
     // Double-click protection
     if (paymentLoading) return;
     setPaymentLoading(true);
+
+    // 🔥 TRACKING: InitiateCheckout — user clicked Pay
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "InitiateCheckout", {
+        value: includeBump ? 448 : 299,
+        currency: "INR",
+        content_ids: [reportData.reportId],
+        content_type: "product",
+      });
+    }
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "begin_checkout", {
+        value: includeBump ? 448 : 299,
+        currency: "INR",
+        items: [{ item_name: "vedic_report", price: includeBump ? 448 : 299 }],
+      });
+    }
 
     try {
       // Create Razorpay order
@@ -136,10 +161,18 @@ export default function ReportPreview() {
             // Fire Meta Pixel Purchase event
             if (typeof window !== "undefined" && window.fbq) {
               window.fbq("track", "Purchase", {
-                value: parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "199"),
+                value: includeBump ? 448 : 299,
                 currency: "INR",
                 content_type: "product",
                 content_ids: [reportData.reportId],
+              });
+            }
+            if (typeof window !== "undefined" && window.gtag) {
+              window.gtag("event", "purchase", {
+                value: includeBump ? 448 : 299,
+                currency: "INR",
+                transaction_id: response.razorpay_payment_id,
+                items: [{ item_name: "vedic_report", price: 299 }, ...(includeBump ? [{ item_name: "12_month_guidance", price: 149 }] : [])],
               });
             }
 
@@ -199,16 +232,6 @@ export default function ReportPreview() {
                 paymentStatus: "paid",
               }),
             }).catch(console.error);
-
-            // Fire Meta Pixel Purchase event
-            if (typeof window !== "undefined" && window.fbq) {
-              window.fbq("track", "Purchase", {
-                value: parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "299"),
-                currency: "INR",
-                content_type: "product",
-                content_ids: [reportData.reportId],
-              });
-            }
 
             // Send email to customer in background
             if (userData.email) {
