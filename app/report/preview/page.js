@@ -234,9 +234,10 @@ export default function ReportPreview() {
                 customerName: userData.name,
                 customerEmail: userData.email,
                 paymentId: response.razorpay_payment_id,
-                amount: process.env.NEXT_PUBLIC_REPORT_PRICE || "299",
+                amount: includeBump ? "448" : "299",
                 placeOfBirth: userData.placeOfBirth,
                 dateOfBirth: userData.dateOfBirth,
+                includeBump,
               }),
             }).catch(console.error);
 
