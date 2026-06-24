@@ -1,3 +1,4 @@
+import { generateWithRetry } from "../../../lib/gemini-retry.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
@@ -97,7 +98,7 @@ Sections:
 
 Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
 
-    const result = await model.generateContent(fullPrompt);
+    const result = await generateWithRetry(model, fullPrompt);
     const responseText = result.response.text();
 
     let reportData;
