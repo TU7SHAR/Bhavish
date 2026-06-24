@@ -78,12 +78,37 @@ export default function ReportPreview() {
     setReportData(JSON.parse(storedReport));
     setUserData(JSON.parse(storedUser));
     setLoading(false);
+
+    // 🔥 TRACKING: Preview page viewed (report generated successfully)
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "ViewContent", { content_name: "preview_generated", content_category: "report" });
+    }
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "view_item", { event_category: "funnel", event_label: "preview_generated" });
+    }
   }, [router]);
 
   const handlePayment = async () => {
     // Double-click protection
     if (paymentLoading) return;
     setPaymentLoading(true);
+
+    // 🔥 TRACKING: InitiateCheckout — user clicked Pay
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "InitiateCheckout", {
+        value: includeBump ? 448 : 299,
+        currency: "INR",
+        content_ids: [reportData.reportId],
+        content_type: "product",
+      });
+    }
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "begin_checkout", {
+        value: includeBump ? 448 : 299,
+        currency: "INR",
+        items: [{ item_name: "vedic_report", price: includeBump ? 448 : 299 }],
+      });
+    }
 
     try {
       // Create Razorpay order
