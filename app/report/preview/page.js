@@ -59,6 +59,7 @@ export default function ReportPreview() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [includeBump, setIncludeBump] = useState(false);
 
   useEffect(() => {
     // Try sessionStorage first, then localStorage backup
@@ -93,6 +94,7 @@ export default function ReportPreview() {
           reportId: reportData.reportId,
           email: userData.email,
           name: userData.name,
+          includeBump,
         }),
       });
 
@@ -119,6 +121,12 @@ export default function ReportPreview() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
+              reportId: reportData.reportId,
+              birthDetails: userData,
+              chartData: reportData.chartData,
+              previewSections: reportData.sections,
+              summary: reportData.summary,
+              includeBump,
             }),
           });
 
@@ -232,7 +240,10 @@ export default function ReportPreview() {
               }),
             }).catch(console.error);
 
-            router.push("/report/full");
+            // Redirect to founder upgrade page (post-purchase upsell)
+            // Store reportId so the upgrade page knows which report
+            sessionStorage.setItem("upgradeReportId", reportData.reportId);
+            router.push("/founder-upgrade");
           } else {
             alert("Payment verification failed. Please contact support.");
           }
@@ -465,10 +476,28 @@ export default function ReportPreview() {
                     ? `Get the full analysis of "${userData.personalQuestion.substring(0, 60)}${userData.personalQuestion.length > 60 ? "..." : ""}" plus 19 more sections including career, marriage, health, and remedies.`
                     : "19 more sections including career, marriage, health, doshas, remedies, and 2026-2027 predictions."}
                 </p>
-                <div className="mb-6">
+                <div className="mb-4">
                   <span className="text-4xl font-bold">&#x20B9;299</span>
                   <span className="text-muted ml-2">one-time</span>
                 </div>
+
+                {/* Order Bump — 12-Month Guidance Add-on */}
+                <label className="flex items-start gap-3 bg-accent/10 border border-accent/40 rounded-xl p-4 mb-5 cursor-pointer text-left hover:bg-accent/15 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={includeBump}
+                    onChange={(e) => setIncludeBump(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 accent-accent shrink-0"
+                  />
+                  <span className="text-sm">
+                    <span className="font-bold text-accent">⭐ Add 12 Months of Personal Guidance</span>
+                    <br />
+                    <span className="text-muted">Get monthly personalized insights for the next 12 months. </span>
+                    <span className="text-muted line-through">₹999</span>{" "}
+                    <span className="text-foreground font-semibold">Today only ₹149</span>
+                  </span>
+                </label>
+
                 <button
                   onClick={handlePayment}
                   disabled={paymentLoading}
@@ -476,7 +505,7 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? "Processing..."
-                    : "Unlock Full Report \u2192"}
+                    : `Unlock Full Report — ₹${includeBump ? "448" : "299"} \u2192`}
                 </button>
                 <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
                   <span>🔒 Secure UPI/Card</span>

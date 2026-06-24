@@ -1,13 +1,12 @@
 import Razorpay from "razorpay";
 import { NextResponse } from "next/server";
 
-// Server-side prices — NEVER trust frontend amount
-const PRICE_BASE = parseInt(process.env.NEXT_PUBLIC_PRICE_BASE || "299");
-const PRICE_BUMP = parseInt(process.env.NEXT_PUBLIC_PRICE_BUMP || "149");
+// Dedicated endpoint for the ₹999 lifetime founder upgrade
+const PRICE_UPGRADE = parseInt(process.env.NEXT_PUBLIC_PRICE_UPGRADE || "999");
 
 export async function POST(request) {
   try {
-    const { reportId, email, name, includeBump } = await request.json();
+    const { reportId, email, name } = await request.json();
 
     if (!reportId) {
       return NextResponse.json(
@@ -21,19 +20,17 @@ export async function POST(request) {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    // SERVER decides the price — frontend cannot manipulate this
-    const totalPrice = includeBump ? PRICE_BASE + PRICE_BUMP : PRICE_BASE;
-    const amount = totalPrice * 100; // paise
+    const amount = PRICE_UPGRADE * 100; // paise — server-controlled
 
     const order = await razorpay.orders.create({
       amount,
       currency: "INR",
-      receipt: reportId,
+      receipt: `UPG-${reportId}`,
       notes: {
         reportId,
         customerEmail: email || "",
         customerName: name || "",
-        has_12_month_guidance: includeBump ? "true" : "false",
+        is_founder_upgrade: "true",
       },
     });
 
@@ -42,13 +39,11 @@ export async function POST(request) {
       amount: order.amount,
       currency: order.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
-      includeBump: !!includeBump,
-      totalPrice,
     });
   } catch (error) {
-    console.error("Order creation error:", error);
+    console.error("Upgrade order creation error:", error);
     return NextResponse.json(
-      { error: "Failed to create payment order. Please try again." },
+      { error: "Failed to create upgrade order. Please try again." },
       { status: 500 }
     );
   }
