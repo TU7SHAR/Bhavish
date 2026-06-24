@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 // Fix #2: Save payment status to database on successful verification
 export async function POST(request) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, reportId, birthDetails, chartData, previewSections, summary } =
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, reportId, birthDetails, chartData, previewSections, summary, includeBump } =
       await request.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -50,6 +50,11 @@ export async function POST(request) {
 
       const { data: { user } } = await supabase.auth.getUser();
 
+      // If 12-month guidance was purchased, set start + end dates
+      const now = new Date();
+      const guidanceEnd = new Date(now);
+      guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
+
       // Upsert report with paid status
       await supabase.from("reports").upsert(
         {
@@ -65,6 +70,9 @@ export async function POST(request) {
           sections: previewSections || [],
           payment_id: razorpay_payment_id,
           payment_status: "paid",
+          has_12_month_guidance: !!includeBump,
+          guidance_start_date: includeBump ? now.toISOString() : null,
+          guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,
         },
         { onConflict: "report_id" }
       );
