@@ -161,10 +161,18 @@ export default function ReportPreview() {
             // Fire Meta Pixel Purchase event
             if (typeof window !== "undefined" && window.fbq) {
               window.fbq("track", "Purchase", {
-                value: parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "199"),
+                value: includeBump ? 448 : 299,
                 currency: "INR",
                 content_type: "product",
                 content_ids: [reportData.reportId],
+              });
+            }
+            if (typeof window !== "undefined" && window.gtag) {
+              window.gtag("event", "purchase", {
+                value: includeBump ? 448 : 299,
+                currency: "INR",
+                transaction_id: response.razorpay_payment_id,
+                items: [{ item_name: "vedic_report", price: 299 }, ...(includeBump ? [{ item_name: "12_month_guidance", price: 149 }] : [])],
               });
             }
 
@@ -224,16 +232,6 @@ export default function ReportPreview() {
                 paymentStatus: "paid",
               }),
             }).catch(console.error);
-
-            // Fire Meta Pixel Purchase event
-            if (typeof window !== "undefined" && window.fbq) {
-              window.fbq("track", "Purchase", {
-                value: parseInt(process.env.NEXT_PUBLIC_REPORT_PRICE || "299"),
-                currency: "INR",
-                content_type: "product",
-                content_ids: [reportData.reportId],
-              });
-            }
 
             // Send email to customer in background
             if (userData.email) {

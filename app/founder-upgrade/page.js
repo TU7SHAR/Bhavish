@@ -81,6 +81,14 @@ export default function FounderUpgrade() {
                 content_ids: [reportId],
               });
             }
+            if (typeof window !== "undefined" && window.gtag) {
+              window.gtag("event", "purchase", {
+                value: parseInt(process.env.NEXT_PUBLIC_PRICE_UPGRADE || "999"),
+                currency: "INR",
+                transaction_id: response.razorpay_payment_id,
+                items: [{ item_name: "founder_upgrade", price: 999 }],
+              });
+            }
             // Notify owner of the upgrade sale
             fetch("/api/notify-sale", {
               method: "POST",
