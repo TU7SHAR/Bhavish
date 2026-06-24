@@ -1,3 +1,4 @@
+import { generateWithRetry } from "../../../lib/gemini-retry.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -83,7 +84,7 @@ Generate JSON:
 Use ${name}'s name. Mix Hindi/Sanskrit with English. Reference specific houses/degrees.
 Return ONLY valid JSON. No markdown.`;
 
-    const result = await model.generateContent(previewPrompt);
+    const result = await generateWithRetry(model, previewPrompt);
     const responseText = result.response.text();
 
     // Robust JSON parsing
