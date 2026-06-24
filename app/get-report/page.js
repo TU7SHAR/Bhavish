@@ -62,6 +62,14 @@ export default function GetReport() {
       return;
     }
 
+    // 🔥 TRACKING: Form submitted — user committed birth details
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "Lead", { content_name: "birth_details_submitted" });
+    }
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "generate_lead", { event_category: "funnel", event_label: "birth_details_submitted" });
+    }
+
     setLoading(true);
     setError("");
     setLoadingProgress(0);
