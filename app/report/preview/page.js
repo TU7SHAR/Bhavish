@@ -491,54 +491,42 @@ export default function ReportPreview() {
             {/* CTA Overlay */}
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
-                <div className="text-4xl mb-4">🔮</div>
-                <h3 className="text-2xl font-bold mb-6">
-                  Your Biggest Predictions Are Ready
+                <h3 className="text-xl font-bold mb-1">
+                  Your Personalized Analysis Is Ready
                 </h3>
+                <p className="text-muted text-xs mb-6">Generated using your exact birth chart and real planetary positions.</p>
 
-                {/* Locked Prediction Cards */}
+                {/* Curiosity-driven locked cards with blurred preview */}
                 <div className="text-left space-y-3 mb-6">
-                  {[
-                    { icon: "💼", title: "Career Breakthrough Timeline", desc: "The months most favorable for promotions, job switches and growth" },
-                    { icon: "💍", title: "Marriage & Relationship Window", desc: "Strongest periods for love, commitment and compatibility" },
-                    { icon: "💰", title: "Wealth & Money Cycles", desc: "When your chart indicates high earning potential and risky periods" },
-                    { icon: "🧠", title: "Hidden Strengths & Blind Spots", desc: "Personality patterns affecting your success without you realizing" },
-                    { icon: "🙏", title: "Personalized Remedies", desc: "Specific Vedic remedies based on your exact planetary placements" },
-                  ].map((card) => (
-                    <div key={card.title} className="flex items-start gap-3 bg-background/50 border border-border rounded-xl p-3">
-                      <span className="text-xl shrink-0">{card.icon}</span>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                          🔒 {card.title}
-                        </p>
-                        <p className="text-xs text-muted mt-0.5">{card.desc}</p>
-                      </div>
-                    </div>
-                  ))}
+                  <div className="bg-background/50 border border-border rounded-xl p-3">
+                    <p className="text-sm font-semibold text-foreground mb-1">🔒 A career pattern in your chart deserves attention.</p>
+                    <p className="text-xs text-muted italic">&ldquo;Your 10th house indicates that...&rdquo;</p>
+                    <div className="h-3 bg-gradient-to-r from-muted/20 to-transparent rounded mt-1"></div>
+                  </div>
+                  <div className="bg-background/50 border border-border rounded-xl p-3">
+                    <p className="text-sm font-semibold text-foreground mb-1">🔒 One relationship phase stands out.</p>
+                    <p className="text-xs text-muted italic">&ldquo;Venus and Moon together suggest...&rdquo;</p>
+                    <div className="h-3 bg-gradient-to-r from-muted/20 to-transparent rounded mt-1"></div>
+                  </div>
+                  <div className="bg-background/50 border border-border rounded-xl p-3">
+                    <p className="text-sm font-semibold text-foreground mb-1">🔒 Your strongest financial cycle has been identified.</p>
+                    <p className="text-xs text-muted italic">&ldquo;Jupiter&apos;s upcoming transit...&rdquo;</p>
+                    <div className="h-3 bg-gradient-to-r from-muted/20 to-transparent rounded mt-1"></div>
+                  </div>
                 </div>
 
+                {/* Price + value */}
                 <div className="mb-4">
                   <span className="text-4xl font-bold">&#x20B9;{includeBump ? "448" : "299"}</span>
-                  <span className="text-muted ml-2">one-time</span>
+                </div>
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted mb-4">
+                  <span>✓ Instant access</span>
+                  <span>✓ 20-page report</span>
+                  <span>✓ PDF download</span>
+                  <span>✓ Lifetime access</span>
                 </div>
 
-                {/* Order Bump — 12-Month Guidance Add-on */}
-                <label className="flex items-start gap-3 bg-accent/10 border border-accent/40 rounded-xl p-3 mb-4 cursor-pointer text-left hover:bg-accent/15 transition-all">
-                  <input
-                    type="checkbox"
-                    checked={includeBump}
-                    onChange={(e) => setIncludeBump(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 accent-accent shrink-0"
-                  />
-                  <span className="text-xs">
-                    <span className="font-bold text-accent">⭐ Add 12 Months of Personal Guidance</span>
-                    <br />
-                    <span className="text-muted">Monthly personalized insights. </span>
-                    <span className="text-muted line-through">₹999</span>{" "}
-                    <span className="text-foreground font-semibold">Today only ₹149</span>
-                  </span>
-                </label>
-
+                {/* Main CTA */}
                 <button
                   onClick={handlePayment}
                   disabled={paymentLoading}
@@ -546,16 +534,19 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? "Processing..."
-                    : `Reveal My 2026 Timeline — ₹${includeBump ? "448" : "299"} \u2192`}
+                    : `Unlock My Complete Report — ₹${includeBump ? "448" : "299"} \u2192`}
                 </button>
 
-                {/* Trust signals */}
-                <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
-                  <span>🔒 Secure UPI/Card</span>
-                  <span>⚡ Instant access</span>
-                  <span>📧 Email copy</span>
-                </div>
-                <p className="text-muted text-xs mt-3">✓ Swiss Ephemeris precision · ✓ Delivered instantly · ✓ Based on your exact birth coordinates</p>
+                {/* ₹149 add-on — minimal, below CTA */}
+                <label className="flex items-center gap-2 justify-center mt-4 cursor-pointer text-xs text-muted hover:text-foreground transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includeBump}
+                    onChange={(e) => setIncludeBump(e.target.checked)}
+                    className="w-4 h-4 accent-accent shrink-0"
+                  />
+                  <span>Add 12-month guidance <span className="line-through">₹999</span> <span className="text-accent font-medium">₹149</span></span>
+                </label>
               </div>
             </div>
           </div>
