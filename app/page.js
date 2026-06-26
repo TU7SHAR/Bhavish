@@ -215,6 +215,37 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Why BhavishAI — Credibility Section */}
+        <section className="py-16">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Why BhavishAI?
+              </h2>
+              <p className="text-muted text-lg">
+                Not another generic horoscope app. Here&apos;s what makes us different.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { icon: "🪐", title: "Swiss Ephemeris Calculations", desc: "Same astronomical engine used by NASA. Sub-arcminute planetary precision." },
+                { icon: "📍", title: "Exact Birth Coordinates", desc: "We geocode your birthplace to exact latitude/longitude for accurate house calculations." },
+                { icon: "🕉️", title: "Vedic Astrology System", desc: "Lahiri Ayanamsa, Whole Sign houses, Vimshottari Dasha — classical Jyotish methodology." },
+                { icon: "🎯", title: "Personalized to YOUR Chart", desc: "Every prediction references your specific planets, houses, and degrees. Not sun-sign-level." },
+                { icon: "📊", title: "Structured 20-Page Analysis", desc: "Career, marriage, health, doshas, remedies, timing — organized into actionable sections." },
+                { icon: "🚫", title: "Not a Generic AI Response", desc: "We calculate first, then interpret. The AI reads real data — it doesn't guess your chart." },
+              ].map((item) => (
+                <div key={item.title} className="bg-surface border border-border rounded-xl p-5 card-hover">
+                  <div className="text-2xl mb-2">{item.icon}</div>
+                  <h3 className="text-sm font-semibold text-foreground mb-1">{item.title}</h3>
+                  <p className="text-xs text-muted">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Features / What You Get */}
         <section id="features" className="py-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

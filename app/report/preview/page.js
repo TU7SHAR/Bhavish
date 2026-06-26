@@ -551,8 +551,28 @@ export default function ReportPreview() {
             </div>
           </div>
 
+          {/* Why BhavishAI — Trust Section */}
+          <div className="mt-8 bg-surface border border-border rounded-2xl p-6">
+            <h3 className="text-sm font-bold mb-4 text-primary-light text-center">Why BhavishAI is Different</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { icon: "🪐", text: "Swiss Ephemeris precision" },
+                { icon: "📍", text: "Exact birth coordinates" },
+                { icon: "🕉️", text: "Vedic astrology system" },
+                { icon: "🎯", text: "Personalized to YOUR chart" },
+                { icon: "📊", text: "20-page structured report" },
+                { icon: "🚫", text: "Not a generic AI response" },
+              ].map((item) => (
+                <div key={item.text} className="flex items-center gap-2 text-xs text-muted">
+                  <span>{item.icon}</span>
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* All 20 section titles */}
-          <div className="mt-12 bg-surface border border-border rounded-2xl p-6">
+          <div className="mt-6 bg-surface border border-border rounded-2xl p-6">
             <h3 className="text-lg font-bold mb-4">
               Your Full Report Includes:
             </h3>
