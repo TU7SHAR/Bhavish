@@ -132,7 +132,29 @@ export default function GetReport() {
           sections: data.sections || data.previewSections || [],
           paymentStatus: "unpaid",
         }),
-      }).catch(console.error);
+      })
+        .then(() => {
+          // OPTION B: After the lead row exists, pre-generate all 10 nurture
+          // emails in ONE Gemini call and store them as drafts. The cron later
+          // just reads + sends these (no AI at send time). Only worth doing
+          // when we actually captured an email. Fully non-blocking.
+          if (formData.email && formData.email.trim()) {
+            fetch("/api/generate-email-sequence", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                reportId: data.reportId,
+                name: formData.name,
+                summary: data.summary,
+                sections: data.sections || data.previewSections || [],
+                dateOfBirth: formData.dateOfBirth,
+                placeOfBirth: formData.placeOfBirth,
+                personalQuestion: formData.personalQuestion || "",
+              }),
+            }).catch(console.error);
+          }
+        })
+        .catch(console.error);
 
       // Small delay to show 100% before redirect
       setTimeout(() => {
