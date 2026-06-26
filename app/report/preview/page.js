@@ -491,32 +491,49 @@ export default function ReportPreview() {
             {/* CTA Overlay */}
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
-                <div className="text-4xl mb-4">🔒</div>
-                <h3 className="text-2xl font-bold mb-2">
-                  Unlock Your Complete Report
+                <div className="text-4xl mb-4">🔮</div>
+                <h3 className="text-2xl font-bold mb-6">
+                  Your Biggest Predictions Are Ready
                 </h3>
-                <p className="text-muted mb-6">
-                  {userData.personalQuestion
-                    ? `Get the full analysis of "${userData.personalQuestion.substring(0, 60)}${userData.personalQuestion.length > 60 ? "..." : ""}" plus 19 more sections including career, marriage, health, and remedies.`
-                    : "19 more sections including career, marriage, health, doshas, remedies, and 2026-2027 predictions."}
-                </p>
+
+                {/* Locked Prediction Cards */}
+                <div className="text-left space-y-3 mb-6">
+                  {[
+                    { icon: "💼", title: "Career Breakthrough Timeline", desc: "The months most favorable for promotions, job switches and growth" },
+                    { icon: "💍", title: "Marriage & Relationship Window", desc: "Strongest periods for love, commitment and compatibility" },
+                    { icon: "💰", title: "Wealth & Money Cycles", desc: "When your chart indicates high earning potential and risky periods" },
+                    { icon: "🧠", title: "Hidden Strengths & Blind Spots", desc: "Personality patterns affecting your success without you realizing" },
+                    { icon: "🙏", title: "Personalized Remedies", desc: "Specific Vedic remedies based on your exact planetary placements" },
+                  ].map((card) => (
+                    <div key={card.title} className="flex items-start gap-3 bg-background/50 border border-border rounded-xl p-3">
+                      <span className="text-xl shrink-0">{card.icon}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          🔒 {card.title}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">{card.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="mb-4">
-                  <span className="text-4xl font-bold">&#x20B9;299</span>
+                  <span className="text-4xl font-bold">&#x20B9;{includeBump ? "448" : "299"}</span>
                   <span className="text-muted ml-2">one-time</span>
                 </div>
 
                 {/* Order Bump — 12-Month Guidance Add-on */}
-                <label className="flex items-start gap-3 bg-accent/10 border border-accent/40 rounded-xl p-4 mb-5 cursor-pointer text-left hover:bg-accent/15 transition-all">
+                <label className="flex items-start gap-3 bg-accent/10 border border-accent/40 rounded-xl p-3 mb-4 cursor-pointer text-left hover:bg-accent/15 transition-all">
                   <input
                     type="checkbox"
                     checked={includeBump}
                     onChange={(e) => setIncludeBump(e.target.checked)}
                     className="w-5 h-5 mt-0.5 accent-accent shrink-0"
                   />
-                  <span className="text-sm">
+                  <span className="text-xs">
                     <span className="font-bold text-accent">⭐ Add 12 Months of Personal Guidance</span>
                     <br />
-                    <span className="text-muted">Get monthly personalized insights for the next 12 months. </span>
+                    <span className="text-muted">Monthly personalized insights. </span>
                     <span className="text-muted line-through">₹999</span>{" "}
                     <span className="text-foreground font-semibold">Today only ₹149</span>
                   </span>
@@ -529,13 +546,16 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? "Processing..."
-                    : `Unlock Full Report — ₹${includeBump ? "448" : "299"} \u2192`}
+                    : `Reveal My 2026 Timeline — ₹${includeBump ? "448" : "299"} \u2192`}
                 </button>
+
+                {/* Trust signals */}
                 <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
                   <span>🔒 Secure UPI/Card</span>
                   <span>⚡ Instant access</span>
                   <span>📧 Email copy</span>
                 </div>
+                <p className="text-muted text-xs mt-3">✓ Swiss Ephemeris precision · ✓ Delivered instantly · ✓ Based on your exact birth coordinates</p>
               </div>
             </div>
           </div>
