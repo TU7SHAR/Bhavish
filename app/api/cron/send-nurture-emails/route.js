@@ -34,6 +34,10 @@ const TOTAL_EMAILS = EMAIL_SCHEDULE_HOURS.length;
 const TIME_BUDGET_MS = 9000;
 const COOLDOWN_HOURS = 6; // never send two emails to the same lead within 6h
 
+// Resend free tier: 2 requests/second. 600ms gap keeps us safely under.
+const SEND_DELAY_MS = 600;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function buildHtml(lead, draft, emailNum) {
   const firstName = (lead.name || "there").split(" ")[0];
   const reportUrl = `https://www.bhavishai.in/get-report`;
@@ -207,6 +211,9 @@ export async function GET(request) {
 
         totalSent++;
         results.push({ email: lead.email, emailNum: newCount, subject });
+
+        // Respect Resend rate limit (2 req/sec)
+        await delay(SEND_DELAY_MS);
       } catch (leadError) {
         console.error(`Error processing lead ${lead.email}:`, leadError.message);
         continue;
