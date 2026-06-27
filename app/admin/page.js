@@ -794,6 +794,25 @@ function DetailCard({ person, expanded, onToggle }) {
             </div>
           )}
 
+          {/* Attribution / Source */}
+          {person.attribution && (
+            <div>
+              <SectionTitle>Attribution / Source</SectionTitle>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <InfoItem label="UTM Source" value={person.attribution.utm_source || "—"} />
+                <InfoItem label="UTM Medium" value={person.attribution.utm_medium || "—"} />
+                <InfoItem label="UTM Campaign" value={person.attribution.utm_campaign || "—"} />
+                <InfoItem label="UTM Content" value={person.attribution.utm_content || "—"} />
+                <InfoItem label="UTM Term" value={person.attribution.utm_term || "—"} />
+                <InfoItem label="Facebook Click ID" value={person.attribution.fbclid ? person.attribution.fbclid.substring(0, 20) + "..." : "—"} mono />
+                <InfoItem label="Google Click ID" value={person.attribution.gclid ? person.attribution.gclid.substring(0, 20) + "..." : "—"} mono />
+                <InfoItem label="Referrer" value={person.attribution.referrer || "Direct"} />
+                <InfoItem label="Landing Page" value={person.attribution.landing_page || "—"} />
+                <InfoItem label="Landed At" value={person.attribution.landed_at ? new Date(person.attribution.landed_at).toLocaleString("en-IN") : "—"} />
+              </div>
+            </div>
+          )}
+
           {/* Report Sections (first 3) */}
           {Array.isArray(person.sections) && person.sections.length > 0 && (
             <div>
