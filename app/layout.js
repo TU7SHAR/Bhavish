@@ -3,6 +3,8 @@ import "./globals.css";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Suspense } from "react";
+import AttributionCapture from "./components/AttributionCapture";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -135,6 +137,7 @@ export default function RootLayout({ children }) {
         )}
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <Suspense fallback={null}><AttributionCapture /></Suspense>
         <Analytics />
         <SpeedInsights />
         {children}

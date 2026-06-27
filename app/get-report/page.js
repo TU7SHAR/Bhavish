@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { getAttribution } from "../components/AttributionCapture";
 
 const loadingMessages = [
   "Mapping planetary positions at your birth time...",
@@ -131,6 +132,7 @@ export default function GetReport() {
           summary: data.summary,
           sections: data.sections || data.previewSections || [],
           paymentStatus: "unpaid",
+          attribution: getAttribution(),
         }),
       })
         .then(() => {

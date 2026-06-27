@@ -16,6 +16,7 @@ export async function POST(request) {
       sections,
       paymentId,
       paymentStatus,
+      attribution,
     } = await request.json();
 
     if (!reportId || !name || !sections) {
@@ -58,6 +59,7 @@ export async function POST(request) {
         sections,
         payment_id: paymentId || null,
         payment_status: paymentStatus || "unpaid",
+        attribution: attribution || null,
       },
       { onConflict: "report_id" }
     );
