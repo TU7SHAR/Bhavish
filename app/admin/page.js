@@ -659,11 +659,11 @@ function ActionsTab({ runAction, actionResult, actionLoading }) {
         />
         <ActionCard
           title="📩 Send to Fresh Leads (0 emails)"
-          desc="Sends Email #1 to all leads who haven't received ANY email yet — even if they signed up less than 12h ago. Great for catching up."
-          btnLabel="Send First Email to All New Leads"
+          desc="Sends Email #1 ONLY to leads who haven't received ANY email yet. Won't touch anyone who already has emails going."
+          btnLabel="Send First Email to New Leads Only"
           color="blue"
           loading={actionLoading === "fresh"}
-          onClick={() => runAction("/api/manual-send-emails?force=true", "fresh")}
+          onClick={() => runAction("/api/manual-send-emails?fresh=true&force=true", "fresh")}
         />
       </div>
 
