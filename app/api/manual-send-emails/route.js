@@ -61,6 +61,7 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const forceMode = searchParams.get("force") === "true";
+  const freshOnly = searchParams.get("fresh") === "true";
   const filterEmail = searchParams.get("email");
 
   try {
@@ -85,6 +86,11 @@ export async function GET(request) {
 
     if (filterEmail) {
       query = query.eq("email", filterEmail);
+    }
+
+    // Fresh mode: ONLY leads who haven't received any email yet
+    if (freshOnly) {
+      query = query.or("emails_sent_count.is.null,emails_sent_count.eq.0");
     }
 
     const { data: leads, error: fetchError } = await query;
@@ -174,7 +180,7 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      mode: forceMode ? "force" : "scheduled",
+      mode: forceMode ? "force" : freshOnly ? "fresh" : "scheduled",
       processed: leads.length,
       sent: totalSent,
       errors,
