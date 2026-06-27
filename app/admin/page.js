@@ -124,6 +124,8 @@ export default function AdminDashboard() {
   const tabs = [
     { id: "overview", label: "Overview", icon: "📊" },
     { id: "leads", label: "Leads", icon: "👥" },
+    { id: "paid-details", label: "Paid People", icon: "💎" },
+    { id: "all-details", label: "Everyone", icon: "🔍" },
     { id: "payments", label: "Payments", icon: "💰" },
     { id: "emails", label: "Emails", icon: "📧" },
     { id: "actions", label: "Actions", icon: "⚡" },
@@ -194,6 +196,8 @@ export default function AdminDashboard() {
           <>
             {tab === "overview" && <OverviewTab data={data.overview} />}
             {tab === "leads" && <LeadsTab leads={data.leads} />}
+            {tab === "paid-details" && <PaidDetailsTab paid={data.paid} />}
+            {tab === "all-details" && <AllDetailsTab all={data.all} />}
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
             {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} />}
@@ -664,6 +668,276 @@ function ActionsTab({ runAction, actionResult, actionLoading }) {
           </pre>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ---------- DETAIL CARD (shared expandable card for full person view) ----------
+function DetailCard({ person, expanded, onToggle }) {
+  const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
+  const drafts = Array.isArray(person.email_drafts) ? person.email_drafts : [];
+
+  return (
+    <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden transition-all">
+      {/* Header row — always visible */}
+      <button onClick={onToggle} className="w-full p-4 flex items-center justify-between gap-4 text-left hover:bg-white/5 transition-colors">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-sm font-bold shrink-0">
+            {(person.name || "?")[0].toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{person.name}</p>
+            <p className="text-gray-400 text-xs truncate">{person.email || "No email"}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+            person.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
+          }`}>{person.payment_status}</span>
+          {person.is_founder_member && <span className="px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">Founder</span>}
+          <span className="text-gray-500 text-lg">{expanded ? "▾" : "▸"}</span>
+        </div>
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="border-t border-white/10 p-4 space-y-5">
+          {/* Personal Info */}
+          <div>
+            <SectionTitle>Personal Info</SectionTitle>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <InfoItem label="Full Name" value={person.name} />
+              <InfoItem label="Email" value={person.email || "—"} />
+              <InfoItem label="Gender" value={person.gender || "—"} />
+              <InfoItem label="Date of Birth" value={person.date_of_birth || "—"} />
+              <InfoItem label="Time of Birth" value={person.time_of_birth || "—"} />
+              <InfoItem label="Place of Birth" value={person.place_of_birth || "—"} />
+              <InfoItem label="Report ID" value={person.report_id} mono />
+              <InfoItem label="User ID" value={person.user_id || "Guest"} mono />
+            </div>
+          </div>
+
+          {/* Payment Info */}
+          <div>
+            <SectionTitle>Payment & Revenue</SectionTitle>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <InfoItem label="Payment Status" value={person.payment_status} badge={person.payment_status === "paid" ? "green" : "amber"} />
+              <InfoItem label="Payment ID" value={person.payment_id || "—"} mono />
+              <InfoItem label="Founder Member" value={person.is_founder_member ? "Yes ₹999" : "No"} badge={person.is_founder_member ? "pink" : null} />
+              <InfoItem label="Founder Payment" value={person.founder_upgrade_payment_id || "—"} mono />
+              <InfoItem label="12-Mo Guidance" value={person.has_12_month_guidance ? "Yes ₹149" : "No"} badge={person.has_12_month_guidance ? "blue" : null} />
+              <InfoItem label="Guidance Start" value={person.guidance_start_date ? new Date(person.guidance_start_date).toLocaleDateString("en-IN") : "—"} />
+              <InfoItem label="Guidance End" value={person.guidance_end_date ? new Date(person.guidance_end_date).toLocaleDateString("en-IN") : "—"} />
+              <InfoItem label="Created At" value={person.created_at ? new Date(person.created_at).toLocaleString("en-IN") : "—"} />
+            </div>
+          </div>
+
+          {/* Email Sequence */}
+          <div>
+            <SectionTitle>Email Sequence</SectionTitle>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+              <InfoItem label="Emails Sent" value={`${person.emails_sent_count || 0} / 10`} />
+              <InfoItem label="Sequence Status" value={person.email_sequence_status || "pending"} />
+              <InfoItem label="Last Email Sent" value={person.last_email_sent_at ? new Date(person.last_email_sent_at).toLocaleString("en-IN") : "Never"} />
+              <InfoItem label="Opens" value={opens.length} />
+            </div>
+            {/* Visual progress */}
+            <div className="flex gap-1 mb-2">
+              {Array.from({ length: 10 }, (_, i) => {
+                const openNums = opens.map((o) => o.num);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <div className={`w-full h-6 rounded ${
+                      openNums.includes(i + 1) ? "bg-green-500" : i < (person.emails_sent_count || 0) ? "bg-amber-500/70" : "bg-white/10"
+                    }`} />
+                    <span className="text-[9px] text-gray-500">{i + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Opens detail */}
+            {opens.length > 0 && (
+              <div className="bg-black/30 rounded-xl p-3 text-xs">
+                <p className="text-gray-400 mb-1 font-medium">Open timestamps:</p>
+                {opens.map((o, i) => (
+                  <p key={i} className="text-gray-500">Email #{o.num} — {new Date(o.opened_at).toLocaleString("en-IN")}</p>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Email Drafts */}
+          {drafts.length > 0 && (
+            <div>
+              <SectionTitle>Email Drafts ({drafts.length})</SectionTitle>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {drafts.map((d, i) => (
+                  <div key={i} className="bg-black/30 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium">#{d.num || i + 1}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400">{d.psychology}</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-200">{d.subject}</p>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{d.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Report Summary */}
+          {person.summary && (
+            <div>
+              <SectionTitle>Report Summary</SectionTitle>
+              <p className="text-sm text-gray-300 bg-black/30 rounded-xl p-3">{person.summary}</p>
+            </div>
+          )}
+
+          {/* Report Sections (first 3) */}
+          {Array.isArray(person.sections) && person.sections.length > 0 && (
+            <div>
+              <SectionTitle>Report Sections ({person.sections.length} total)</SectionTitle>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {person.sections.slice(0, 5).map((s, i) => (
+                  <div key={i} className="bg-black/30 rounded-xl p-3">
+                    <p className="text-sm font-medium text-gray-200">{s.title}</p>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-3">{s.content}</p>
+                  </div>
+                ))}
+                {person.sections.length > 5 && (
+                  <p className="text-xs text-gray-500 italic">...and {person.sections.length - 5} more sections</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InfoItem({ label, value, mono, badge }) {
+  const badgeColors = {
+    green: "bg-green-500/20 text-green-400",
+    amber: "bg-amber-500/20 text-amber-400",
+    pink: "bg-pink-500/20 text-pink-400",
+    blue: "bg-blue-500/20 text-blue-400",
+  };
+  return (
+    <div>
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
+      {badge ? (
+        <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${badgeColors[badge]}`}>{value}</span>
+      ) : (
+        <p className={`text-sm mt-0.5 ${mono ? "font-mono text-gray-400 text-xs break-all" : "text-gray-200"}`}>{value}</p>
+      )}
+    </div>
+  );
+}
+
+
+// ---------- PAID PEOPLE (full detail) ----------
+function PaidDetailsTab({ paid }) {
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(null);
+
+  const filtered = useMemo(() => {
+    if (!paid) return [];
+    const q = search.toLowerCase();
+    return paid.filter((p) => {
+      return !q || (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.payment_id || "").includes(q);
+    });
+  }, [paid, search]);
+
+  if (!paid) return null;
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search paid customers..."
+            className="w-full bg-[#11111f] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+        <span className="text-xs text-gray-500">{filtered.length} paid customers</span>
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map((person) => (
+          <DetailCard
+            key={person.report_id}
+            person={person}
+            expanded={expanded === person.report_id}
+            onToggle={() => setExpanded(expanded === person.report_id ? null : person.report_id)}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center text-gray-500 py-12">No paid customers found.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- EVERYONE (full detail for every single lead) ----------
+function AllDetailsTab({ all }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+
+  const filtered = useMemo(() => {
+    if (!all) return [];
+    const q = search.toLowerCase();
+    return all.filter((p) => {
+      const matchesSearch = !q || (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.report_id || "").includes(q);
+      const matchesStatus =
+        status === "all" ? true :
+        status === "paid" ? p.payment_status === "paid" :
+        status === "unpaid" ? p.payment_status === "unpaid" :
+        status === "founder" ? p.is_founder_member :
+        status === "noemail" ? (!p.email || !p.email.trim()) : true;
+      return matchesSearch && matchesStatus;
+    });
+  }, [all, search, status]);
+
+  if (!all) return null;
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search anyone by name, email, or report ID..."
+            className="w-full bg-[#11111f] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+        <Pill active={status === "all"} onClick={() => setStatus("all")}>All</Pill>
+        <Pill active={status === "paid"} onClick={() => setStatus("paid")}>Paid</Pill>
+        <Pill active={status === "unpaid"} onClick={() => setStatus("unpaid")}>Unpaid</Pill>
+        <Pill active={status === "founder"} onClick={() => setStatus("founder")}>Founder</Pill>
+        <Pill active={status === "noemail"} onClick={() => setStatus("noemail")}>No email</Pill>
+        <span className="text-xs text-gray-500 ml-auto">{filtered.length} of {all.length}</span>
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map((person) => (
+          <DetailCard
+            key={person.report_id}
+            person={person}
+            expanded={expanded === person.report_id}
+            onToggle={() => setExpanded(expanded === person.report_id ? null : person.report_id)}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center text-gray-500 py-12">No one matches your filters.</div>
+        )}
+      </div>
     </div>
   );
 }

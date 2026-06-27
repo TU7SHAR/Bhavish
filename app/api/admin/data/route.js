@@ -112,6 +112,27 @@ export async function GET(request) {
       return NextResponse.json({ payments: payments || [] });
     }
 
+    if (tab === "paid-details") {
+      // EVERY column for paid customers — full report data, payment, upgrades, emails, everything
+      const { data: paid } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("payment_status", "paid")
+        .order("created_at", { ascending: false });
+
+      return NextResponse.json({ paid: paid || [] });
+    }
+
+    if (tab === "all-details") {
+      // EVERY column for EVERY single lead — the raw dump
+      const { data: all } = await supabase
+        .from("reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      return NextResponse.json({ all: all || [] });
+    }
+
     if (tab === "emails") {
       const { data: emails } = await supabase
         .from("reports")
