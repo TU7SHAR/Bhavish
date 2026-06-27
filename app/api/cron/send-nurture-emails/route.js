@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 
@@ -77,13 +78,39 @@ export async function GET(request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
+    // Email senders: Resend (primary) + Gmail (fallback)
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+
+    async function sendEmail({ to, subject, html }) {
+      // Try Resend first
+      try {
+        const { data, error } = await resend.emails.send({
+          from: `BhavishAI <${fromEmail}>`,
+          to: [to],
+          subject,
+          html,
+        });
+        if (error) throw new Error(error.message || "Resend failed");
+        return { provider: "resend", messageId: data?.id };
+      } catch (resendError) {
+        // Fall back to Gmail
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+          throw resendError;
+        }
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+        });
+        const info = await transporter.sendMail({
+          from: `BhavishAI <${process.env.GMAIL_USER}>`,
+          to,
+          subject,
+          html,
+        });
+        return { provider: "gmail", messageId: info.messageId };
+      }
+    }
 
     // Pull unpaid leads with an email and pre-generated drafts that haven't
     // finished the sequence. Oldest first so no lead gets starved.
@@ -160,8 +187,7 @@ export async function GET(request) {
 
         const subject = (draft.subject || "Your BhavishAI report").toString();
 
-        await transporter.sendMail({
-          from: `BhavishAI <${process.env.GMAIL_USER}>`,
+        await sendEmail({
           to: lead.email,
           subject,
           html: buildHtml(lead, draft),
@@ -188,8 +214,7 @@ export async function GET(request) {
     // Owner summary email (only when something actually went out).
     if (totalSent > 0 && process.env.GMAIL_USER) {
       try {
-        await transporter.sendMail({
-          from: `BhavishAI Cron <${process.env.GMAIL_USER}>`,
+        await sendEmail({
           to: process.env.GMAIL_USER,
           subject: `Nurture cron: sent ${totalSent} email(s)`,
           html: `<p>Sent ${totalSent}. Deferred to next run: ${skippedForTime}.</p><pre>${JSON.stringify(results, null, 2)}</pre>`,
