@@ -18,6 +18,10 @@ const EMAIL_SCHEDULE_HOURS = [
 ];
 const TOTAL_EMAILS = EMAIL_SCHEDULE_HOURS.length;
 
+// Resend free tier: 2 requests/second. 600ms gap keeps us safely under.
+const SEND_DELAY_MS = 600;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function buildHtml(lead, draft, emailNum) {
   const firstName = (lead.name || "there").split(" ")[0];
   const reportUrl = `https://www.bhavishai.in/get-report`;
@@ -144,6 +148,7 @@ export async function GET(request) {
 
         if (error) {
           errors.push({ email: lead.email, emailNum, error: error.message });
+          await delay(SEND_DELAY_MS);
           continue;
         }
 
@@ -159,6 +164,9 @@ export async function GET(request) {
 
         totalSent++;
         results.push({ email: lead.email, emailNum, subject, messageId: data?.id });
+
+        // Respect Resend rate limit (2 req/sec)
+        await delay(SEND_DELAY_MS);
       } catch (leadError) {
         errors.push({ email: lead.email, error: leadError.message });
       }
