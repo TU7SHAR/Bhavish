@@ -1,38 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 
+// Manual email send endpoint — NO time budget, NO cron involvement.
+// Sends ALL due nurture emails in one go via Resend.
+// 
+// GET /api/manual-send-emails
+// Header: Authorization: Bearer <CRON_SECRET>
+//
+// Optional query params:
+//   ?force=true      → ignore schedule, send next email for ALL leads
+//   ?email=x@y.com   → send only to this specific lead
 export const maxDuration = 60;
 
-// OPTION B: This cron does NOT call Gemini. The 10 nurture emails are
-// pre-generated (one Gemini call) when the user creates their preview and
-// stored in reports.email_drafts (JSONB). Here we just pick the next due
-// email and SEND it — fast enough to fit Vercel's function timeout.
-
-// When each email goes out (hours after the lead was created).
-// Index i => email number i+1. Must stay aligned with EMAIL_PLAN order
-// in /api/generate-email-sequence.
 const EMAIL_SCHEDULE_HOURS = [
-  12,   // 1 - unfinished_task (12h)
-  24,   // 2 - curiosity_gap (1d)
-  72,   // 3 - authority (3d)
-  120,  // 4 - personal_identity (5d)
-  168,  // 5 - future_self (7d)
-  240,  // 6 - social_proof (10d)
-  336,  // 7 - loss_aversion (14d)
-  504,  // 8 - hope (21d)
-  720,  // 9 - commitment (30d)
-  1080, // 10 - discount (45d)
+  12, 24, 72, 120, 168, 240, 336, 504, 720, 1080,
 ];
-
 const TOTAL_EMAILS = EMAIL_SCHEDULE_HOURS.length;
-
-// Stop sending before the function times out. Free tier kills at ~10s,
-// Pro respects maxDuration (60s). Leftover due emails are picked up on the
-// next cron run, so nothing is lost — it just spreads across runs.
-const TIME_BUDGET_MS = 9000;
-const COOLDOWN_HOURS = 6; // never send two emails to the same lead within 6h
 
 function buildHtml(lead, draft, emailNum) {
   const firstName = (lead.name || "there").split(" ")[0];
@@ -66,13 +50,14 @@ function buildHtml(lead, draft, emailNum) {
 }
 
 export async function GET(request) {
-  const startTime = Date.now();
-
-  // Optional cron secret protection
   const authHeader = request.headers.get("authorization");
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { searchParams } = new URL(request.url);
+  const forceMode = searchParams.get("force") === "true";
+  const filterEmail = searchParams.get("email");
 
   try {
     const supabase = createClient(
@@ -80,43 +65,11 @@ export async function GET(request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
-    // Email senders: Resend (primary) + Gmail (fallback)
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
-    async function sendEmail({ to, subject, html }) {
-      // Try Resend first
-      try {
-        const { data, error } = await resend.emails.send({
-          from: `BhavishAI <${fromEmail}>`,
-          to: [to],
-          subject,
-          html,
-        });
-        if (error) throw new Error(error.message || "Resend failed");
-        return { provider: "resend", messageId: data?.id };
-      } catch (resendError) {
-        // Fall back to Gmail
-        if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-          throw resendError;
-        }
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-        });
-        const info = await transporter.sendMail({
-          from: `BhavishAI <${process.env.GMAIL_USER}>`,
-          to,
-          subject,
-          html,
-        });
-        return { provider: "gmail", messageId: info.messageId };
-      }
-    }
-
-    // Pull unpaid leads with an email and pre-generated drafts that haven't
-    // finished the sequence. Oldest first so no lead gets starved.
-    const { data: leads, error: fetchError } = await supabase
+    // Build query
+    let query = supabase
       .from("reports")
       .select("report_id, name, email, created_at, emails_sent_count, last_email_sent_at, email_sequence_status, email_drafts")
       .eq("payment_status", "unpaid")
@@ -126,9 +79,14 @@ export async function GET(request) {
       .or("email_sequence_status.is.null,email_sequence_status.neq.completed")
       .order("created_at", { ascending: true });
 
+    if (filterEmail) {
+      query = query.eq("email", filterEmail);
+    }
+
+    const { data: leads, error: fetchError } = await query;
+
     if (fetchError) {
-      console.error("Failed to fetch leads:", fetchError);
-      return NextResponse.json({ error: "DB fetch failed" }, { status: 500 });
+      return NextResponse.json({ error: "DB fetch failed", details: fetchError.message }, { status: 500 });
     }
 
     if (!leads || leads.length === 0) {
@@ -137,23 +95,16 @@ export async function GET(request) {
 
     const now = new Date();
     let totalSent = 0;
-    let skippedForTime = 0;
     const results = [];
+    const errors = [];
 
     for (const lead of leads) {
-      // Time guard — stop before the function is killed; rest waits for next run.
-      if (Date.now() - startTime > TIME_BUDGET_MS) {
-        skippedForTime = leads.length - leads.indexOf(lead);
-        break;
-      }
-
       try {
         const drafts = Array.isArray(lead.email_drafts) ? lead.email_drafts : [];
         if (drafts.length === 0) continue;
 
         const emailsSent = lead.emails_sent_count || 0;
 
-        // Whole sequence done (or we have no more drafts) -> mark complete.
         if (emailsSent >= TOTAL_EMAILS || emailsSent >= drafts.length) {
           await supabase
             .from("reports")
@@ -162,21 +113,15 @@ export async function GET(request) {
           continue;
         }
 
-        // Is the next email due yet?
-        const dueAfterHours = EMAIL_SCHEDULE_HOURS[emailsSent];
-        const hoursSinceCreation = (now - new Date(lead.created_at)) / 3.6e6;
-        if (hoursSinceCreation < dueAfterHours) continue;
-
-        // Cooldown so a backlog doesn't fire several emails at once.
-        if (lead.last_email_sent_at) {
-          const hoursSinceLast = (now - new Date(lead.last_email_sent_at)) / 3.6e6;
-          if (hoursSinceLast < COOLDOWN_HOURS) continue;
+        // In normal mode, check schedule. In force mode, skip schedule check.
+        if (!forceMode) {
+          const dueAfterHours = EMAIL_SCHEDULE_HOURS[emailsSent];
+          const hoursSinceCreation = (now - new Date(lead.created_at)) / 3.6e6;
+          if (hoursSinceCreation < dueAfterHours) continue;
         }
 
         const draft = drafts[emailsSent];
         if (!draft || !draft.body) {
-          // Bad/empty draft — skip this slot but advance the counter so the
-          // sequence doesn't get permanently stuck on it.
           await supabase
             .from("reports")
             .update({
@@ -188,12 +133,19 @@ export async function GET(request) {
         }
 
         const subject = (draft.subject || "Your BhavishAI report").toString();
+        const emailNum = emailsSent + 1;
 
-        await sendEmail({
-          to: lead.email,
+        const { data, error } = await resend.emails.send({
+          from: `BhavishAI <${fromEmail}>`,
+          to: [lead.email],
           subject,
-          html: buildHtml(lead, draft, emailsSent + 1),
+          html: buildHtml(lead, draft, emailNum),
         });
+
+        if (error) {
+          errors.push({ email: lead.email, emailNum, error: error.message });
+          continue;
+        }
 
         const newCount = emailsSent + 1;
         await supabase
@@ -206,33 +158,22 @@ export async function GET(request) {
           .eq("report_id", lead.report_id);
 
         totalSent++;
-        results.push({ email: lead.email, emailNum: newCount, subject });
+        results.push({ email: lead.email, emailNum, subject, messageId: data?.id });
       } catch (leadError) {
-        console.error(`Error processing lead ${lead.email}:`, leadError.message);
-        continue;
+        errors.push({ email: lead.email, error: leadError.message });
       }
-    }
-
-    // Owner summary email (only when something actually went out).
-    if (totalSent > 0 && process.env.GMAIL_USER) {
-      try {
-        await sendEmail({
-          to: process.env.GMAIL_USER,
-          subject: `Nurture cron: sent ${totalSent} email(s)`,
-          html: `<p>Sent ${totalSent}. Deferred to next run: ${skippedForTime}.</p><pre>${JSON.stringify(results, null, 2)}</pre>`,
-        });
-      } catch {}
     }
 
     return NextResponse.json({
       success: true,
+      mode: forceMode ? "force" : "scheduled",
       processed: leads.length,
       sent: totalSent,
-      deferredToNextRun: skippedForTime,
+      errors,
       results,
     });
   } catch (error) {
-    console.error("Cron error:", error);
+    console.error("Manual send error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
