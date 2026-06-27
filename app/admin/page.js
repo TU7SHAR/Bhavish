@@ -196,8 +196,8 @@ export default function AdminDashboard() {
           <>
             {tab === "overview" && <OverviewTab data={data.overview} />}
             {tab === "leads" && <LeadsTab leads={data.leads} />}
-            {tab === "paid-details" && <PaidDetailsTab paid={data.paid} />}
-            {tab === "all-details" && <AllDetailsTab all={data.all} />}
+            {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
+            {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
             {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} />}
@@ -646,11 +646,57 @@ function ActionsTab({ runAction, actionResult, actionLoading }) {
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-amber-300 text-sm">
         ⚠️ These actions send real emails to real leads. Use Force Send carefully.
       </div>
+
+      <SectionTitle>Scheduled Sends</SectionTitle>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ActionCard title="📬 Send Due Emails" desc="Sends all emails currently due per the schedule. No time limit (unlike cron)." btnLabel="Send Scheduled" color="purple" loading={actionLoading === "send"} onClick={() => runAction("/api/manual-send-emails", "send")} />
-        <ActionCard title="🚀 Force Send Next" desc="Ignores schedule — sends the next email in sequence to ALL leads right now." btnLabel="Force Send All" color="red" loading={actionLoading === "force"} onClick={() => runAction("/api/manual-send-emails?force=true", "force")} />
-        <ActionCard title="⏰ Trigger Cron" desc="Runs the normal cron (with 9s time budget). Same as Vercel auto-trigger." btnLabel="Run Cron" color="blue" loading={actionLoading === "cron"} onClick={() => runAction("/api/cron/send-nurture-emails", "cron")} />
-        <ActionCard title="🔄 Backfill Drafts" desc="Generates email drafts for leads missing them. Processes 3 at a time." btnLabel="Backfill 3 Leads" color="green" loading={actionLoading === "backfill"} onClick={() => runAction("/api/backfill-email-drafts", "backfill")} />
+        <ActionCard
+          title="📬 Send All Due Emails"
+          desc="Checks the schedule (12h, 1d, 3d, 5d...) and sends ONLY emails that are due right now. Safe to run anytime — won't double-send."
+          btnLabel="Send Due Now"
+          color="purple"
+          loading={actionLoading === "send"}
+          onClick={() => runAction("/api/manual-send-emails", "send")}
+        />
+        <ActionCard
+          title="📩 Send to Fresh Leads (0 emails)"
+          desc="Sends Email #1 to all leads who haven't received ANY email yet — even if they signed up less than 12h ago. Great for catching up."
+          btnLabel="Send First Email to All New Leads"
+          color="blue"
+          loading={actionLoading === "fresh"}
+          onClick={() => runAction("/api/manual-send-emails?force=true", "fresh")}
+        />
+      </div>
+
+      <SectionTitle>Dangerous Actions</SectionTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ActionCard
+          title="🚀 Force Next Email (ALL Leads)"
+          desc="Ignores schedule — sends the NEXT email in each lead's sequence immediately. If lead got 2 emails, sends #3 now regardless of timing."
+          btnLabel="Force Send Everyone"
+          color="red"
+          loading={actionLoading === "force"}
+          onClick={() => runAction("/api/manual-send-emails?force=true", "force")}
+        />
+        <ActionCard
+          title="⏰ Trigger Cron (9s budget)"
+          desc="Runs the same job Vercel auto-triggers twice daily. Has a 9-second time limit — stops early and picks up rest next run. For testing."
+          btnLabel="Simulate Cron Run"
+          color="blue"
+          loading={actionLoading === "cron"}
+          onClick={() => runAction("/api/cron/send-nurture-emails", "cron")}
+        />
+      </div>
+
+      <SectionTitle>System Maintenance</SectionTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ActionCard
+          title="🔄 Backfill Email Drafts"
+          desc="For leads that don't have pre-generated email drafts yet. Calls Gemini to generate all 10 email drafts. Processes 3 leads per click."
+          btnLabel="Generate Drafts (3 Leads)"
+          color="green"
+          loading={actionLoading === "backfill"}
+          onClick={() => runAction("/api/backfill-email-drafts", "backfill")}
+        />
       </div>
 
       {actionResult && (
@@ -674,9 +720,40 @@ function ActionsTab({ runAction, actionResult, actionLoading }) {
 
 
 // ---------- DETAIL CARD (shared expandable card for full person view) ----------
-function DetailCard({ person, expanded, onToggle }) {
+function DetailCard({ person, expanded, onToggle, password }) {
   const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
   const drafts = Array.isArray(person.email_drafts) ? person.email_drafts : [];
+  const [emailAction, setEmailAction] = useState(null); // {status, message}
+  const [emailLoading, setEmailLoading] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+  const [customSubject, setCustomSubject] = useState("");
+  const [customBody, setCustomBody] = useState("");
+  const [showFullReport, setShowFullReport] = useState(false);
+
+  const sendLeadEmail = async (mode) => {
+    setEmailLoading(mode);
+    setEmailAction(null);
+    try {
+      const body = mode === "custom"
+        ? { reportId: person.report_id, mode, customSubject, customBody }
+        : { reportId: person.report_id, mode };
+      const res = await fetch("/api/admin/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setEmailAction({ status: "success", message: `✅ Sent email #${json.emailNum || "custom"} to ${json.email}` });
+        if (mode === "custom") { setShowCustom(false); setCustomSubject(""); setCustomBody(""); }
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setEmailLoading("");
+  };
 
   return (
     <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden transition-all">
@@ -692,6 +769,7 @@ function DetailCard({ person, expanded, onToggle }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <span className="text-gray-500 text-[11px]">{person.emails_sent_count || 0}/10</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
             person.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
           }`}>{person.payment_status}</span>
@@ -703,6 +781,69 @@ function DetailCard({ person, expanded, onToggle }) {
       {/* Expanded detail */}
       {expanded && (
         <div className="border-t border-white/10 p-4 space-y-5">
+
+          {/* === EMAIL ACTION BUTTONS === */}
+          {person.email && person.email.trim() && (
+            <div>
+              <SectionTitle>Email Actions</SectionTitle>
+              <div className="flex flex-wrap gap-2 mb-2">
+                <button
+                  onClick={() => sendLeadEmail("scheduled")}
+                  disabled={!!emailLoading}
+                  className="px-3 py-2 rounded-xl text-xs font-medium bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white transition-colors"
+                >
+                  {emailLoading === "scheduled" ? "Sending..." : `📬 Send Scheduled (#${(person.emails_sent_count || 0) + 1})`}
+                </button>
+                <button
+                  onClick={() => sendLeadEmail("force")}
+                  disabled={!!emailLoading}
+                  className="px-3 py-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white transition-colors"
+                >
+                  {emailLoading === "force" ? "Sending..." : `🚀 Force Next (#${(person.emails_sent_count || 0) + 1})`}
+                </button>
+                <button
+                  onClick={() => setShowCustom(!showCustom)}
+                  className="px-3 py-2 rounded-xl text-xs font-medium bg-white/10 hover:bg-white/20 text-gray-200 border border-white/10 transition-colors"
+                >
+                  ✏️ Custom Email
+                </button>
+              </div>
+
+              {/* Custom email form */}
+              {showCustom && (
+                <div className="bg-black/30 rounded-xl p-3 space-y-2 mb-2">
+                  <input
+                    value={customSubject}
+                    onChange={(e) => setCustomSubject(e.target.value)}
+                    placeholder="Subject line..."
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <textarea
+                    value={customBody}
+                    onChange={(e) => setCustomBody(e.target.value)}
+                    placeholder="Email body (plain text, use line breaks)..."
+                    rows={4}
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  />
+                  <button
+                    onClick={() => sendLeadEmail("custom")}
+                    disabled={!customSubject || !customBody || !!emailLoading}
+                    className="px-4 py-2 rounded-xl text-xs font-medium bg-gradient-to-r from-purple-600 to-indigo-600 disabled:opacity-50 text-white transition-all"
+                  >
+                    {emailLoading === "custom" ? "Sending..." : "Send Custom Email →"}
+                  </button>
+                </div>
+              )}
+
+              {/* Action result */}
+              {emailAction && (
+                <p className={`text-xs px-3 py-2 rounded-lg ${emailAction.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                  {emailAction.message}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Personal Info */}
           <div>
             <SectionTitle>Personal Info</SectionTitle>
@@ -777,6 +918,7 @@ function DetailCard({ person, expanded, onToggle }) {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium">#{d.num || i + 1}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400">{d.psychology}</span>
+                      {i < (person.emails_sent_count || 0) && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Sent</span>}
                     </div>
                     <p className="text-sm font-medium text-gray-200">{d.subject}</p>
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2">{d.body}</p>
@@ -786,11 +928,40 @@ function DetailCard({ person, expanded, onToggle }) {
             </div>
           )}
 
-          {/* Report Summary */}
+          {/* Report — formatted like user would see */}
           {person.summary && (
             <div>
-              <SectionTitle>Report Summary</SectionTitle>
-              <p className="text-sm text-gray-300 bg-black/30 rounded-xl p-3">{person.summary}</p>
+              <SectionTitle>Their Report</SectionTitle>
+              <div className="bg-gradient-to-br from-[#0d0d1a] to-[#11111f] border border-white/10 rounded-2xl p-5 space-y-4">
+                {/* Summary */}
+                <div className="border-b border-white/10 pb-4">
+                  <p className="text-purple-300 text-xs uppercase tracking-wider mb-1 font-semibold">Summary</p>
+                  <p className="text-gray-200 text-sm leading-relaxed">{person.summary}</p>
+                </div>
+
+                {/* Sections — formatted */}
+                {Array.isArray(person.sections) && person.sections.length > 0 && (
+                  <>
+                    {person.sections.slice(0, showFullReport ? 999 : 3).map((s, i) => (
+                      <div key={i} className="border-b border-white/5 pb-4 last:border-0">
+                        <h4 className="text-sm font-semibold text-purple-200 mb-2 flex items-center gap-2">
+                          <span className="text-purple-500/60 text-xs">{i + 1}.</span>
+                          {s.title}
+                        </h4>
+                        <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">{s.content}</p>
+                      </div>
+                    ))}
+                    {person.sections.length > 3 && (
+                      <button
+                        onClick={() => setShowFullReport(!showFullReport)}
+                        className="text-xs text-purple-400 hover:text-purple-300 font-medium"
+                      >
+                        {showFullReport ? "▴ Show less" : `▾ Show all ${person.sections.length} sections`}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -809,24 +980,6 @@ function DetailCard({ person, expanded, onToggle }) {
                 <InfoItem label="Referrer" value={person.attribution.referrer || "Direct"} />
                 <InfoItem label="Landing Page" value={person.attribution.landing_page || "—"} />
                 <InfoItem label="Landed At" value={person.attribution.landed_at ? new Date(person.attribution.landed_at).toLocaleString("en-IN") : "—"} />
-              </div>
-            </div>
-          )}
-
-          {/* Report Sections (first 3) */}
-          {Array.isArray(person.sections) && person.sections.length > 0 && (
-            <div>
-              <SectionTitle>Report Sections ({person.sections.length} total)</SectionTitle>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {person.sections.slice(0, 5).map((s, i) => (
-                  <div key={i} className="bg-black/30 rounded-xl p-3">
-                    <p className="text-sm font-medium text-gray-200">{s.title}</p>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-3">{s.content}</p>
-                  </div>
-                ))}
-                {person.sections.length > 5 && (
-                  <p className="text-xs text-gray-500 italic">...and {person.sections.length - 5} more sections</p>
-                )}
               </div>
             </div>
           )}
@@ -857,7 +1010,7 @@ function InfoItem({ label, value, mono, badge }) {
 
 
 // ---------- PAID PEOPLE (full detail) ----------
-function PaidDetailsTab({ paid }) {
+function PaidDetailsTab({ paid, password }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(null);
 
@@ -892,6 +1045,7 @@ function PaidDetailsTab({ paid }) {
             person={person}
             expanded={expanded === person.report_id}
             onToggle={() => setExpanded(expanded === person.report_id ? null : person.report_id)}
+            password={password}
           />
         ))}
         {filtered.length === 0 && (
@@ -903,7 +1057,7 @@ function PaidDetailsTab({ paid }) {
 }
 
 // ---------- EVERYONE (full detail for every single lead) ----------
-function AllDetailsTab({ all }) {
+function AllDetailsTab({ all, password }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [expanded, setExpanded] = useState(null);
@@ -951,6 +1105,7 @@ function AllDetailsTab({ all }) {
             person={person}
             expanded={expanded === person.report_id}
             onToggle={() => setExpanded(expanded === person.report_id ? null : person.report_id)}
+            password={password}
           />
         ))}
         {filtered.length === 0 && (
