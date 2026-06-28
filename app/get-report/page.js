@@ -306,18 +306,58 @@ export default function GetReport() {
 
               {/* Time of Birth */}
               <div>
-                <label htmlFor="timeOfBirth" className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Time of Birth *
                 </label>
-                <input
-                  type="time"
-                  id="timeOfBirth"
-                  name="timeOfBirth"
-                  required
-                  value={formData.timeOfBirth}
-                  onChange={handleChange}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 h-12 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark] appearance-none"
-                />
+                <div className="flex gap-2">
+                  <select
+                    value={formData.timeOfBirth ? (parseInt(formData.timeOfBirth.split(":")[0]) % 12 || 12).toString() : ""}
+                    onChange={(e) => {
+                      const h = parseInt(e.target.value);
+                      const currentMin = formData.timeOfBirth ? formData.timeOfBirth.split(":")[1]?.substring(0,2) || "00" : "00";
+                      const currentPeriod = formData.timeOfBirth && parseInt(formData.timeOfBirth.split(":")[0]) >= 12 ? "PM" : "AM";
+                      const h24 = currentPeriod === "PM" ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
+                      setFormData({ ...formData, timeOfBirth: `${h24.toString().padStart(2,"0")}:${currentMin}` });
+                    }}
+                    required
+                    className="flex-1 bg-background border border-border rounded-xl px-3 py-3 h-12 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
+                  >
+                    <option value="" disabled>Hour</option>
+                    {[12,1,2,3,4,5,6,7,8,9,10,11].map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                  <select
+                    value={formData.timeOfBirth ? formData.timeOfBirth.split(":")[1]?.substring(0,2) || "" : ""}
+                    onChange={(e) => {
+                      const currentHour = formData.timeOfBirth ? formData.timeOfBirth.split(":")[0] : "00";
+                      setFormData({ ...formData, timeOfBirth: `${currentHour}:${e.target.value}` });
+                    }}
+                    required
+                    className="flex-1 bg-background border border-border rounded-xl px-3 py-3 h-12 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
+                  >
+                    <option value="" disabled>Min</option>
+                    {Array.from({length: 60}, (_, i) => <option key={i} value={i.toString().padStart(2,"0")}>{i.toString().padStart(2,"0")}</option>)}
+                  </select>
+                  <select
+                    value={formData.timeOfBirth && parseInt(formData.timeOfBirth.split(":")[0]) >= 12 ? "PM" : formData.timeOfBirth ? "AM" : ""}
+                    onChange={(e) => {
+                      if (!formData.timeOfBirth) {
+                        setFormData({ ...formData, timeOfBirth: e.target.value === "PM" ? "12:00" : "00:00" });
+                        return;
+                      }
+                      let h = parseInt(formData.timeOfBirth.split(":")[0]);
+                      const min = formData.timeOfBirth.split(":")[1]?.substring(0,2) || "00";
+                      if (e.target.value === "PM" && h < 12) h += 12;
+                      if (e.target.value === "AM" && h >= 12) h -= 12;
+                      setFormData({ ...formData, timeOfBirth: `${h.toString().padStart(2,"0")}:${min}` });
+                    }}
+                    required
+                    className="w-20 bg-background border border-border rounded-xl px-2 py-3 h-12 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all [color-scheme:dark]"
+                  >
+                    <option value="" disabled>AM/PM</option>
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
                 <p className="text-muted text-xs mt-1">
                   Check your birth certificate for exact time. Even a few minutes matter!
                 </p>
