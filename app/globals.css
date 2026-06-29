@@ -129,3 +129,34 @@ input, textarea, select {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+
+/* Blog article content styling */
+.blog-content h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.blog-content p {
+  margin-bottom: 1rem;
+  line-height: 1.8;
+}
+
+.blog-content ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.blog-content li {
+  margin-bottom: 0.5rem;
+  line-height: 1.7;
+}
+
+.blog-content strong {
+  color: var(--foreground);
+  font-weight: 600;
+}

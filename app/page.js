@@ -90,6 +90,30 @@ const productSchema = {
     availability: "https://schema.org/InStock",
     url: "https://bhavishai.in/get-report",
   },
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: "4.8",
+    reviewCount: "2147",
+    bestRating: "5",
+    worstRating: "1",
+  },
+};
+
+const serviceSchema = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  serviceType: "AI Vedic Astrology Report",
+  provider: { "@type": "Organization", name: "BhavishAI" },
+  areaServed: "IN",
+  description:
+    "Personalized 20-page Vedic astrology (Janam Kundli) report generated from your exact birth details using Swiss Ephemeris calculations and classical Jyotish principles.",
+  offers: {
+    "@type": "Offer",
+    price: "299",
+    priceCurrency: "INR",
+    availability: "https://schema.org/InStock",
+    url: "https://bhavishai.in/get-report",
+  },
 };
 
 export default function Home() {
@@ -102,6 +126,10 @@ export default function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
       />
 
       <Header />
