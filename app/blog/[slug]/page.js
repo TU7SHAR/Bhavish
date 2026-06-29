@@ -8,14 +8,9 @@ import { articleSchema, breadcrumbSchema } from "../../../lib/schema";
 
 const BASE_URL = "https://www.bhavishai.in";
 
-// Allow on-demand rendering of DB posts not known at build time.
-export const dynamicParams = true;
-export const revalidate = 60;
-
-// Pre-render every static blog post at build time (great for SEO).
-export function generateStaticParams() {
-  return posts.map((p) => ({ slug: p.slug }));
-}
+// Always render on the server per-request so newly published DB articles
+// (and the static ones) are always found. No static caching of 404s.
+export const dynamic = "force-dynamic";
 
 // Look up a post by slug from static first, then DB.
 async function findPost(slug) {
