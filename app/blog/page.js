@@ -12,7 +12,7 @@ export const metadata = {
 };
 
 // Revalidate hourly so newly generated articles appear without a redeploy.
-export const revalidate = 3600;
+export const revalidate = 60;
 
 export default async function BlogIndex() {
   const dbPosts = await getDbPosts();
