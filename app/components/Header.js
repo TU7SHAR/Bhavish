@@ -67,6 +67,9 @@ export default function Header() {
             <a href="/#faq" className="text-muted hover:text-foreground transition-colors text-sm">
               FAQ
             </a>
+            <Link href="/blog" className="text-muted hover:text-foreground transition-colors text-sm">
+              Blog
+            </Link>
 
             {!loading && user ? (
               <>
@@ -154,6 +157,9 @@ export default function Header() {
               <a href="/#faq" className="text-muted hover:text-foreground transition-colors" onClick={() => setMobileOpen(false)}>
                 FAQ
               </a>
+              <Link href="/blog" className="text-muted hover:text-foreground transition-colors" onClick={() => setMobileOpen(false)}>
+                Blog
+              </Link>
 
               {user ? (
                 <>

@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Suspense } from "react";
 import AttributionCapture from "./components/AttributionCapture";
+import { organizationSchema, websiteSchema } from "../lib/schema";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -90,6 +91,15 @@ export default function RootLayout({ children }) {
       data-scroll-behavior="smooth"
     >
       <head>
+        {/* Global structured data: Organization + WebSite (SEO/AEO/LLM) */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
         {/* Google Analytics */}
         {gaId && gaId !== "your_ga_id_here" && (
           <>
