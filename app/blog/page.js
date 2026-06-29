@@ -11,8 +11,8 @@ export const metadata = {
   alternates: { canonical: "https://www.bhavishai.in/blog" },
 };
 
-// Revalidate hourly so newly generated articles appear without a redeploy.
-export const revalidate = 60;
+// Always render fresh so newly published articles appear immediately.
+export const dynamic = "force-dynamic";
 
 export default async function BlogIndex() {
   const dbPosts = await getDbPosts();
