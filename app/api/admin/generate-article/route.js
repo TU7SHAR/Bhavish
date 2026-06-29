@@ -2,6 +2,7 @@ import { generateWithRetry } from "../../../../lib/gemini-retry.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 // Admin: generate a new SEO blog article with Gemini and store it in Supabase.
 // POST /api/admin/generate-article
@@ -100,6 +101,15 @@ Return ONLY valid JSON in EXACTLY this shape (no markdown fences):
         { error: "Failed to save article. Did you run the blog_posts SQL migration?", details: insertError.message },
         { status: 500 }
       );
+    }
+
+    // Purge caches so the new article is live immediately (no 404 / no wait).
+    try {
+      revalidatePath("/blog");
+      revalidatePath(`/blog/${slug}`);
+      revalidatePath("/sitemap.xml");
+    } catch (e) {
+      console.warn("revalidatePath failed:", e?.message);
     }
 
     return NextResponse.json({

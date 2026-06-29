@@ -10,7 +10,7 @@ const BASE_URL = "https://www.bhavishai.in";
 
 // Allow on-demand rendering of DB posts not known at build time.
 export const dynamicParams = true;
-export const revalidate = 3600;
+export const revalidate = 60;
 
 // Pre-render every static blog post at build time (great for SEO).
 export function generateStaticParams() {
