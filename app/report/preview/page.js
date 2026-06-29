@@ -491,42 +491,85 @@ export default function ReportPreview() {
             {/* CTA Overlay */}
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
+
+                {/* Priority 9: Uniqueness / confidence banner */}
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-2.5 mb-5 text-left">
+                  <p className="text-xs text-purple-300 leading-relaxed">
+                    🔍 During analysis, your chart matched <span className="font-bold text-purple-200">3 uncommon planetary combinations</span>. These influence the personalized predictions in your complete report.
+                  </p>
+                </div>
+
+                {/* Priority 6: Emotional headline */}
                 <h3 className="text-xl font-bold mb-1">
-                  Your Personalized Analysis Is Ready
+                  Your Chart Revealed Several Rare Patterns
                 </h3>
-                <p className="text-muted text-xs mb-6">Generated using your exact birth chart and real planetary positions.</p>
+                <p className="text-muted text-xs mb-5">Generated from your exact birth time, coordinates &amp; Vedic calculations.</p>
 
-                {/* Curiosity-driven locked cards with blurred preview */}
-                <div className="text-left space-y-3 mb-6">
-                  <div className="bg-background/50 border border-border rounded-xl p-3">
-                    <p className="text-sm font-semibold text-foreground mb-1">🔒 A career pattern in your chart deserves attention.</p>
-                    <p className="text-xs text-muted italic">&ldquo;Your 10th house indicates that...&rdquo;</p>
-                    <div className="h-3 bg-gradient-to-r from-muted/20 to-transparent rounded mt-1"></div>
-                  </div>
-                  <div className="bg-background/50 border border-border rounded-xl p-3">
-                    <p className="text-sm font-semibold text-foreground mb-1">🔒 One relationship phase stands out.</p>
-                    <p className="text-xs text-muted italic">&ldquo;Venus and Moon together suggest...&rdquo;</p>
-                    <div className="h-3 bg-gradient-to-r from-muted/20 to-transparent rounded mt-1"></div>
-                  </div>
-                  <div className="bg-background/50 border border-border rounded-xl p-3">
-                    <p className="text-sm font-semibold text-foreground mb-1">🔒 Your strongest financial cycle has been identified.</p>
-                    <p className="text-xs text-muted italic">&ldquo;Jupiter&apos;s upcoming transit...&rdquo;</p>
-                    <div className="h-3 bg-gradient-to-r from-muted/20 to-transparent rounded mt-1"></div>
+                {/* Priority 7: Emotional summary — what was found */}
+                <div className="text-left bg-background/50 border border-border rounded-xl p-4 mb-5">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">During analysis we found:</p>
+                  <div className="space-y-1.5 text-sm text-foreground">
+                    <p>✓ A major career timing window</p>
+                    <p>✓ One relationship cycle that stands out</p>
+                    <p>✓ Your strongest financial period</p>
+                    <p>✓ A hidden strength in your chart</p>
+                    <p>✓ One repeating life challenge mapped</p>
                   </div>
                 </div>
 
-                {/* Price + value */}
-                <div className="mb-4">
-                  <span className="text-4xl font-bold">&#x20B9;{includeBump ? "448" : "299"}</span>
+                {/* Priority 1: Curiosity-driven locked cards — tease, don't reveal */}
+                <div className="text-left space-y-2.5 mb-5">
+                  <div className="bg-background/50 border border-border rounded-xl p-3">
+                    <p className="text-sm font-semibold text-foreground mb-0.5">🔒 One career decision could shape your next five years.</p>
+                    <p className="text-xs text-muted italic">&ldquo;Your 10th house indicates that between...&rdquo;</p>
+                    <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
+                  </div>
+                  <div className="bg-background/50 border border-border rounded-xl p-3">
+                    <p className="text-sm font-semibold text-foreground mb-0.5">🔒 A relationship period appears much stronger than others.</p>
+                    <p className="text-xs text-muted italic">&ldquo;Venus and Moon conjunction suggests a window where...&rdquo;</p>
+                    <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
+                  </div>
+                  <div className="bg-background/50 border border-border rounded-xl p-3">
+                    <p className="text-sm font-semibold text-foreground mb-0.5">🔒 Your strongest wealth cycle is closer than you think.</p>
+                    <p className="text-xs text-muted italic">&ldquo;Jupiter&apos;s upcoming transit through your 2nd house...&rdquo;</p>
+                    <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
+                  </div>
+                  {/* Priority 8: Personal question teaser */}
+                  {userData.personalQuestion && (
+                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
+                      <p className="text-sm font-semibold text-primary-light mb-0.5">🔒 We answered your exact question:</p>
+                      <p className="text-xs text-muted mb-1">&ldquo;{userData.personalQuestion.length > 60 ? userData.personalQuestion.substring(0, 60) + "..." : userData.personalQuestion}&rdquo;</p>
+                      <p className="text-xs text-muted italic">&ldquo;Your chart suggests the path forward involves...&rdquo;</p>
+                      <div className="h-2.5 bg-gradient-to-r from-primary/20 to-transparent rounded mt-1.5"></div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted mb-4">
-                  <span>✓ Instant access</span>
-                  <span>✓ 20-page report</span>
+
+                {/* Priority 5: Report quality bullets */}
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs text-muted mb-4">
+                  <span>✓ 20 personalized pages</span>
+                  <span>✓ Exact birth time analysis</span>
+                  <span>✓ Remedies included</span>
+                  <span>✓ Personal question answered</span>
                   <span>✓ PDF download</span>
                   <span>✓ Lifetime access</span>
                 </div>
 
-                {/* Main CTA */}
+                {/* Price */}
+                <div className="mb-3">
+                  <span className="text-4xl font-bold">&#x20B9;{includeBump ? "448" : "299"}</span>
+                  <span className="text-muted text-sm ml-2 line-through">₹999</span>
+                </div>
+
+                {/* Priority 3: Social proof */}
+                <div className="flex items-center justify-center gap-3 text-xs text-muted mb-4">
+                  <span>⭐⭐⭐⭐⭐</span>
+                  <span>2,000+ reports generated</span>
+                  <span>·</span>
+                  <span>Avg 14 min read</span>
+                </div>
+
+                {/* Priority 2: Compelling CTA */}
                 <button
                   onClick={handlePayment}
                   disabled={paymentLoading}
@@ -534,19 +577,21 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? "Processing..."
-                    : `Unlock My Complete Report — ₹${includeBump ? "448" : "299"} \u2192`}
+                    : `Reveal My Hidden Predictions — ₹${includeBump ? "448" : "299"} →`}
                 </button>
 
-                {/* ₹149 add-on — minimal, below CTA */}
-                <label className="flex items-center gap-2 justify-center mt-4 cursor-pointer text-xs text-muted hover:text-foreground transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={includeBump}
-                    onChange={(e) => setIncludeBump(e.target.checked)}
-                    className="w-4 h-4 accent-accent shrink-0"
-                  />
-                  <span>Add 12-month guidance <span className="line-through">₹999</span> <span className="text-accent font-medium">₹149</span></span>
-                </label>
+                {/* Priority 4: ₹149 upsell — extremely minimal */}
+                <p className="mt-3 text-[11px] text-gray-500 text-center">
+                  <label className="cursor-pointer hover:text-gray-300 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={includeBump}
+                      onChange={(e) => setIncludeBump(e.target.checked)}
+                      className="w-3 h-3 accent-accent mr-1 align-middle"
+                    />
+                    Add 12-month guidance +₹149
+                  </label>
+                </p>
               </div>
             </div>
           </div>
