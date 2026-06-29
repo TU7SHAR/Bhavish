@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (authed) fetchData(tab);
+    if (authed && tab !== "actions") fetchData(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
