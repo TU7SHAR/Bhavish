@@ -133,6 +133,15 @@ export async function GET(request) {
       return NextResponse.json({ all: all || [] });
     }
 
+    if (tab === "blog") {
+      const { data: blogPosts } = await supabase
+        .from("blog_posts")
+        .select("slug, title, description, read_minutes, published, created_at")
+        .order("created_at", { ascending: false });
+
+      return NextResponse.json({ blogPosts: blogPosts || [] });
+    }
+
     if (tab === "emails") {
       const { data: emails } = await supabase
         .from("reports")
