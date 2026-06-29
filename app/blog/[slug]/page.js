@@ -3,18 +3,30 @@ import { notFound } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { posts } from "../../../lib/blog-posts";
+import { getDbPost } from "../../../lib/blog-db";
 import { articleSchema, breadcrumbSchema } from "../../../lib/schema";
 
 const BASE_URL = "https://www.bhavishai.in";
 
-// Pre-render every blog post at build time (great for SEO).
+// Allow on-demand rendering of DB posts not known at build time.
+export const dynamicParams = true;
+export const revalidate = 3600;
+
+// Pre-render every static blog post at build time (great for SEO).
 export function generateStaticParams() {
   return posts.map((p) => ({ slug: p.slug }));
 }
 
+// Look up a post by slug from static first, then DB.
+async function findPost(slug) {
+  const staticPost = posts.find((p) => p.slug === slug);
+  if (staticPost) return staticPost;
+  return await getDbPost(slug);
+}
+
 // Per-article SEO metadata.
-export function generateMetadata({ params }) {
-  const post = posts.find((p) => p.slug === params.slug);
+export async function generateMetadata({ params }) {
+  const post = await findPost(params.slug);
   if (!post) return {};
   return {
     title: post.title,
@@ -32,10 +44,11 @@ export function generateMetadata({ params }) {
   };
 }
 
-export default function BlogPost({ params }) {
-  const post = posts.find((p) => p.slug === params.slug);
+export default async function BlogPost({ params }) {
+  const post = await findPost(params.slug);
   if (!post) notFound();
 
+  // Related posts from static set (always available, fast).
   const related = posts.filter((p) => p.slug !== post.slug).slice(0, 3);
 
   const articleLd = articleSchema({

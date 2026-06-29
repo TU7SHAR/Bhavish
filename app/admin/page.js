@@ -128,6 +128,7 @@ export default function AdminDashboard() {
     { id: "all-details", label: "Everyone", icon: "🔍" },
     { id: "payments", label: "Payments", icon: "💰" },
     { id: "emails", label: "Emails", icon: "📧" },
+    { id: "blog", label: "Blog", icon: "📝" },
     { id: "actions", label: "Actions", icon: "⚡" },
   ];
 
@@ -200,6 +201,7 @@ export default function AdminDashboard() {
             {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
+            {tab === "blog" && <BlogTab blogPosts={data.blogPosts} password={password} onRefresh={() => fetchData("blog")} />}
             {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} />}
           </>
         )}
@@ -1110,6 +1112,136 @@ function AllDetailsTab({ all, password }) {
         ))}
         {filtered.length === 0 && (
           <div className="text-center text-gray-500 py-12">No one matches your filters.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ---------- BLOG (AI article generator + manager) ----------
+function BlogTab({ blogPosts, password, onRefresh }) {
+  const [topic, setTopic] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const generate = async () => {
+    if (!topic.trim()) return;
+    setGenerating(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/generate-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ topic, keyword }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setResult({ status: "success", message: `✅ Published: "${json.title}"`, url: json.url });
+        setTopic("");
+        setKeyword("");
+        if (onRefresh) onRefresh();
+      } else {
+        setResult({ status: "error", message: `❌ ${json.error}${json.details ? " — " + json.details : ""}` });
+      }
+    } catch (err) {
+      setResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setGenerating(false);
+  };
+
+  const ideas = [
+    "What is Sade Sati and how does it affect you",
+    "Understanding the 7th house in your birth chart",
+    "Gemstones in Vedic astrology and who should wear them",
+    "What is Pitra Dosha? Causes and remedies",
+    "How to read your career from your Janam Kundli",
+    "Saturn (Shani) in astrology: lessons and timing",
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Generator */}
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <SectionTitle>Generate New SEO Article</SectionTitle>
+        <p className="text-gray-400 text-sm mb-4">
+          Enter a topic. AI writes a full SEO-optimized article and publishes it to your blog instantly. Each new article = another page Google &amp; AI engines can rank.
+        </p>
+        <div className="space-y-3">
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Article topic, e.g. 'What is Sade Sati?'"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <input
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="Primary SEO keyword (optional), e.g. 'sade sati'"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <button
+            onClick={generate}
+            disabled={generating || !topic.trim()}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-600/30"
+          >
+            {generating ? "Writing article... (~15s)" : "✨ Generate & Publish Article"}
+          </button>
+        </div>
+
+        {result && (
+          <div className={`mt-3 text-sm px-3 py-2 rounded-lg ${result.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+            {result.message}
+            {result.url && (
+              <a href={result.url} target="_blank" rel="noreferrer" className="ml-2 underline">View →</a>
+            )}
+          </div>
+        )}
+
+        {/* Idea chips */}
+        <div className="mt-4">
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-2">Ideas (click to use)</p>
+          <div className="flex flex-wrap gap-2">
+            {ideas.map((idea) => (
+              <button
+                key={idea}
+                onClick={() => setTopic(idea)}
+                className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-colors"
+              >
+                {idea}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Published AI articles */}
+      <div>
+        <SectionTitle>AI-Generated Articles ({blogPosts ? blogPosts.length : 0})</SectionTitle>
+        {!blogPosts || blogPosts.length === 0 ? (
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl p-6 text-center text-gray-500 text-sm">
+            No AI-generated articles yet. Generate your first one above.
+            <br />
+            <span className="text-xs text-gray-600">(Your 10 hand-written articles live in the code and are always published.)</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {blogPosts.map((p) => (
+              <div key={p.slug} className="bg-[#11111f] border border-white/10 rounded-xl p-4 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{p.title}</p>
+                  <p className="text-gray-500 text-xs truncate">{p.description}</p>
+                  <p className="text-gray-600 text-[11px] mt-1">
+                    {p.read_minutes} min · {new Date(p.created_at).toLocaleDateString("en-IN")} · {p.published ? "Published" : "Draft"}
+                  </p>
+                </div>
+                <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="shrink-0 text-purple-400 hover:text-purple-300 text-sm font-medium">
+                  View →
+                </a>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { posts } from "../../lib/blog-posts";
+import { getDbPosts } from "../../lib/blog-db";
 
 export const metadata = {
   title: "Vedic Astrology Blog — Janam Kundli, Dasha & Nakshatra Guides",
@@ -10,8 +11,15 @@ export const metadata = {
   alternates: { canonical: "https://www.bhavishai.in/blog" },
 };
 
-export default function BlogIndex() {
-  const sorted = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date));
+// Revalidate hourly so newly generated articles appear without a redeploy.
+export const revalidate = 3600;
+
+export default async function BlogIndex() {
+  const dbPosts = await getDbPosts();
+  // Merge static + DB, de-duplicate by slug (static wins).
+  const staticSlugs = new Set(posts.map((p) => p.slug));
+  const merged = [...posts, ...dbPosts.filter((p) => !staticSlugs.has(p.slug))];
+  const sorted = merged.sort((a, b) => new Date(b.date) - new Date(a.date));
 
   return (
     <>

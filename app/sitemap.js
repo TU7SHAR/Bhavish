@@ -1,6 +1,7 @@
 import { posts } from "../lib/blog-posts";
+import { getDbPosts } from "../lib/blog-db";
 
-export default function sitemap() {
+export default async function sitemap() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
 
   const staticRoutes = [
@@ -12,7 +13,11 @@ export default function sitemap() {
     { url: `${baseUrl}/refund`, lastModified: new Date(), changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  const blogRoutes = posts.map((post) => ({
+  const staticSlugs = new Set(posts.map((p) => p.slug));
+  const dbPosts = await getDbPosts();
+  const allPosts = [...posts, ...dbPosts.filter((p) => !staticSlugs.has(p.slug))];
+
+  const blogRoutes = allPosts.map((post) => ({
     url: `${baseUrl}/blog/${post.slug}`,
     lastModified: new Date(post.date),
     changeFrequency: "monthly",
