@@ -36,7 +36,7 @@ export default function Footer() {
               <li><Link href="/privacy" className="text-muted hover:text-primary-light transition-colors">Privacy Policy</Link></li>
               <li><Link href="/terms" className="text-muted hover:text-primary-light transition-colors">Terms of Service</Link></li>
               <li><Link href="/refund" className="text-muted hover:text-primary-light transition-colors">Refund Policy</Link></li>
-              <li><a href="mailto:support@bhavishai.in" className="text-muted hover:text-primary-light transition-colors">Contact Us</a></li>
+              <li><Link href="/contact" className="text-muted hover:text-primary-light transition-colors">Contact Us</Link></li>
             </ul>
           </div>
         </div>
