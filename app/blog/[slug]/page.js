@@ -21,7 +21,8 @@ async function findPost(slug) {
 
 // Per-article SEO metadata.
 export async function generateMetadata({ params }) {
-  const post = await findPost(params.slug);
+  const { slug } = await params;
+  const post = await findPost(slug);
   if (!post) return {};
   return {
     title: post.title,
@@ -40,7 +41,8 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function BlogPost({ params }) {
-  const post = await findPost(params.slug);
+  const { slug } = await params;
+  const post = await findPost(slug);
   if (!post) notFound();
 
   // Related posts from static set (always available, fast).
