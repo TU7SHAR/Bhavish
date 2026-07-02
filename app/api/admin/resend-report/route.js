@@ -114,6 +114,7 @@ export async function POST(request) {
         to: [report.email],
         subject: `Your Vedic Astrology Report (Re-sent) - ${report.name}`,
         html,
+        reply_to: process.env.GMAIL_USER || fromEmail,
       });
       if (error) throw new Error(error.message);
       result = { provider: "resend", messageId: data?.id };

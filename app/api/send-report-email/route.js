@@ -59,6 +59,7 @@ async function sendWithResend({ email, name, reportId, html }) {
     to: [email],
     subject: `Your Personalized Vedic Astrology Report - ${name}`,
     html,
+    reply_to: process.env.GMAIL_USER || fromEmail,
   });
 
   if (error) throw new Error(error.message || "Resend failed");

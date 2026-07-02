@@ -150,6 +150,7 @@ export async function GET(request) {
           to: [lead.email],
           subject,
           html: buildHtml(lead, draft, emailNum),
+          reply_to: process.env.GMAIL_USER || fromEmail,
         });
 
         if (error) {
