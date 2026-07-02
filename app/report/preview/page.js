@@ -59,6 +59,7 @@ export default function ReportPreview() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [retryMessage, setRetryMessage] = useState(null);
   const [includeBump, setIncludeBump] = useState(false);
 
   useEffect(() => {
@@ -177,9 +178,10 @@ export default function ReportPreview() {
             }
 
             // PHASE 2: Now generate the FULL 20-section report (only after payment)
+            // Includes retry on timeout — Gemini can sometimes take >60s
             setPaymentLoading(true);
             let fullData = null;
-            try {
+            const generateFullReport = async () => {
               const fullRes = await fetch("/api/generate-full-report", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -194,9 +196,29 @@ export default function ReportPreview() {
                   personalQuestion: userData.personalQuestion || "",
                 }),
               });
-              fullData = await fullRes.json();
-            } catch (e) {
-              console.error("Full report generation failed:", e);
+              if (!fullRes.ok) throw new Error(`Status ${fullRes.status}`);
+              const data = await fullRes.json();
+              if (!data.sections || data.sections.length < 10) throw new Error("Incomplete report");
+              return data;
+            };
+
+            // Try up to 2 times (first attempt + 1 retry)
+            try {
+              fullData = await generateFullReport();
+            } catch (e1) {
+              console.warn("Full report attempt 1 failed, retrying:", e1.message);
+              // Show a special message during retry — randomly pick one
+              const retryMessages = [
+                { title: "Your birth chart has a few uncommon planetary combinations.", sub: "Our astrologer is taking a little extra time to analyze them accurately." },
+                { title: "Your Kundli contains several rare planetary alignments.", sub: "This requires a deeper analysis to ensure your report is accurate." },
+              ];
+              setRetryMessage(retryMessages[Math.random() < 0.5 ? 0 : 1]);
+              try {
+                fullData = await generateFullReport();
+              } catch (e2) {
+                console.error("Full report attempt 2 also failed:", e2.message);
+              }
+              setRetryMessage(null);
             }
 
             // Use full report if generated, otherwise fall back to preview sections
@@ -244,6 +266,10 @@ export default function ReportPreview() {
                   reportId: reportData.reportId,
                   sections: finalSections,
                   summary: finalSummary,
+                  chartData: reportData.chartData,
+                  dateOfBirth: userData.dateOfBirth,
+                  timeOfBirth: userData.timeOfBirth,
+                  placeOfBirth: userData.placeOfBirth,
                 }),
               }).catch(console.error);
             }
@@ -576,9 +602,17 @@ export default function ReportPreview() {
                   className="w-full bg-primary hover:bg-primary-dark disabled:opacity-50 text-white py-4 rounded-full font-semibold text-lg transition-all pulse-glow"
                 >
                   {paymentLoading
-                    ? "Processing..."
+                    ? (retryMessage ? "Analyzing deeper..." : "Generating your report...")
                     : `Reveal My Hidden Predictions — ₹${includeBump ? "448" : "299"} →`}
                 </button>
+
+                {/* Retry message — shows when Gemini needs extra time */}
+                {retryMessage && (
+                  <div className="mt-3 bg-primary/10 border border-primary/30 rounded-xl p-3 text-center">
+                    <p className="text-sm font-medium text-primary-light">{retryMessage.title}</p>
+                    <p className="text-xs text-muted mt-1">{retryMessage.sub}</p>
+                  </div>
+                )}
 
                 {/* Priority 4: ₹149 upsell — extremely minimal */}
                 <p className="mt-3 text-[11px] text-gray-500 text-center">
