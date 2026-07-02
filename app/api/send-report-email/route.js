@@ -44,6 +44,7 @@ function buildReportHtml({ name, reportId, summary, sections }) {
     <p>This report is generated using AI-powered Vedic astrology analysis based on Swiss Ephemeris calculations.</p>
     <p>For major life decisions, consult with qualified professionals.</p>
   </div>
+  <img src="https://www.bhavishai.in/api/track/open?rid=${encodeURIComponent(reportId)}&type=report" width="1" height="1" style="display:none;" alt="" />
 </body>
 </html>`;
 }

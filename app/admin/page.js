@@ -307,6 +307,15 @@ function OverviewTab({ data }) {
           <StatCard label="Open Rate" value={`${data.openRate}%`} sub={`${data.totalOpens} opens`} accent="pink" icon="👁" />
         </div>
       </div>
+
+      <div>
+        <SectionTitle>Paid Customer Emails</SectionTitle>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Report Emails Opened" value={data.paidReportOpened || 0} sub={`of ${data.totalPaid} paid`} accent="green" icon="📄" />
+          <StatCard label="Thank You Sent" value={data.paidThankYouSent || 0} sub={`of ${data.totalPaid} paid`} accent="pink" icon="🙏" />
+          <StatCard label="Thank You Opened" value={data.paidThankYouOpened || 0} sub={data.paidThankYouSent ? `${Math.round((data.paidThankYouOpened / data.paidThankYouSent) * 100)}% open rate` : "—"} accent="purple" icon="👁" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -802,6 +811,33 @@ function DetailCard({ person, expanded, onToggle, password }) {
     setEmailLoading("");
   };
 
+  const sendAdminAction = async (action) => {
+    setEmailLoading(action);
+    setEmailAction(null);
+    try {
+      const url = action === "resend-report" ? "/api/admin/resend-report" : "/api/admin/send-thankyou";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ reportId: person.report_id }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const msg = action === "resend-report"
+          ? `✅ Report re-sent to ${json.email}`
+          : `✅ Thank you email sent to ${json.email}`;
+        setEmailAction({ status: "success", message: msg });
+        // Update local state to show thank you was sent
+        if (action === "thankyou") person.thankyou_sent_at = new Date().toISOString();
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setEmailLoading("");
+  };
+
   return (
     <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden transition-all">
       {/* Header row — always visible */}
@@ -834,6 +870,30 @@ function DetailCard({ person, expanded, onToggle, password }) {
             <div>
               <SectionTitle>Email Actions</SectionTitle>
               <div className="flex flex-wrap gap-2 mb-2">
+                {/* Paid-only actions: resend report + thank you */}
+                {person.payment_status === "paid" && (
+                  <>
+                    <button
+                      onClick={() => sendAdminAction("resend-report")}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "resend-report" ? "Sending..." : "📄 Resend Report"}
+                    </button>
+                    <button
+                      onClick={() => sendAdminAction("thankyou")}
+                      disabled={!!emailLoading || person.thankyou_sent_at}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                        person.thankyou_sent_at
+                          ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                          : "bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white"
+                      }`}
+                    >
+                      {emailLoading === "thankyou" ? "Sending..." : person.thankyou_sent_at ? `✅ Thank You Sent (${new Date(person.thankyou_sent_at).toLocaleDateString("en-IN", {day: "numeric", month: "short"})})` : "🙏 Send Thank You (from Founder)"}
+                    </button>
+                  </>
+                )}
+                {/* Nurture sequence actions (for unpaid or all) */}
                 <button
                   onClick={() => sendLeadEmail("scheduled")}
                   disabled={!!emailLoading}
@@ -920,6 +980,40 @@ function DetailCard({ person, expanded, onToggle, password }) {
               <InfoItem label="Created At" value={person.created_at ? new Date(person.created_at).toLocaleString("en-IN") : "—"} />
             </div>
           </div>
+
+          {/* Paid Email Status */}
+          {person.payment_status === "paid" && (
+            <div>
+              <SectionTitle>Paid Email Status</SectionTitle>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <InfoItem
+                  label="Report Email"
+                  value={Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "report") ? "Opened ✅" : "Not opened"}
+                  badge={Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "report") ? "green" : null}
+                />
+                <InfoItem
+                  label="Thank You Email"
+                  value={
+                    !person.thankyou_sent_at ? "Not sent" :
+                    Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "thankyou") ? "Opened ✅" : "Sent, not opened"
+                  }
+                  badge={
+                    !person.thankyou_sent_at ? null :
+                    Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "thankyou") ? "green" : "amber"
+                  }
+                />
+                <InfoItem label="Thank You Sent At" value={person.thankyou_sent_at ? new Date(person.thankyou_sent_at).toLocaleString("en-IN") : "—"} />
+                <InfoItem
+                  label="Report Opened At"
+                  value={(() => {
+                    const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
+                    const reportOpen = opens.find((o) => o.type === "report");
+                    return reportOpen ? new Date(reportOpen.opened_at).toLocaleString("en-IN") : "—";
+                  })()}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Email Sequence */}
           <div>
