@@ -114,6 +114,7 @@ export async function POST(request) {
         to: [lead.email],
         subject: customSubject,
         html: buildCustomHtml(lead, customSubject, customBody),
+        reply_to: process.env.GMAIL_USER || fromEmail,
       });
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -156,6 +157,7 @@ export async function POST(request) {
       to: [lead.email],
       subject,
       html: buildHtml(lead, draft, emailNum),
+      reply_to: process.env.GMAIL_USER || fromEmail,
     });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

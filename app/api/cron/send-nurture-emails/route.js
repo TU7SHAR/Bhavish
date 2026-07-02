@@ -96,6 +96,7 @@ export async function GET(request) {
           to: [to],
           subject,
           html,
+          reply_to: process.env.GMAIL_USER || fromEmail,
         });
         if (error) throw new Error(error.message || "Resend failed");
         return { provider: "resend", messageId: data?.id };
