@@ -2,6 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+// Detect device type from User-Agent header
+function detectDevice(userAgent) {
+  if (!userAgent) return "unknown";
+  if (/mobile|android|iphone|ipad|ipod|blackberry|windows phone|opera mini|iemobile/i.test(userAgent)) {
+    return "mobile";
+  }
+  return "desktop";
+}
+
 export async function POST(request) {
   try {
     const {
@@ -17,6 +26,8 @@ export async function POST(request) {
       paymentId,
       paymentStatus,
       attribution,
+      personalQuestion,
+      city,
     } = await request.json();
 
     if (!reportId || !name || !sections) {
@@ -26,7 +37,11 @@ export async function POST(request) {
       );
     }
 
-    // Create Supabase admin client (uses service role for inserting without auth)
+    // Detect device type from request headers
+    const userAgent = request.headers.get("user-agent") || "";
+    const deviceType = detectDevice(userAgent);
+
+    // Create Supabase client
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -44,25 +59,43 @@ export async function POST(request) {
     // Check if user is logged in
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Save report to database
-    const { data, error } = await supabase.from("reports").upsert(
-      {
-        report_id: reportId,
-        user_id: user?.id || null,
-        name,
-        email: email || user?.email || null,
-        date_of_birth: dateOfBirth,
-        time_of_birth: timeOfBirth,
-        place_of_birth: placeOfBirth,
-        gender,
-        summary,
-        sections,
-        payment_id: paymentId || null,
-        payment_status: paymentStatus || "unpaid",
-        attribution: attribution || null,
-      },
-      { onConflict: "report_id" }
-    );
+    // Core report data (always works — these columns already exist)
+    const coreData = {
+      report_id: reportId,
+      user_id: user?.id || null,
+      name,
+      email: email || user?.email || null,
+      date_of_birth: dateOfBirth,
+      time_of_birth: timeOfBirth,
+      place_of_birth: placeOfBirth,
+      gender,
+      summary,
+      sections,
+      payment_id: paymentId || null,
+      payment_status: paymentStatus || "unpaid",
+      attribution: attribution || null,
+    };
+
+    // Enhanced tracking fields (only work after migration is run)
+    // If columns don't exist yet, Supabase ignores unknown fields in upsert
+    // but just in case, we try with them first, fall back to core-only
+    const enhancedData = {
+      ...coreData,
+      personal_question: personalQuestion || null,
+      city: city || null,
+      device_type: deviceType,
+      preview_generated_at: paymentStatus !== "paid" ? new Date().toISOString() : undefined,
+    };
+
+    // Try with enhanced fields first
+    let { error } = await supabase.from("reports").upsert(enhancedData, { onConflict: "report_id" });
+
+    // If it fails (columns don't exist yet), fall back to core-only save
+    if (error) {
+      console.warn("Enhanced save failed, falling back to core save:", error.message);
+      const fallback = await supabase.from("reports").upsert(coreData, { onConflict: "report_id" });
+      error = fallback.error;
+    }
 
     if (error) {
       console.error("Supabase save error:", error);
