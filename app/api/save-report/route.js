@@ -59,10 +59,12 @@ export async function POST(request) {
     // Check if user is logged in
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Core report data (always works — these columns already exist)
-    const coreData = {
+    // CRITICAL: Only include fields that are ACTUALLY provided in this request.
+    // If a field is not passed (e.g. attribution on second save after payment),
+    // we must NOT include it — otherwise upsert sets it to null, wiping the
+    // value that was stored on the first save.
+    const data = {
       report_id: reportId,
-      user_id: user?.id || null,
       name,
       email: email || user?.email || null,
       date_of_birth: dateOfBirth,
@@ -73,27 +75,28 @@ export async function POST(request) {
       sections,
       payment_id: paymentId || null,
       payment_status: paymentStatus || "unpaid",
-      attribution: attribution || null,
     };
 
-    // Enhanced tracking fields (only work after migration is run)
-    // If columns don't exist yet, Supabase ignores unknown fields in upsert
-    // but just in case, we try with them first, fall back to core-only
-    const enhancedData = {
-      ...coreData,
-      personal_question: personalQuestion || null,
-      city: city || null,
-      device_type: deviceType,
-      preview_generated_at: paymentStatus !== "paid" ? new Date().toISOString() : undefined,
-    };
+    // Only set user_id if user is logged in (don't wipe existing with null)
+    if (user?.id) data.user_id = user.id;
 
-    // Try with enhanced fields first
-    let { error } = await supabase.from("reports").upsert(enhancedData, { onConflict: "report_id" });
+    // Only include attribution if actually provided (prevents wipe on 2nd save)
+    if (attribution) data.attribution = attribution;
 
-    // If it fails (columns don't exist yet), fall back to core-only save
+    // Enhanced tracking fields — only include when provided (prevents wipe)
+    if (personalQuestion) data.personal_question = personalQuestion;
+    if (city) data.city = city;
+    if (deviceType && deviceType !== "unknown") data.device_type = deviceType;
+    if (paymentStatus !== "paid") data.preview_generated_at = new Date().toISOString();
+
+    // Try with all fields first (works after migration)
+    let { error } = await supabase.from("reports").upsert(data, { onConflict: "report_id" });
+
+    // If enhanced columns don't exist yet, strip them and retry
     if (error) {
-      console.warn("Enhanced save failed, falling back to core save:", error.message);
-      const fallback = await supabase.from("reports").upsert(coreData, { onConflict: "report_id" });
+      console.warn("Enhanced save failed, falling back:", error.message);
+      const { personal_question, city: c, device_type, preview_generated_at, ...coreOnly } = data;
+      const fallback = await supabase.from("reports").upsert(coreOnly, { onConflict: "report_id" });
       error = fallback.error;
     }
 

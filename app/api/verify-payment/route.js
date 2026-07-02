@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-// Fix #2: Save payment status to database on successful verification
 export async function POST(request) {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, reportId, birthDetails, chartData, previewSections, summary, includeBump } =
@@ -32,7 +31,7 @@ export async function POST(request) {
       );
     }
 
-    // Fix #2: Save to Supabase with payment confirmed
+    // Save payment status to database
     try {
       const cookieStore = await cookies();
       const supabase = createServerClient(
@@ -50,41 +49,38 @@ export async function POST(request) {
 
       const { data: { user } } = await supabase.auth.getUser();
 
-      // If 12-month guidance was purchased, set start + end dates
       const now = new Date();
       const guidanceEnd = new Date(now);
       guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
 
-      // Upsert report with paid status
-      // Try with paid_at first; if column doesn't exist yet, fall back without it
-      const upsertData = {
-        report_id: reportId,
-        user_id: user?.id || null,
-        name: birthDetails?.name || "",
-        email: birthDetails?.email || user?.email || null,
-        date_of_birth: birthDetails?.dateOfBirth || "",
-        time_of_birth: birthDetails?.timeOfBirth || "",
-        place_of_birth: birthDetails?.placeOfBirth || "",
-        gender: birthDetails?.gender || "",
-        summary: summary || "",
-        sections: previewSections || [],
+      // CRITICAL: Use .update() NOT .upsert() — only change payment fields.
+      // .upsert() rewrites the entire row and wipes attribution, city,
+      // device_type, personal_question, email_drafts, etc.
+      const updateData = {
         payment_id: razorpay_payment_id,
         payment_status: "paid",
-        paid_at: now.toISOString(),
         has_12_month_guidance: !!includeBump,
         guidance_start_date: includeBump ? now.toISOString() : null,
         guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,
       };
 
-      let { error: upsertErr } = await supabase.from("reports").upsert(upsertData, { onConflict: "report_id" });
+      // Only set user_id if user is logged in (don't wipe existing with null)
+      if (user?.id) updateData.user_id = user.id;
 
-      // Fallback: if paid_at column doesn't exist yet, retry without it
-      if (upsertErr) {
-        const { paid_at, ...coreData } = upsertData;
-        await supabase.from("reports").upsert(coreData, { onConflict: "report_id" });
+      // Try with paid_at (new column); fall back without it
+      let { error: updateErr } = await supabase
+        .from("reports")
+        .update({ ...updateData, paid_at: now.toISOString() })
+        .eq("report_id", reportId);
+
+      if (updateErr) {
+        await supabase
+          .from("reports")
+          .update(updateData)
+          .eq("report_id", reportId);
       }
     } catch (dbError) {
-      // Don't fail the payment verification if DB save fails
+      // Don't fail payment verification if DB save fails
       console.error("DB save error (non-critical):", dbError.message);
     }
 
