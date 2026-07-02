@@ -258,10 +258,15 @@ function OverviewTab({ data }) {
       {/* Hero revenue banner */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-purple-600/20 via-indigo-600/10 to-transparent p-6">
         <div className="absolute -right-10 -top-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
-        <div className="relative grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="relative grid grid-cols-2 md:grid-cols-5 gap-6">
           <div>
-            <p className="text-gray-400 text-xs uppercase tracking-wider">Total Revenue</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1 bg-gradient-to-r from-purple-300 to-indigo-300 bg-clip-text text-transparent">₹{data.totalRevenue.toLocaleString("en-IN")}</p>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">Gross Revenue</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1 bg-gradient-to-r from-purple-300 to-indigo-300 bg-clip-text text-transparent">₹{(data.totalRevenue || 0).toLocaleString("en-IN")}</p>
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">In Your Account</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1 text-green-400">₹{(data.netRevenue || 0).toLocaleString("en-IN")}</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">after Razorpay fees (₹{(data.totalFees || 0).toLocaleString("en-IN")})</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Paid Customers</p>
@@ -275,6 +280,34 @@ function OverviewTab({ data }) {
             <p className="text-gray-400 text-xs uppercase tracking-wider">Conversion</p>
             <p className="text-3xl md:text-4xl font-bold mt-1 text-green-400">{data.conversionRate}%</p>
           </div>
+        </div>
+      </div>
+
+      {/* Settlement Status */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-[#11111f] border border-green-500/20 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-400 text-[11px] uppercase tracking-wider font-medium">Settled (in your bank)</p>
+            <span className="text-sm opacity-60">🏦</span>
+          </div>
+          <p className="text-2xl font-bold mt-1.5 text-green-400">₹{(data.settledAmount || 0).toLocaleString("en-IN")}</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">gross ₹{(data.settledGross || 0).toLocaleString("en-IN")} − fees ₹{(data.settledFees || 0).toLocaleString("en-IN")}</p>
+        </div>
+        <div className="bg-[#11111f] border border-amber-500/20 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-400 text-[11px] uppercase tracking-wider font-medium">Pending Settlement</p>
+            <span className="text-sm opacity-60">⏳</span>
+          </div>
+          <p className="text-2xl font-bold mt-1.5 text-amber-400">₹{(data.pendingAmount || 0).toLocaleString("en-IN")}</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">last 3 days — settles T+2 business days</p>
+        </div>
+        <div className="bg-[#11111f] border border-red-500/20 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-400 text-[11px] uppercase tracking-wider font-medium">Razorpay Fees (total)</p>
+            <span className="text-sm opacity-60">💸</span>
+          </div>
+          <p className="text-2xl font-bold mt-1.5 text-red-400">₹{(data.totalFees || 0).toLocaleString("en-IN")}</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">2% + GST = 2.36% per transaction</p>
         </div>
       </div>
 
