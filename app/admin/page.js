@@ -307,6 +307,15 @@ function OverviewTab({ data }) {
           <StatCard label="Open Rate" value={`${data.openRate}%`} sub={`${data.totalOpens} opens`} accent="pink" icon="👁" />
         </div>
       </div>
+
+      <div>
+        <SectionTitle>Paid Customer Emails</SectionTitle>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Report Emails Opened" value={data.paidReportOpened || 0} sub={`of ${data.totalPaid} paid`} accent="green" icon="📄" />
+          <StatCard label="Thank You Sent" value={data.paidThankYouSent || 0} sub={`of ${data.totalPaid} paid`} accent="pink" icon="🙏" />
+          <StatCard label="Thank You Opened" value={data.paidThankYouOpened || 0} sub={data.paidThankYouSent ? `${Math.round((data.paidThankYouOpened / data.paidThankYouSent) * 100)}% open rate` : "—"} accent="purple" icon="👁" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -971,6 +980,40 @@ function DetailCard({ person, expanded, onToggle, password }) {
               <InfoItem label="Created At" value={person.created_at ? new Date(person.created_at).toLocaleString("en-IN") : "—"} />
             </div>
           </div>
+
+          {/* Paid Email Status */}
+          {person.payment_status === "paid" && (
+            <div>
+              <SectionTitle>Paid Email Status</SectionTitle>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <InfoItem
+                  label="Report Email"
+                  value={Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "report") ? "Opened ✅" : "Not opened"}
+                  badge={Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "report") ? "green" : null}
+                />
+                <InfoItem
+                  label="Thank You Email"
+                  value={
+                    !person.thankyou_sent_at ? "Not sent" :
+                    Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "thankyou") ? "Opened ✅" : "Sent, not opened"
+                  }
+                  badge={
+                    !person.thankyou_sent_at ? null :
+                    Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "thankyou") ? "green" : "amber"
+                  }
+                />
+                <InfoItem label="Thank You Sent At" value={person.thankyou_sent_at ? new Date(person.thankyou_sent_at).toLocaleString("en-IN") : "—"} />
+                <InfoItem
+                  label="Report Opened At"
+                  value={(() => {
+                    const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
+                    const reportOpen = opens.find((o) => o.type === "report");
+                    return reportOpen ? new Date(reportOpen.opened_at).toLocaleString("en-IN") : "—";
+                  })()}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Email Sequence */}
           <div>

@@ -49,6 +49,7 @@ function buildReportHtml({ name, reportId, summary, sections }) {
     <p>&copy; ${new Date().getFullYear()} BhavishAI | bhavishai.in</p>
     <p>This report was generated using AI-powered Vedic astrology analysis based on Swiss Ephemeris calculations.</p>
   </div>
+  <img src="https://www.bhavishai.in/api/track/open?rid=${encodeURIComponent(reportId)}&type=report" width="1" height="1" style="display:none;" alt="" />
 </body>
 </html>`;
 }

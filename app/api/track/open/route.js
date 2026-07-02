@@ -7,23 +7,23 @@ const PIXEL = Buffer.from(
   "base64"
 );
 
-// Logs email opens. Embedded as <img> in every nurture email.
+// Logs email opens. Embedded as <img> in every email.
 // GET /api/track/open?rid=REPORT_ID&en=EMAIL_NUMBER
+// GET /api/track/open?rid=REPORT_ID&type=report   (report email open)
+// GET /api/track/open?rid=REPORT_ID&type=thankyou  (thank you email open)
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const reportId = searchParams.get("rid");
     const emailNum = parseInt(searchParams.get("en") || "0", 10);
+    const type = searchParams.get("type"); // "report" or "thankyou"
 
-    if (reportId && emailNum > 0) {
+    if (reportId && (emailNum > 0 || type)) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       );
 
-      // Append to email_opens array: [{num, opened_at}]
-      // Using raw SQL via rpc or a simple column approach.
-      // We'll store opens in a JSONB column `email_opens` on reports.
       const { data: report } = await supabase
         .from("reports")
         .select("email_opens")
@@ -31,14 +31,21 @@ export async function GET(request) {
         .single();
 
       const existingOpens = Array.isArray(report?.email_opens) ? report.email_opens : [];
-      
-      // Only log first open per email number (avoid duplicates from re-opens)
-      const alreadyTracked = existingOpens.some((o) => o.num === emailNum);
+
+      // Use special identifiers for paid emails
+      const trackId = type === "report" ? "report_email" : type === "thankyou" ? "thankyou_email" : emailNum;
+
+      // Only log first open per type (avoid duplicates)
+      const alreadyTracked = existingOpens.some((o) =>
+        type ? o.type === type : o.num === emailNum
+      );
+
       if (!alreadyTracked) {
-        existingOpens.push({
-          num: emailNum,
-          opened_at: new Date().toISOString(),
-        });
+        const openEntry = type
+          ? { type, opened_at: new Date().toISOString() }
+          : { num: emailNum, opened_at: new Date().toISOString() };
+
+        existingOpens.push(openEntry);
 
         await supabase
           .from("reports")

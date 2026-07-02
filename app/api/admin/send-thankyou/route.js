@@ -8,8 +8,9 @@ import { NextResponse } from "next/server";
 // Body: { reportId }
 export const maxDuration = 30;
 
-function buildThankYouHtml(name) {
+function buildThankYouHtml(name, reportId) {
   const firstName = (name || "there").split(" ")[0];
+  const trackingPixel = `https://www.bhavishai.in/api/track/open?rid=${encodeURIComponent(reportId)}&type=thankyou`;
 
   return `
     <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; padding: 40px 24px; color: #1a1a2e;">
@@ -42,6 +43,7 @@ function buildThankYouHtml(name) {
       <p style="font-size: 11px; color: #9ca3af; text-align: center;">
         BhavishAI | bhavishai.in
       </p>
+      <img src="${trackingPixel}" width="1" height="1" style="display:none;" alt="" />
     </div>
   `;
 }
@@ -92,7 +94,7 @@ export async function POST(request) {
       from: `Tushar from BhavishAI <${fromEmail}>`,
       to: [lead.email],
       subject: `Thank you, ${(lead.name || "").split(" ")[0]} 🙏`,
-      html: buildThankYouHtml(lead.name),
+      html: buildThankYouHtml(lead.name, lead.report_id),
       reply_to: process.env.GMAIL_USER || fromEmail,
     });
 

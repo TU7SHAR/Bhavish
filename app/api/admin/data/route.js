@@ -89,6 +89,10 @@ export async function GET(request) {
           recentPaid,
           todayLeads,
           todayPaid,
+          // Paid email tracking
+          paidReportOpened: reports.filter((r) => r.payment_status === "paid" && Array.isArray(r.email_opens) && r.email_opens.some((o) => o.type === "report")).length,
+          paidThankYouOpened: reports.filter((r) => r.payment_status === "paid" && Array.isArray(r.email_opens) && r.email_opens.some((o) => o.type === "thankyou")).length,
+          paidThankYouSent: reports.filter((r) => r.thankyou_sent_at).length,
         },
       });
     }
