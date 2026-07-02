@@ -39,7 +39,50 @@ export async function GET(request) {
       const reports = allReports || [];
       const totalPaid = reports.filter((r) => r.payment_status === "paid").length;
       const totalUnpaid = reports.filter((r) => r.payment_status === "unpaid").length;
-      const totalRevenue = totalPaid * 299; // base price
+
+      // Accurate revenue calculation (accounts for all products)
+      const founderMembers = reports.filter((r) => r.is_founder_member).length;
+      const with12MonthGuidance = reports.filter((r) => r.has_12_month_guidance).length;
+      const baseRevenue = totalPaid * 299;
+      const founderRevenue = founderMembers * 999;
+      const guidanceRevenue = with12MonthGuidance * 149;
+      const totalRevenue = baseRevenue + founderRevenue + guidanceRevenue;
+
+      // Razorpay fee: 2% + 18% GST on the 2% = 2.36% effective
+      const RAZORPAY_FEE_PERCENT = 2.36;
+      const totalFees = Math.round(totalRevenue * RAZORPAY_FEE_PERCENT / 100);
+      const netRevenue = totalRevenue - totalFees;
+
+      // Settlement calculation: Razorpay settles T+2 business days
+      // We use 3 calendar days as a safe buffer (covers weekends)
+      const SETTLEMENT_DAYS = 3;
+      const settlementCutoff = new Date(Date.now() - SETTLEMENT_DAYS * 24 * 3600 * 1000).toISOString();
+
+      const paidReports = reports.filter((r) => r.payment_status === "paid");
+
+      // Settled = paid before cutoff date
+      const settledReports = paidReports.filter((r) => {
+        const payDate = r.paid_at || r.created_at;
+        return payDate && payDate < settlementCutoff;
+      });
+      // Pending = paid after cutoff date (recent payments)
+      const pendingReports = paidReports.filter((r) => {
+        const payDate = r.paid_at || r.created_at;
+        return !payDate || payDate >= settlementCutoff;
+      });
+
+      // Calculate settled/pending amounts per product
+      function calcRevenue(list) {
+        const base = list.length * 299;
+        const founder = list.filter((r) => r.is_founder_member).length * 999;
+        const guidance = list.filter((r) => r.has_12_month_guidance).length * 149;
+        const gross = base + founder + guidance;
+        const fees = Math.round(gross * RAZORPAY_FEE_PERCENT / 100);
+        return { gross, net: gross - fees, fees };
+      }
+
+      const settled = calcRevenue(settledReports);
+      const pending = calcRevenue(pendingReports);
       const withEmail = reports.filter((r) => r.email && r.email.trim()).length;
       const withDrafts = reports.filter((r) => r.email_drafts && Array.isArray(r.email_drafts)).length;
       const emailsActive = reports.filter((r) => r.email_sequence_status === "active").length;
@@ -51,10 +94,6 @@ export async function GET(request) {
       const totalOpens = reports.reduce((sum, r) => {
         return sum + (Array.isArray(r.email_opens) ? r.email_opens.length : 0);
       }, 0);
-
-      // Founder upgrades
-      const founderMembers = reports.filter((r) => r.is_founder_member).length;
-      const with12MonthGuidance = reports.filter((r) => r.has_12_month_guidance).length;
 
       // Recent activity (last 7 days)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
@@ -74,6 +113,17 @@ export async function GET(request) {
           totalPaid,
           totalUnpaid,
           totalRevenue,
+          netRevenue,
+          totalFees,
+          baseRevenue,
+          founderRevenue,
+          guidanceRevenue,
+          settledAmount: settled.net,
+          settledGross: settled.gross,
+          settledFees: settled.fees,
+          pendingAmount: pending.net,
+          pendingGross: pending.gross,
+          pendingFees: pending.fees,
           founderMembers,
           with12MonthGuidance,
           conversionRate: totalLeads ? ((totalPaid / totalLeads) * 100).toFixed(1) : "0",
