@@ -409,7 +409,7 @@ function LeadsTab({ leads }) {
                 <th className="p-3 font-medium">Status</th>
                 <th className="p-3 font-medium text-center">Emails</th>
                 <th className="p-3 font-medium text-center">Opens</th>
-                <th className="p-3 font-medium">Joined</th>
+                <th className="p-3 font-medium">Generated At</th>
               </tr>
             </thead>
             <tbody>
@@ -429,7 +429,7 @@ function LeadsTab({ leads }) {
                       ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span>
                       : <span className="text-gray-600">0</span>}
                   </td>
-                  <td className="p-3 text-gray-500 text-xs">{new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
+                  <td className="p-3 text-gray-500 text-xs whitespace-nowrap">{new Date(lead.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
