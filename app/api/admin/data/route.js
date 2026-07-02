@@ -100,9 +100,11 @@ export async function GET(request) {
       const recentLeads = reports.filter((r) => r.created_at >= sevenDaysAgo).length;
       const recentPaid = reports.filter((r) => r.payment_status === "paid" && r.created_at >= sevenDaysAgo).length;
 
-      // Today
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      // Today (IST = UTC+5:30) — Vercel runs in UTC, so we need to calculate IST midnight
+      const nowUTC = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000; // 5h 30m in ms
+      const nowIST = new Date(nowUTC.getTime() + istOffset);
+      const todayStart = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - istOffset);
       const todayISO = todayStart.toISOString();
       const todayLeads = reports.filter((r) => r.created_at >= todayISO).length;
       const todayPaid = reports.filter((r) => r.payment_status === "paid" && r.created_at >= todayISO).length;
