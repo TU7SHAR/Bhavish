@@ -55,7 +55,7 @@ export async function POST(request) {
       const guidanceEnd = new Date(now);
       guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
 
-      // Upsert report with paid status
+      // Upsert report with paid status + paid_at timestamp
       await supabase.from("reports").upsert(
         {
           report_id: reportId,
@@ -70,6 +70,7 @@ export async function POST(request) {
           sections: previewSections || [],
           payment_id: razorpay_payment_id,
           payment_status: "paid",
+          paid_at: now.toISOString(),
           has_12_month_guidance: !!includeBump,
           guidance_start_date: includeBump ? now.toISOString() : null,
           guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,

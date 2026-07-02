@@ -2,6 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+// Detect device type from User-Agent header
+function detectDevice(userAgent) {
+  if (!userAgent) return "unknown";
+  const ua = userAgent.toLowerCase();
+  if (/mobile|android|iphone|ipad|ipod|blackberry|windows phone|opera mini|iemobile/i.test(ua)) {
+    return "mobile";
+  }
+  return "desktop";
+}
+
 export async function POST(request) {
   try {
     const {
@@ -17,6 +27,8 @@ export async function POST(request) {
       paymentId,
       paymentStatus,
       attribution,
+      personalQuestion,
+      city,
     } = await request.json();
 
     if (!reportId || !name || !sections) {
@@ -25,6 +37,10 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    // Detect device type from request headers
+    const userAgent = request.headers.get("user-agent") || "";
+    const deviceType = detectDevice(userAgent);
 
     // Create Supabase admin client (uses service role for inserting without auth)
     const cookieStore = await cookies();
@@ -44,7 +60,7 @@ export async function POST(request) {
     // Check if user is logged in
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Save report to database
+    // Save report to database (includes new tracking fields)
     const { data, error } = await supabase.from("reports").upsert(
       {
         report_id: reportId,
@@ -60,6 +76,11 @@ export async function POST(request) {
         payment_id: paymentId || null,
         payment_status: paymentStatus || "unpaid",
         attribution: attribution || null,
+        // New tracking fields
+        personal_question: personalQuestion || null,
+        city: city || null,
+        device_type: deviceType,
+        preview_generated_at: paymentStatus !== "paid" ? new Date().toISOString() : undefined,
       },
       { onConflict: "report_id" }
     );

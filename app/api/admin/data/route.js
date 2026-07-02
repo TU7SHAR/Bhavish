@@ -68,6 +68,35 @@ export async function GET(request) {
       const todayLeads = reports.filter((r) => r.created_at >= todayISO).length;
       const todayPaid = reports.filter((r) => r.payment_status === "paid" && r.created_at >= todayISO).length;
 
+      // Device breakdown
+      const mobileLeads = reports.filter((r) => r.device_type === "mobile").length;
+      const desktopLeads = reports.filter((r) => r.device_type === "desktop").length;
+
+      // Top cities (top 5)
+      const cityCounts = {};
+      reports.forEach((r) => {
+        if (r.city) {
+          cityCounts[r.city] = (cityCounts[r.city] || 0) + 1;
+        }
+      });
+      const topCities = Object.entries(cityCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([city, count]) => ({ city, count }));
+
+      // Average time to pay (for paid users with both timestamps)
+      const paidWithTimestamps = reports.filter((r) => r.payment_status === "paid" && r.paid_at && r.created_at);
+      let avgTimeToPay = null;
+      if (paidWithTimestamps.length > 0) {
+        const totalMinutes = paidWithTimestamps.reduce((sum, r) => {
+          return sum + (new Date(r.paid_at) - new Date(r.created_at)) / 60000;
+        }, 0);
+        avgTimeToPay = Math.round(totalMinutes / paidWithTimestamps.length);
+      }
+
+      // Leads with personal question
+      const withQuestion = reports.filter((r) => r.personal_question && r.personal_question.trim()).length;
+
       return NextResponse.json({
         overview: {
           totalLeads: totalLeads || reports.length,
@@ -89,6 +118,13 @@ export async function GET(request) {
           recentPaid,
           todayLeads,
           todayPaid,
+          // New analytics
+          mobileLeads,
+          desktopLeads,
+          mobilePercent: reports.length ? ((mobileLeads / reports.length) * 100).toFixed(0) : "0",
+          topCities,
+          avgTimeToPay,
+          withQuestion,
         },
       });
     }
@@ -96,7 +132,7 @@ export async function GET(request) {
     if (tab === "leads") {
       const { data: leads } = await supabase
         .from("reports")
-        .select("report_id, name, email, gender, date_of_birth, place_of_birth, payment_status, payment_id, created_at, emails_sent_count, email_sequence_status, email_opens, has_12_month_guidance, is_founder_member")
+        .select("report_id, name, email, gender, date_of_birth, place_of_birth, payment_status, payment_id, created_at, emails_sent_count, email_sequence_status, email_opens, has_12_month_guidance, is_founder_member, city, device_type, personal_question, preview_generated_at, paid_at, attribution")
         .order("created_at", { ascending: false });
 
       return NextResponse.json({ leads: leads || [] });
@@ -105,7 +141,7 @@ export async function GET(request) {
     if (tab === "payments") {
       const { data: payments } = await supabase
         .from("reports")
-        .select("report_id, name, email, payment_status, payment_id, created_at, has_12_month_guidance, is_founder_member, founder_upgrade_payment_id")
+        .select("report_id, name, email, payment_status, payment_id, created_at, paid_at, has_12_month_guidance, is_founder_member, founder_upgrade_payment_id, city, device_type")
         .eq("payment_status", "paid")
         .order("created_at", { ascending: false });
 

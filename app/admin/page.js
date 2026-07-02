@@ -307,6 +307,35 @@ function OverviewTab({ data }) {
           <StatCard label="Open Rate" value={`${data.openRate}%`} sub={`${data.totalOpens} opens`} accent="pink" icon="👁" />
         </div>
       </div>
+
+      <div>
+        <SectionTitle>Audience Insights</SectionTitle>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Mobile Users" value={data.mobileLeads || 0} sub={`${data.mobilePercent || 0}% of total`} accent="blue" icon="📱" />
+          <StatCard label="Desktop Users" value={data.desktopLeads || 0} accent="purple" icon="💻" />
+          <StatCard label="Avg Time to Pay" value={data.avgTimeToPay ? `${data.avgTimeToPay}m` : "—"} sub="minutes from preview → payment" accent="green" icon="⏱" />
+          <StatCard label="Asked a Question" value={data.withQuestion || 0} sub="had personal concern" accent="amber" icon="❓" />
+        </div>
+      </div>
+
+      {/* Top Cities */}
+      {data.topCities && data.topCities.length > 0 && (
+        <div>
+          <SectionTitle>Top Cities</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {data.topCities.map((c, i) => (
+              <div key={c.city} className={`bg-[#11111f] border border-white/10 rounded-2xl p-4 transition-transform hover:-translate-y-0.5`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 text-[11px] uppercase tracking-wider font-medium">#{i + 1}</span>
+                  <span className="text-sm opacity-60">📍</span>
+                </div>
+                <p className="text-lg font-bold mt-1">{c.city}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">{c.count} leads</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -359,12 +388,15 @@ function LeadsTab({ leads }) {
     if (!leads) return [];
     let out = leads.filter((l) => {
       const q = search.toLowerCase();
-      const matchesSearch = !q || (l.name || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q);
+      const matchesSearch = !q || (l.name || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q) || (l.city || "").toLowerCase().includes(q);
       const matchesStatus =
         status === "all" ? true :
         status === "paid" ? l.payment_status === "paid" :
         status === "unpaid" ? l.payment_status === "unpaid" :
         status === "founder" ? l.is_founder_member :
+        status === "mobile" ? l.device_type === "mobile" :
+        status === "desktop" ? l.device_type === "desktop" :
+        status === "hasQuestion" ? (l.personal_question && l.personal_question.trim()) :
         status === "opened" ? (Array.isArray(l.email_opens) && l.email_opens.length > 0) : true;
       return matchesSearch && matchesStatus;
     });
@@ -378,6 +410,24 @@ function LeadsTab({ leads }) {
     return out;
   }, [leads, search, status, sort]);
 
+  // Helper: get UTM source from attribution
+  function getSource(lead) {
+    if (!lead.attribution) return null;
+    return lead.attribution.utm_source || (lead.attribution.fbclid ? "facebook" : lead.attribution.gclid ? "google" : null);
+  }
+
+  // Helper: calculate time to pay in readable format
+  function getTimeToPay(lead) {
+    if (lead.payment_status !== "paid" || !lead.paid_at || !lead.created_at) return null;
+    const diffMs = new Date(lead.paid_at) - new Date(lead.created_at);
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 1) return "<1m";
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.round(hrs / 24)}d`;
+  }
+
   if (!leads) return null;
   return (
     <div>
@@ -386,6 +436,9 @@ function LeadsTab({ leads }) {
         <Pill active={status === "paid"} onClick={() => setStatus("paid")}>Paid</Pill>
         <Pill active={status === "unpaid"} onClick={() => setStatus("unpaid")}>Unpaid</Pill>
         <Pill active={status === "founder"} onClick={() => setStatus("founder")}>Founder</Pill>
+        <Pill active={status === "mobile"} onClick={() => setStatus("mobile")}>Mobile</Pill>
+        <Pill active={status === "desktop"} onClick={() => setStatus("desktop")}>Desktop</Pill>
+        <Pill active={status === "hasQuestion"} onClick={() => setStatus("hasQuestion")}>Has Question</Pill>
         <Pill active={status === "opened"} onClick={() => setStatus("opened")}>Opened email</Pill>
         <select
           value={sort}
@@ -406,34 +459,69 @@ function LeadsTab({ leads }) {
               <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
                 <th className="p-3 font-medium">Name</th>
                 <th className="p-3 font-medium">Email</th>
+                <th className="p-3 font-medium">City</th>
                 <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium text-center">Device</th>
                 <th className="p-3 font-medium text-center">Emails</th>
                 <th className="p-3 font-medium text-center">Opens</th>
+                <th className="p-3 font-medium">Source</th>
+                <th className="p-3 font-medium">Question</th>
                 <th className="p-3 font-medium">Joined</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((lead) => (
-                <tr key={lead.report_id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="p-3 font-medium">{lead.name}</td>
-                  <td className="p-3 text-gray-400 text-xs">{lead.email || "—"}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                      lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
-                    }`}>{lead.payment_status}</span>
-                    {lead.is_founder_member && <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">Founder</span>}
-                  </td>
-                  <td className="p-3 text-center text-gray-300">{lead.emails_sent_count || 0}<span className="text-gray-600">/10</span></td>
-                  <td className="p-3 text-center">
-                    {Array.isArray(lead.email_opens) && lead.email_opens.length > 0
-                      ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span>
-                      : <span className="text-gray-600">0</span>}
-                  </td>
-                  <td className="p-3 text-gray-500 text-xs">{new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
-                </tr>
-              ))}
+              {filtered.map((lead) => {
+                const source = getSource(lead);
+                const timeToPay = getTimeToPay(lead);
+                return (
+                  <tr key={lead.report_id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="p-3 font-medium whitespace-nowrap">{lead.name}</td>
+                    <td className="p-3 text-gray-400 text-xs">{lead.email || "—"}</td>
+                    <td className="p-3 text-gray-300 text-xs whitespace-nowrap">{lead.city || "—"}</td>
+                    <td className="p-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                        lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>{lead.payment_status}</span>
+                      {lead.is_founder_member && <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">F</span>}
+                      {timeToPay && <span className="ml-1 text-[10px] text-gray-500">({timeToPay})</span>}
+                    </td>
+                    <td className="p-3 text-center">
+                      {lead.device_type === "mobile" ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">📱</span>
+                      ) : lead.device_type === "desktop" ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">💻</span>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-center text-gray-300">{lead.emails_sent_count || 0}<span className="text-gray-600">/10</span></td>
+                    <td className="p-3 text-center">
+                      {Array.isArray(lead.email_opens) && lead.email_opens.length > 0
+                        ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span>
+                        : <span className="text-gray-600">0</span>}
+                    </td>
+                    <td className="p-3 text-xs whitespace-nowrap">
+                      {source ? (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          source === "facebook" || source === "fb" || source === "ig" ? "bg-blue-600/20 text-blue-400" :
+                          source === "google" ? "bg-red-500/20 text-red-400" :
+                          "bg-white/10 text-gray-400"
+                        }`}>{source}</span>
+                      ) : <span className="text-gray-600">organic</span>}
+                    </td>
+                    <td className="p-3 text-xs max-w-[120px]">
+                      {lead.personal_question ? (
+                        <span className="text-gray-400 truncate block" title={lead.personal_question}>
+                          {lead.personal_question.length > 30 ? lead.personal_question.substring(0, 30) + "..." : lead.personal_question}
+                        </span>
+                      ) : <span className="text-gray-600">—</span>}
+                    </td>
+                    <td className="p-3 text-gray-500 text-xs whitespace-nowrap">{new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500">No leads match your filters.</td></tr>
+                <tr><td colSpan={10} className="p-8 text-center text-gray-500">No leads match your filters.</td></tr>
               )}
             </tbody>
           </table>
@@ -767,10 +855,11 @@ function DetailCard({ person, expanded, onToggle, password }) {
           </div>
           <div className="min-w-0">
             <p className="font-semibold truncate">{person.name}</p>
-            <p className="text-gray-400 text-xs truncate">{person.email || "No email"}</p>
+            <p className="text-gray-400 text-xs truncate">{person.email || "No email"}{person.city ? ` · ${person.city}` : ""}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {person.device_type === "mobile" ? <span className="text-[11px]">📱</span> : person.device_type === "desktop" ? <span className="text-[11px]">💻</span> : null}
           <span className="text-gray-500 text-[11px]">{person.emails_sent_count || 0}/10</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
             person.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
@@ -856,10 +945,22 @@ function DetailCard({ person, expanded, onToggle, password }) {
               <InfoItem label="Date of Birth" value={person.date_of_birth || "—"} />
               <InfoItem label="Time of Birth" value={person.time_of_birth || "—"} />
               <InfoItem label="Place of Birth" value={person.place_of_birth || "—"} />
+              <InfoItem label="City" value={person.city || "—"} />
+              <InfoItem label="Device" value={person.device_type || "—"} badge={person.device_type === "mobile" ? "blue" : person.device_type === "desktop" ? "purple" : null} />
               <InfoItem label="Report ID" value={person.report_id} mono />
               <InfoItem label="User ID" value={person.user_id || "Guest"} mono />
             </div>
           </div>
+
+          {/* Personal Question */}
+          {person.personal_question && (
+            <div>
+              <SectionTitle>Their Question / Concern</SectionTitle>
+              <div className="bg-black/30 rounded-xl p-4">
+                <p className="text-sm text-gray-200 leading-relaxed italic">&ldquo;{person.personal_question}&rdquo;</p>
+              </div>
+            </div>
+          )}
 
           {/* Payment Info */}
           <div>
@@ -867,11 +968,14 @@ function DetailCard({ person, expanded, onToggle, password }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <InfoItem label="Payment Status" value={person.payment_status} badge={person.payment_status === "paid" ? "green" : "amber"} />
               <InfoItem label="Payment ID" value={person.payment_id || "—"} mono />
+              <InfoItem label="Paid At" value={person.paid_at ? new Date(person.paid_at).toLocaleString("en-IN") : "—"} />
+              <InfoItem label="Time to Pay" value={person.paid_at && person.created_at ? (() => { const mins = Math.round((new Date(person.paid_at) - new Date(person.created_at)) / 60000); return mins < 60 ? `${mins} min` : mins < 1440 ? `${Math.round(mins/60)} hr` : `${Math.round(mins/1440)} days`; })() : "—"} />
               <InfoItem label="Founder Member" value={person.is_founder_member ? "Yes ₹999" : "No"} badge={person.is_founder_member ? "pink" : null} />
               <InfoItem label="Founder Payment" value={person.founder_upgrade_payment_id || "—"} mono />
               <InfoItem label="12-Mo Guidance" value={person.has_12_month_guidance ? "Yes ₹149" : "No"} badge={person.has_12_month_guidance ? "blue" : null} />
               <InfoItem label="Guidance Start" value={person.guidance_start_date ? new Date(person.guidance_start_date).toLocaleDateString("en-IN") : "—"} />
               <InfoItem label="Guidance End" value={person.guidance_end_date ? new Date(person.guidance_end_date).toLocaleDateString("en-IN") : "—"} />
+              <InfoItem label="Preview Generated" value={person.preview_generated_at ? new Date(person.preview_generated_at).toLocaleString("en-IN") : "—"} />
               <InfoItem label="Created At" value={person.created_at ? new Date(person.created_at).toLocaleString("en-IN") : "—"} />
             </div>
           </div>
@@ -997,6 +1101,7 @@ function InfoItem({ label, value, mono, badge }) {
     amber: "bg-amber-500/20 text-amber-400",
     pink: "bg-pink-500/20 text-pink-400",
     blue: "bg-blue-500/20 text-blue-400",
+    purple: "bg-purple-500/20 text-purple-400",
   };
   return (
     <div>

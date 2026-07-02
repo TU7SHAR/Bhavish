@@ -110,6 +110,11 @@ Return ONLY valid JSON. No markdown.`;
 
     const reportId = `RPT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
+    // Extract city name from geocoded displayName (first part before comma)
+    const city = location.displayName
+      ? location.displayName.split(",")[0].trim()
+      : placeOfBirth.split(",")[0].trim();
+
     return NextResponse.json({
       reportId,
       summary: reportData.summary,
@@ -120,6 +125,7 @@ Return ONLY valid JSON. No markdown.`;
       previewSections: reportData.sections,
       chartData,
       kundliSVG,
+      city,
       generatedAt: new Date().toISOString(),
       birthDetails: { name, dateOfBirth, timeOfBirth, placeOfBirth, gender, personalQuestion: personalQuestion || "" },
     });
