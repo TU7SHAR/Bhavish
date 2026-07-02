@@ -133,6 +133,8 @@ export default function GetReport() {
           sections: data.sections || data.previewSections || [],
           paymentStatus: "unpaid",
           attribution: getAttribution(),
+          personalQuestion: formData.personalQuestion || "",
+          city: data.city || "",
         }),
       })
         .then(() => {

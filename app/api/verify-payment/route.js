@@ -56,26 +56,33 @@ export async function POST(request) {
       guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
 
       // Upsert report with paid status
-      await supabase.from("reports").upsert(
-        {
-          report_id: reportId,
-          user_id: user?.id || null,
-          name: birthDetails?.name || "",
-          email: birthDetails?.email || user?.email || null,
-          date_of_birth: birthDetails?.dateOfBirth || "",
-          time_of_birth: birthDetails?.timeOfBirth || "",
-          place_of_birth: birthDetails?.placeOfBirth || "",
-          gender: birthDetails?.gender || "",
-          summary: summary || "",
-          sections: previewSections || [],
-          payment_id: razorpay_payment_id,
-          payment_status: "paid",
-          has_12_month_guidance: !!includeBump,
-          guidance_start_date: includeBump ? now.toISOString() : null,
-          guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,
-        },
-        { onConflict: "report_id" }
-      );
+      // Try with paid_at first; if column doesn't exist yet, fall back without it
+      const upsertData = {
+        report_id: reportId,
+        user_id: user?.id || null,
+        name: birthDetails?.name || "",
+        email: birthDetails?.email || user?.email || null,
+        date_of_birth: birthDetails?.dateOfBirth || "",
+        time_of_birth: birthDetails?.timeOfBirth || "",
+        place_of_birth: birthDetails?.placeOfBirth || "",
+        gender: birthDetails?.gender || "",
+        summary: summary || "",
+        sections: previewSections || [],
+        payment_id: razorpay_payment_id,
+        payment_status: "paid",
+        paid_at: now.toISOString(),
+        has_12_month_guidance: !!includeBump,
+        guidance_start_date: includeBump ? now.toISOString() : null,
+        guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,
+      };
+
+      let { error: upsertErr } = await supabase.from("reports").upsert(upsertData, { onConflict: "report_id" });
+
+      // Fallback: if paid_at column doesn't exist yet, retry without it
+      if (upsertErr) {
+        const { paid_at, ...coreData } = upsertData;
+        await supabase.from("reports").upsert(coreData, { onConflict: "report_id" });
+      }
     } catch (dbError) {
       // Don't fail the payment verification if DB save fails
       console.error("DB save error (non-critical):", dbError.message);

@@ -359,12 +359,15 @@ function LeadsTab({ leads }) {
     if (!leads) return [];
     let out = leads.filter((l) => {
       const q = search.toLowerCase();
-      const matchesSearch = !q || (l.name || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q);
+      const matchesSearch = !q || (l.name || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q) || (l.city || "").toLowerCase().includes(q);
       const matchesStatus =
         status === "all" ? true :
         status === "paid" ? l.payment_status === "paid" :
         status === "unpaid" ? l.payment_status === "unpaid" :
         status === "founder" ? l.is_founder_member :
+        status === "mobile" ? l.device_type === "mobile" :
+        status === "desktop" ? l.device_type === "desktop" :
+        status === "hasQuestion" ? (l.personal_question && l.personal_question.trim()) :
         status === "opened" ? (Array.isArray(l.email_opens) && l.email_opens.length > 0) : true;
       return matchesSearch && matchesStatus;
     });
@@ -378,6 +381,12 @@ function LeadsTab({ leads }) {
     return out;
   }, [leads, search, status, sort]);
 
+  // Helper: get source from attribution
+  function getSource(lead) {
+    if (!lead.attribution) return null;
+    return lead.attribution.utm_source || (lead.attribution.fbclid ? "facebook" : lead.attribution.gclid ? "google" : null);
+  }
+
   if (!leads) return null;
   return (
     <div>
@@ -386,6 +395,9 @@ function LeadsTab({ leads }) {
         <Pill active={status === "paid"} onClick={() => setStatus("paid")}>Paid</Pill>
         <Pill active={status === "unpaid"} onClick={() => setStatus("unpaid")}>Unpaid</Pill>
         <Pill active={status === "founder"} onClick={() => setStatus("founder")}>Founder</Pill>
+        <Pill active={status === "mobile"} onClick={() => setStatus("mobile")}>Mobile</Pill>
+        <Pill active={status === "desktop"} onClick={() => setStatus("desktop")}>Desktop</Pill>
+        <Pill active={status === "hasQuestion"} onClick={() => setStatus("hasQuestion")}>Has Question</Pill>
         <Pill active={status === "opened"} onClick={() => setStatus("opened")}>Opened email</Pill>
         <select
           value={sort}
@@ -406,34 +418,67 @@ function LeadsTab({ leads }) {
               <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
                 <th className="p-3 font-medium">Name</th>
                 <th className="p-3 font-medium">Email</th>
+                <th className="p-3 font-medium">City</th>
                 <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium text-center">Device</th>
                 <th className="p-3 font-medium text-center">Emails</th>
                 <th className="p-3 font-medium text-center">Opens</th>
-                <th className="p-3 font-medium">Joined</th>
+                <th className="p-3 font-medium">Source</th>
+                <th className="p-3 font-medium">Question</th>
+                <th className="p-3 font-medium">Generated At</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((lead) => (
-                <tr key={lead.report_id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="p-3 font-medium">{lead.name}</td>
-                  <td className="p-3 text-gray-400 text-xs">{lead.email || "—"}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                      lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
-                    }`}>{lead.payment_status}</span>
-                    {lead.is_founder_member && <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">Founder</span>}
-                  </td>
-                  <td className="p-3 text-center text-gray-300">{lead.emails_sent_count || 0}<span className="text-gray-600">/10</span></td>
-                  <td className="p-3 text-center">
-                    {Array.isArray(lead.email_opens) && lead.email_opens.length > 0
-                      ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span>
-                      : <span className="text-gray-600">0</span>}
-                  </td>
-                  <td className="p-3 text-gray-500 text-xs">{new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
-                </tr>
-              ))}
+              {filtered.map((lead) => {
+                const source = getSource(lead);
+                return (
+                  <tr key={lead.report_id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="p-3 font-medium whitespace-nowrap">{lead.name}</td>
+                    <td className="p-3 text-gray-400 text-xs">{lead.email || "—"}</td>
+                    <td className="p-3 text-gray-300 text-xs whitespace-nowrap">{lead.city || "—"}</td>
+                    <td className="p-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                        lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>{lead.payment_status}</span>
+                      {lead.is_founder_member && <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">F</span>}
+                    </td>
+                    <td className="p-3 text-center">
+                      {lead.device_type === "mobile" ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">📱</span>
+                      ) : lead.device_type === "desktop" ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">💻</span>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-center text-gray-300">{lead.emails_sent_count || 0}<span className="text-gray-600">/10</span></td>
+                    <td className="p-3 text-center">
+                      {Array.isArray(lead.email_opens) && lead.email_opens.length > 0
+                        ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span>
+                        : <span className="text-gray-600">0</span>}
+                    </td>
+                    <td className="p-3 text-xs whitespace-nowrap">
+                      {source ? (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          source === "facebook" || source === "fb" || source === "ig" ? "bg-blue-600/20 text-blue-400" :
+                          source === "google" ? "bg-red-500/20 text-red-400" :
+                          "bg-white/10 text-gray-400"
+                        }`}>{source}</span>
+                      ) : <span className="text-gray-600">organic</span>}
+                    </td>
+                    <td className="p-3 text-xs max-w-[120px]">
+                      {lead.personal_question ? (
+                        <span className="text-gray-400 truncate block" title={lead.personal_question}>
+                          {lead.personal_question.length > 30 ? lead.personal_question.substring(0, 30) + "..." : lead.personal_question}
+                        </span>
+                      ) : <span className="text-gray-600">—</span>}
+                    </td>
+                    <td className="p-3 text-gray-500 text-xs whitespace-nowrap">{new Date(lead.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500">No leads match your filters.</td></tr>
+                <tr><td colSpan={10} className="p-8 text-center text-gray-500">No leads match your filters.</td></tr>
               )}
             </tbody>
           </table>

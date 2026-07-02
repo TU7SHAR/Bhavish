@@ -94,12 +94,15 @@ export async function GET(request) {
     }
 
     if (tab === "leads") {
+      // Using select("*") so it works whether or not the new columns exist yet
       const { data: leads } = await supabase
         .from("reports")
-        .select("report_id, name, email, gender, date_of_birth, place_of_birth, payment_status, payment_id, created_at, emails_sent_count, email_sequence_status, email_opens, has_12_month_guidance, is_founder_member")
+        .select("*")
         .order("created_at", { ascending: false });
 
-      return NextResponse.json({ leads: leads || [] });
+      // Strip heavy fields to keep response small
+      const slim = (leads || []).map(({ sections, email_drafts, summary, ...rest }) => rest);
+      return NextResponse.json({ leads: slim });
     }
 
     if (tab === "payments") {
