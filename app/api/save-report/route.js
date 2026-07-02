@@ -62,7 +62,6 @@ export async function POST(request) {
     // Core report data (always works — these columns already exist)
     const coreData = {
       report_id: reportId,
-      user_id: user?.id || null,
       name,
       email: email || user?.email || null,
       date_of_birth: dateOfBirth,
@@ -75,19 +74,21 @@ export async function POST(request) {
       payment_status: paymentStatus || "unpaid",
     };
 
-    // Only set attribution if it was actually provided (avoid overwriting existing data)
-    if (attribution) {
-      coreData.attribution = attribution;
-    }
+    // Only set user_id if user is logged in (don't wipe existing link)
+    if (user?.id) coreData.user_id = user.id;
+
+    // Only include fields that were ACTUALLY provided in this request.
+    // This prevents overwriting data that was set in a previous save
+    // (e.g., attribution set on first save shouldn't be wiped on second save after payment)
+    if (attribution) coreData.attribution = attribution;
 
     // Enhanced tracking fields (only work after migration is run)
-    const enhancedData = {
-      ...coreData,
-      personal_question: personalQuestion || null,
-      city: city || null,
-      device_type: deviceType,
-      preview_generated_at: paymentStatus !== "paid" ? new Date().toISOString() : undefined,
-    };
+    // Only include if actually provided — never set to null (that would overwrite)
+    const enhancedData = { ...coreData };
+    if (personalQuestion) enhancedData.personal_question = personalQuestion;
+    if (city) enhancedData.city = city;
+    if (deviceType && deviceType !== "unknown") enhancedData.device_type = deviceType;
+    if (paymentStatus !== "paid") enhancedData.preview_generated_at = new Date().toISOString();
 
     // Try with enhanced fields first
     let { error } = await supabase.from("reports").upsert(enhancedData, { onConflict: "report_id" });

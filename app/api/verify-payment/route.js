@@ -58,7 +58,6 @@ export async function POST(request) {
       guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
 
       const updateData = {
-        user_id: user?.id || null,
         payment_id: razorpay_payment_id,
         payment_status: "paid",
         paid_at: now.toISOString(),
@@ -66,6 +65,9 @@ export async function POST(request) {
         guidance_start_date: includeBump ? now.toISOString() : null,
         guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,
       };
+
+      // Only set user_id if user is actually logged in (don't wipe existing)
+      if (user?.id) updateData.user_id = user.id;
 
       let { error: updateErr } = await supabase
         .from("reports")
