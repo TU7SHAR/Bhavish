@@ -177,9 +177,10 @@ export default function ReportPreview() {
             }
 
             // PHASE 2: Now generate the FULL 20-section report (only after payment)
+            // Includes retry on timeout — Gemini can sometimes take >60s
             setPaymentLoading(true);
             let fullData = null;
-            try {
+            const generateFullReport = async () => {
               const fullRes = await fetch("/api/generate-full-report", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -194,9 +195,22 @@ export default function ReportPreview() {
                   personalQuestion: userData.personalQuestion || "",
                 }),
               });
-              fullData = await fullRes.json();
-            } catch (e) {
-              console.error("Full report generation failed:", e);
+              if (!fullRes.ok) throw new Error(`Status ${fullRes.status}`);
+              const data = await fullRes.json();
+              if (!data.sections || data.sections.length < 10) throw new Error("Incomplete report");
+              return data;
+            };
+
+            // Try up to 2 times (first attempt + 1 retry)
+            try {
+              fullData = await generateFullReport();
+            } catch (e1) {
+              console.warn("Full report attempt 1 failed, retrying:", e1.message);
+              try {
+                fullData = await generateFullReport();
+              } catch (e2) {
+                console.error("Full report attempt 2 also failed:", e2.message);
+              }
             }
 
             // Use full report if generated, otherwise fall back to preview sections
@@ -244,6 +258,10 @@ export default function ReportPreview() {
                   reportId: reportData.reportId,
                   sections: finalSections,
                   summary: finalSummary,
+                  chartData: reportData.chartData,
+                  dateOfBirth: userData.dateOfBirth,
+                  timeOfBirth: userData.timeOfBirth,
+                  placeOfBirth: userData.placeOfBirth,
                 }),
               }).catch(console.error);
             }
