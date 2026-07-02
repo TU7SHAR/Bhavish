@@ -802,6 +802,33 @@ function DetailCard({ person, expanded, onToggle, password }) {
     setEmailLoading("");
   };
 
+  const sendAdminAction = async (action) => {
+    setEmailLoading(action);
+    setEmailAction(null);
+    try {
+      const url = action === "resend-report" ? "/api/admin/resend-report" : "/api/admin/send-thankyou";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ reportId: person.report_id }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const msg = action === "resend-report"
+          ? `✅ Report re-sent to ${json.email}`
+          : `✅ Thank you email sent to ${json.email}`;
+        setEmailAction({ status: "success", message: msg });
+        // Update local state to show thank you was sent
+        if (action === "thankyou") person.thankyou_sent_at = new Date().toISOString();
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setEmailLoading("");
+  };
+
   return (
     <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden transition-all">
       {/* Header row — always visible */}
@@ -834,6 +861,30 @@ function DetailCard({ person, expanded, onToggle, password }) {
             <div>
               <SectionTitle>Email Actions</SectionTitle>
               <div className="flex flex-wrap gap-2 mb-2">
+                {/* Paid-only actions: resend report + thank you */}
+                {person.payment_status === "paid" && (
+                  <>
+                    <button
+                      onClick={() => sendAdminAction("resend-report")}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "resend-report" ? "Sending..." : "📄 Resend Report"}
+                    </button>
+                    <button
+                      onClick={() => sendAdminAction("thankyou")}
+                      disabled={!!emailLoading || person.thankyou_sent_at}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                        person.thankyou_sent_at
+                          ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                          : "bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white"
+                      }`}
+                    >
+                      {emailLoading === "thankyou" ? "Sending..." : person.thankyou_sent_at ? `✅ Thank You Sent (${new Date(person.thankyou_sent_at).toLocaleDateString("en-IN", {day: "numeric", month: "short"})})` : "🙏 Send Thank You (from Founder)"}
+                    </button>
+                  </>
+                )}
+                {/* Nurture sequence actions (for unpaid or all) */}
                 <button
                   onClick={() => sendLeadEmail("scheduled")}
                   disabled={!!emailLoading}
