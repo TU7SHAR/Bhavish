@@ -73,12 +73,14 @@ export async function POST(request) {
       sections,
       payment_id: paymentId || null,
       payment_status: paymentStatus || "unpaid",
-      attribution: attribution || null,
     };
 
+    // Only set attribution if it was actually provided (avoid overwriting existing data)
+    if (attribution) {
+      coreData.attribution = attribution;
+    }
+
     // Enhanced tracking fields (only work after migration is run)
-    // If columns don't exist yet, Supabase ignores unknown fields in upsert
-    // but just in case, we try with them first, fall back to core-only
     const enhancedData = {
       ...coreData,
       personal_question: personalQuestion || null,

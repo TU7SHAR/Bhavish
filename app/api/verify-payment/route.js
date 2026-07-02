@@ -50,24 +50,15 @@ export async function POST(request) {
 
       const { data: { user } } = await supabase.auth.getUser();
 
-      // If 12-month guidance was purchased, set start + end dates
+      // Update ONLY payment-related fields on the existing row.
+      // Using .update() instead of .upsert() so we don't overwrite
+      // attribution, personal_question, city, device_type, etc.
       const now = new Date();
       const guidanceEnd = new Date(now);
       guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
 
-      // Upsert report with paid status
-      // Try with paid_at first; if column doesn't exist yet, fall back without it
-      const upsertData = {
-        report_id: reportId,
+      const updateData = {
         user_id: user?.id || null,
-        name: birthDetails?.name || "",
-        email: birthDetails?.email || user?.email || null,
-        date_of_birth: birthDetails?.dateOfBirth || "",
-        time_of_birth: birthDetails?.timeOfBirth || "",
-        place_of_birth: birthDetails?.placeOfBirth || "",
-        gender: birthDetails?.gender || "",
-        summary: summary || "",
-        sections: previewSections || [],
         payment_id: razorpay_payment_id,
         payment_status: "paid",
         paid_at: now.toISOString(),
@@ -76,12 +67,18 @@ export async function POST(request) {
         guidance_end_date: includeBump ? guidanceEnd.toISOString() : null,
       };
 
-      let { error: upsertErr } = await supabase.from("reports").upsert(upsertData, { onConflict: "report_id" });
+      let { error: updateErr } = await supabase
+        .from("reports")
+        .update(updateData)
+        .eq("report_id", reportId);
 
       // Fallback: if paid_at column doesn't exist yet, retry without it
-      if (upsertErr) {
-        const { paid_at, ...coreData } = upsertData;
-        await supabase.from("reports").upsert(coreData, { onConflict: "report_id" });
+      if (updateErr) {
+        const { paid_at, ...coreUpdate } = updateData;
+        await supabase
+          .from("reports")
+          .update(coreUpdate)
+          .eq("report_id", reportId);
       }
     } catch (dbError) {
       // Don't fail the payment verification if DB save fails
