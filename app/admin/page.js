@@ -315,15 +315,16 @@ function OverviewTab({ data }) {
     });
 
     const leads = filtered.length;
-    const paid = filtered.filter((r) => r.payment_status === "paid").length;
+    const paid = filtered.filter((r) => r.payment_status === "paid" && !r.is_founder_free).length;
     const founders = filtered.filter((r) => r.is_founder_member).length;
     const guidance = filtered.filter((r) => r.has_12_month_guidance).length;
+    const founderFreeReports = filtered.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
     const gross = (paid * 299) + (founders * 999) + (guidance * 149);
     const fees = Math.round(gross * 2.36 / 100);
     const net = gross - fees;
     const conversion = leads > 0 ? ((paid / leads) * 100).toFixed(1) : "0";
 
-    return { leads, paid, gross, net, fees, conversion, founders, guidance };
+    return { leads, paid, gross, net, fees, conversion, founders, guidance, founderFreeReports };
   };
 
   const filtered = getFilteredStats();

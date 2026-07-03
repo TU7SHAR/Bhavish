@@ -174,7 +174,7 @@ Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
       place_of_birth: placeOfBirth,
       summary: reportData.summary,
       sections: reportData.sections,
-      payment_status: "paid", // comped — founder free report
+      payment_status: "founder", // free founder generation — NOT paid revenue
       personal_question: personalQuestion || null,
     };
 

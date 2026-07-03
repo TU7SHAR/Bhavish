@@ -37,8 +37,9 @@ export async function GET(request) {
         .select("*", { count: "exact" });
 
       const reports = allReports || [];
-      const totalPaid = reports.filter((r) => r.payment_status === "paid").length;
+      const totalPaid = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free).length;
       const totalUnpaid = reports.filter((r) => r.payment_status === "unpaid").length;
+      const totalFounderFree = reports.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
 
       // Accurate revenue calculation (accounts for all products)
       const founderMembers = reports.filter((r) => r.is_founder_member).length;
@@ -58,7 +59,7 @@ export async function GET(request) {
       const SETTLEMENT_DAYS = 3;
       const settlementCutoff = new Date(Date.now() - SETTLEMENT_DAYS * 24 * 3600 * 1000).toISOString();
 
-      const paidReports = reports.filter((r) => r.payment_status === "paid");
+      const paidReports = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free);
 
       // Settled = paid before cutoff date
       const settledReports = paidReports.filter((r) => {
@@ -98,7 +99,7 @@ export async function GET(request) {
       // Recent activity (last 7 days)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
       const recentLeads = reports.filter((r) => r.created_at >= sevenDaysAgo).length;
-      const recentPaid = reports.filter((r) => r.payment_status === "paid" && r.created_at >= sevenDaysAgo).length;
+      const recentPaid = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free && r.created_at >= sevenDaysAgo).length;
 
       // Today (IST = UTC+5:30) — Vercel runs in UTC, so we need to calculate IST midnight
       const nowUTC = new Date();
@@ -107,13 +108,14 @@ export async function GET(request) {
       const todayStart = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - istOffset);
       const todayISO = todayStart.toISOString();
       const todayLeads = reports.filter((r) => r.created_at >= todayISO).length;
-      const todayPaid = reports.filter((r) => r.payment_status === "paid" && r.created_at >= todayISO).length;
+      const todayPaid = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free && r.created_at >= todayISO).length;
 
       return NextResponse.json({
         overview: {
           totalLeads: totalLeads || reports.length,
           totalPaid,
           totalUnpaid,
+          totalFounderFree,
           totalRevenue,
           netRevenue,
           totalFees,
@@ -180,11 +182,11 @@ export async function GET(request) {
     }
 
     if (tab === "paid-details") {
-      // EVERY column for paid customers — full report data, payment, upgrades, emails, everything
+      // EVERY column for paid customers + founder free reports
       const { data: paid } = await supabase
         .from("reports")
         .select("*")
-        .eq("payment_status", "paid")
+        .in("payment_status", ["paid", "founder"])
         .order("created_at", { ascending: false });
 
       return NextResponse.json({ paid: paid || [] });
