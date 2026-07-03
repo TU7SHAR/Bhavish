@@ -39,6 +39,9 @@ export default async function Dashboard() {
     .eq("payment_status", "paid")
     .order("created_at", { ascending: false });
 
+  // Is this user a Founder Member? (any of their reports has is_founder_member)
+  const isFounder = Array.isArray(reports) && reports.some((r) => r.is_founder_member);
+
   return (
     <>
       <Header />
@@ -57,6 +60,27 @@ export default async function Dashboard() {
               + New Report
             </Link>
           </div>
+
+          {/* Founder Member banner */}
+          {isFounder && (
+            <div className="relative overflow-hidden bg-gradient-to-br from-accent/15 via-accent/5 to-transparent border-2 border-accent/40 rounded-2xl p-6 mb-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="text-4xl">🎖️</div>
+                  <div>
+                    <h2 className="text-xl font-bold text-accent">Founding Member</h2>
+                    <p className="text-muted text-sm mt-1">You have <strong className="text-foreground">free unlimited reports</strong>. Generate a new report for yourself, family, or friends — no charge.</p>
+                  </div>
+                </div>
+                <Link
+                  href="/founder/new"
+                  className="shrink-0 bg-accent hover:bg-accent-light text-black px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                >
+                  🎁 Generate Free Report
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* Reports Grid */}
           {!reports || reports.length === 0 ? (
