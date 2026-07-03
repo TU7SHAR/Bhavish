@@ -103,7 +103,7 @@ export async function GET(request) {
 
     const { data: reports } = await supabase
       .from("reports")
-      .select("created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance")
+      .select("created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, sections")
       .order("created_at", { ascending: false });
 
     const all = reports || [];
@@ -172,8 +172,29 @@ export async function GET(request) {
       .slice(0, 15);
 
     // ===== QUESTIONS (AI CATEGORIZED) =====
-    const paidQuestions = paid.filter((r) => r.personal_question && r.personal_question.trim()).map((r) => r.personal_question.trim());
-    const unpaidQuestions = unpaid.filter((r) => r.personal_question && r.personal_question.trim()).map((r) => r.personal_question.trim());
+    // Extract personal question from:
+    // 1. personal_question column (new leads after PR #68)
+    // 2. Section 21 title containing "Personal Concern:" (older leads)
+    function getQuestion(r) {
+      if (r.personal_question && r.personal_question.trim()) return r.personal_question.trim();
+      // Fallback: check sections for a "Personal Concern" section (section 21)
+      if (Array.isArray(r.sections)) {
+        const personalSection = r.sections.find((s) =>
+          s.title && /personal|concern|query|question/i.test(s.title)
+        );
+        if (personalSection) {
+          // Extract question from title like "Personal Concern: When will I get married?"
+          const match = personalSection.title.match(/(?:Personal Concern|Query|Question)[:\s]+(.+)/i);
+          if (match) return match[1].trim();
+          // If title itself is the question marker, return a cleaned version
+          return personalSection.title.replace(/^\d+\.\s*/, "").trim();
+        }
+      }
+      return null;
+    }
+
+    const paidQuestions = paid.map((r) => getQuestion(r)).filter(Boolean);
+    const unpaidQuestions = unpaid.map((r) => getQuestion(r)).filter(Boolean);
     const paidWithoutQuestion = paid.length - paidQuestions.length;
     const unpaidWithoutQuestion = unpaid.length - unpaidQuestions.length;
 
