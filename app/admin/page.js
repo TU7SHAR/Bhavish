@@ -696,7 +696,10 @@ function AnalyticsTab({ password }) {
                 </div>
                 <div className="space-y-2">
                   {cat.questions.map((q, i) => (
-                    <p key={i} className="text-xs text-gray-300 pl-3 border-l-2 border-green-500/30 py-1">&ldquo;{q}&rdquo;</p>
+                    <div key={i} className="pl-3 border-l-2 border-green-500/30 py-1">
+                      <p className="text-xs text-gray-300">&ldquo;{q.text}&rdquo;</p>
+                      {q.date && <p className="text-[10px] text-gray-600 mt-0.5">{new Date(q.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -722,7 +725,10 @@ function AnalyticsTab({ password }) {
                 </div>
                 <div className="space-y-2">
                   {cat.questions.map((q, i) => (
-                    <p key={i} className="text-xs text-gray-300 pl-3 border-l-2 border-amber-500/30 py-1">&ldquo;{q}&rdquo;</p>
+                    <div key={i} className="pl-3 border-l-2 border-amber-500/30 py-1">
+                      <p className="text-xs text-gray-300">&ldquo;{q.text}&rdquo;</p>
+                      {q.date && <p className="text-[10px] text-gray-600 mt-0.5">{new Date(q.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>}
+                    </div>
                   ))}
                 </div>
               </div>

@@ -174,49 +174,70 @@ export async function GET(request) {
     // ===== QUESTIONS (AI CATEGORIZED) =====
     // Extract personal question from:
     // 1. personal_question column (new leads after PR #68)
-    // 2. Section 21 title containing "Personal Concern:" (older leads)
+    // 2. A dedicated "Personal Concern" section in the FULL report (older paid leads)
+    // IMPORTANT: must match the exact phrase "Personal Concern" — NOT "Personality"
+    // (preview sections like "Rashi & Personality Overview" must NOT match)
     function getQuestion(r) {
       if (r.personal_question && r.personal_question.trim()) return r.personal_question.trim();
-      // Fallback: check sections for a "Personal Concern" section (section 21)
+      // Fallback: only match a real "Personal Concern:" section (section 21 of full report)
       if (Array.isArray(r.sections)) {
         const personalSection = r.sections.find((s) =>
-          s.title && /personal|concern|query|question/i.test(s.title)
+          s.title && /personal concern/i.test(s.title)
         );
         if (personalSection) {
-          // Extract question from title like "Personal Concern: When will I get married?"
-          const match = personalSection.title.match(/(?:Personal Concern|Query|Question)[:\s]+(.+)/i);
+          const match = personalSection.title.match(/personal concern[:\s-]+(.+)/i);
           if (match) return match[1].trim();
-          // If title itself is the question marker, return a cleaned version
-          return personalSection.title.replace(/^\d+\.\s*/, "").trim();
         }
       }
       return null;
     }
 
-    const paidQuestions = paid.map((r) => getQuestion(r)).filter(Boolean);
-    const unpaidQuestions = unpaid.map((r) => getQuestion(r)).filter(Boolean);
+    // Build {question, date} objects (keep the date for display + sorting)
+    const paidQ = paid.map((r) => ({ q: getQuestion(r), date: r.paid_at || r.created_at })).filter((x) => x.q);
+    const unpaidQ = unpaid.map((r) => ({ q: getQuestion(r), date: r.created_at })).filter((x) => x.q);
+
+    const paidQuestions = paidQ.map((x) => x.q);
+    const unpaidQuestions = unpaidQ.map((x) => x.q);
     const paidWithoutQuestion = paid.length - paidQuestions.length;
     const unpaidWithoutQuestion = unpaid.length - unpaidQuestions.length;
 
-    // AI categorize with caching (separate caches for paid vs unpaid)
-    const paidCategorized = await getCachedCategories(supabase, "questions_paid", paid.length, paidQuestions);
-    const unpaidCategorized = await getCachedCategories(supabase, "questions_unpaid", unpaid.length, unpaidQuestions);
+    // AI categorize with caching (separate caches for paid vs unpaid).
+    // cacheKey includes "v2" so the old (buggy) cache is invalidated automatically.
+    const paidCategorized = await getCachedCategories(supabase, "questions_paid_v2", paid.length, paidQuestions);
+    const unpaidCategorized = await getCachedCategories(supabase, "questions_unpaid_v2", unpaid.length, unpaidQuestions);
 
-    // Group into categories with ALL questions shown
+    // Attach dates back to categorized questions (match by question text + order)
+    function attachDates(categorized, sourceQ) {
+      const used = new Set();
+      return categorized.map((c) => {
+        // find the first matching source entry not yet used
+        const idx = sourceQ.findIndex((s, i) => !used.has(i) && s.q === c.question);
+        if (idx >= 0) { used.add(idx); return { ...c, date: sourceQ[idx].date }; }
+        return { ...c, date: null };
+      });
+    }
+    const paidWithDates = attachDates(paidCategorized, paidQ);
+    const unpaidWithDates = attachDates(unpaidCategorized, unpaidQ);
+
+    // Group into categories with ALL questions shown, newest first within each category
     function groupByCategory(categorized) {
       const groups = {};
-      categorized.forEach(({ question, category }) => {
+      categorized.forEach(({ question, category, date }) => {
         if (!groups[category]) groups[category] = { count: 0, questions: [] };
         groups[category].count++;
-        groups[category].questions.push(question);
+        groups[category].questions.push({ text: question, date });
+      });
+      // sort questions in each category by date (newest first)
+      Object.values(groups).forEach((g) => {
+        g.questions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       });
       return Object.entries(groups)
         .map(([category, data]) => ({ category, ...data }))
         .sort((a, b) => b.count - a.count);
     }
 
-    const paidCatsSorted = groupByCategory(paidCategorized);
-    const unpaidCatsSorted = groupByCategory(unpaidCategorized);
+    const paidCatsSorted = groupByCategory(paidWithDates);
+    const unpaidCatsSorted = groupByCategory(unpaidWithDates);
 
     // ===== CONVERSION FUNNEL =====
     const timesToPay = paid
