@@ -11,7 +11,7 @@ export const maxDuration = 60;
 // ===== AI CATEGORIZATION =====
 async function categorizeWithAI(questions) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
   const prompt = `You are categorizing personal questions asked by users of a Vedic astrology report service (Indian audience, mix of Hindi/English/Hinglish).
 
