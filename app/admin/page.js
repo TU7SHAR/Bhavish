@@ -1359,6 +1359,28 @@ function DetailCard({ person, expanded, onToggle, password }) {
     setEmailLoading("");
   };
 
+  const regenerateReport = async () => {
+    if (!confirm("Regenerate the FULL report for this customer? This recalculates their chart and generates all 20 sections fresh. Their old report will be replaced.")) return;
+    setEmailLoading("regenerate");
+    setEmailAction(null);
+    try {
+      const res = await fetch("/api/admin/regenerate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ reportId: person.report_id }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setEmailAction({ status: "success", message: `✅ Regenerated ${json.sectionCount} sections. Refresh to see, then use "Resend Report" to email it.` });
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setEmailLoading("");
+  };
+
   return (
     <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden transition-all">
       {/* Header row — always visible */}
@@ -1411,6 +1433,13 @@ function DetailCard({ person, expanded, onToggle, password }) {
                       }`}
                     >
                       {emailLoading === "thankyou" ? "Sending..." : person.thankyou_sent_at ? `✅ Thank You Sent (${new Date(person.thankyou_sent_at).toLocaleDateString("en-IN", {day: "numeric", month: "short"})})` : "🙏 Send Thank You (from Founder)"}
+                    </button>
+                    <button
+                      onClick={() => regenerateReport()}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "regenerate" ? "Regenerating... (~30s)" : "🔄 Regenerate Full Report"}
                     </button>
                   </>
                 )}
