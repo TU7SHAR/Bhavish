@@ -145,6 +145,14 @@ export async function GET(request) {
           paidReportOpened: reports.filter((r) => r.payment_status === "paid" && Array.isArray(r.email_opens) && r.email_opens.some((o) => o.type === "report")).length,
           paidThankYouOpened: reports.filter((r) => r.payment_status === "paid" && Array.isArray(r.email_opens) && r.email_opens.some((o) => o.type === "thankyou")).length,
           paidThankYouSent: reports.filter((r) => r.thankyou_sent_at).length,
+          // Lightweight array for client-side date filtering
+          reportDates: reports.map((r) => ({
+            created_at: r.created_at,
+            payment_status: r.payment_status,
+            is_founder_member: !!r.is_founder_member,
+            has_12_month_guidance: !!r.has_12_month_guidance,
+            paid_at: r.paid_at || null,
+          })),
         },
       });
     }

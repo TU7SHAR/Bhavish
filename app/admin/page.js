@@ -252,10 +252,137 @@ function SectionTitle({ children }) {
 
 // ---------- OVERVIEW ----------
 function OverviewTab({ data }) {
+  const [dateFilter, setDateFilter] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+
   if (!data) return null;
+
+  // Calculate filtered stats based on date selection
+  const getFilteredStats = () => {
+    const reports = data.reportDates || [];
+    if (reports.length === 0) return { leads: 0, paid: 0, revenue: 0, net: 0, conversion: "0" };
+
+    // IST offset
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const nowIST = new Date(Date.now() + IST_OFFSET);
+
+    let fromDate = null;
+    let toDate = null;
+
+    if (dateFilter === "today") {
+      fromDate = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET);
+    } else if (dateFilter === "yesterday") {
+      const yesterday = new Date(nowIST);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      fromDate = new Date(Date.UTC(yesterday.getUTCFullYear(), yesterday.getUTCMonth(), yesterday.getUTCDate()) - IST_OFFSET);
+      toDate = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET);
+    } else if (dateFilter === "7days") {
+      fromDate = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    } else if (dateFilter === "30days") {
+      fromDate = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    } else if (dateFilter === "custom" && customFrom) {
+      fromDate = new Date(customFrom + "T00:00:00+05:30");
+      if (customTo) toDate = new Date(customTo + "T23:59:59+05:30");
+    }
+    // "all" = no filter
+
+    const filtered = reports.filter((r) => {
+      if (!r.created_at) return false;
+      const d = new Date(r.created_at);
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+      return true;
+    });
+
+    const leads = filtered.length;
+    const paid = filtered.filter((r) => r.payment_status === "paid").length;
+    const founders = filtered.filter((r) => r.is_founder_member).length;
+    const guidance = filtered.filter((r) => r.has_12_month_guidance).length;
+    const gross = (paid * 299) + (founders * 999) + (guidance * 149);
+    const fees = Math.round(gross * 2.36 / 100);
+    const net = gross - fees;
+    const conversion = leads > 0 ? ((paid / leads) * 100).toFixed(1) : "0";
+
+    return { leads, paid, gross, net, fees, conversion, founders, guidance };
+  };
+
+  const filtered = getFilteredStats();
+  const showFiltered = dateFilter !== "all";
+
   return (
     <div className="space-y-8">
-      {/* Hero revenue banner */}
+      {/* Date Filter Bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { id: "today", label: "Today" },
+          { id: "yesterday", label: "Yesterday" },
+          { id: "7days", label: "Last 7 Days" },
+          { id: "30days", label: "Last 30 Days" },
+          { id: "all", label: "All Time" },
+          { id: "custom", label: "Custom" },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setDateFilter(f.id)}
+            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${
+              dateFilter === f.id
+                ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-600/20"
+                : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2 ml-2">
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="bg-[#11111f] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]"
+            />
+            <span className="text-gray-500 text-xs">to</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="bg-[#11111f] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Filtered stats banner (only shows when a filter is active) */}
+      {showFiltered && (
+        <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-600/10 to-transparent p-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Filtered Revenue</p>
+              <p className="text-2xl font-bold mt-1 text-green-400">₹{filtered.net.toLocaleString("en-IN")}</p>
+              <p className="text-[10px] text-gray-500">gross ₹{filtered.gross.toLocaleString("en-IN")}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Leads</p>
+              <p className="text-2xl font-bold mt-1">{filtered.leads}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Paid</p>
+              <p className="text-2xl font-bold mt-1">{filtered.paid}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Conversion</p>
+              <p className="text-2xl font-bold mt-1 text-green-400">{filtered.conversion}%</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Fees Lost</p>
+              <p className="text-2xl font-bold mt-1 text-red-400">₹{filtered.fees.toLocaleString("en-IN")}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hero revenue banner (all-time totals always shown) */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-purple-600/20 via-indigo-600/10 to-transparent p-6">
         <div className="absolute -right-10 -top-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
         <div className="relative grid grid-cols-2 md:grid-cols-5 gap-6">
