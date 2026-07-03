@@ -1,30 +1,91 @@
 import { createClient } from "@supabase/supabase-js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
 // Admin analytics API — computes insights from all reports data.
+// Uses Gemini AI to categorize personal questions (cached in DB).
 // GET /api/admin/analytics
 // Header: Authorization: Bearer <ADMIN_SECRET>
-export const maxDuration = 30;
+export const maxDuration = 60;
 
-// Auto-categorize personal questions into ad-relevant buckets
-function categorizeQuestion(q) {
-  if (!q) return null;
-  const lower = q.toLowerCase();
+// ===== AI CATEGORIZATION =====
+async function categorizeWithAI(questions) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
-  if (/career|job|promotion|work|profession|office|business opportunity|resign|switch/i.test(lower)) return "Career & Job";
-  if (/marri|shadi|spouse|husband|wife|wedding|vivah|partner find|life partner/i.test(lower)) return "Marriage";
-  if (/love|relationship|boyfriend|girlfriend|breakup|affair|dating|ex /i.test(lower)) return "Love & Relationships";
-  if (/money|wealth|financ|income|salary|debt|loan|profit|loss|invest/i.test(lower)) return "Money & Finance";
-  if (/business|startup|entrepre|freelance|company|venture|self.?employ/i.test(lower)) return "Business & Startup";
-  if (/abroad|foreign|visa|immigra|settle abroad|go overseas|usa|canada|uk|australia|germany/i.test(lower)) return "Foreign & Travel";
-  if (/health|illness|disease|body|mental|anxiety|depression|medical/i.test(lower)) return "Health";
-  if (/education|study|exam|college|university|degree|masters|competitive/i.test(lower)) return "Education & Exams";
-  if (/child|baby|pregnan|son|daughter|fertility|conceive/i.test(lower)) return "Children & Family";
-  if (/property|house|flat|real estate|land|home/i.test(lower)) return "Property & Home";
-  if (/when|timing|kab|future|next year|2026|2027|prediction/i.test(lower)) return "Timing & Predictions";
-  if (/lucky|gemstone|remedy|upay|mantra|spiritual/i.test(lower)) return "Remedies & Spirituality";
+  const prompt = `You are categorizing personal questions asked by users of a Vedic astrology report service (Indian audience, mix of Hindi/English/Hinglish).
 
-  return "General / Other";
+Categorize EACH question into exactly ONE of these categories:
+- Career & Job
+- Marriage
+- Love & Relationships
+- Money & Finance
+- Business & Startup
+- Foreign & Travel
+- Health
+- Education & Exams
+- Children & Family
+- Property & Home
+- Timing & Predictions
+- Remedies & Spirituality
+- General / Other
+
+Here are the questions (numbered):
+${questions.map((q, i) => `${i + 1}. "${q}"`).join("\n")}
+
+Return ONLY valid JSON array, no markdown:
+[{"index": 1, "category": "Career & Job"}, {"index": 2, "category": "Marriage"}, ...]`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error("No JSON array in AI response");
+  return JSON.parse(match[0]);
+}
+
+// ===== CACHE LOGIC =====
+async function getCachedCategories(supabase, cacheKey, currentCount, questions) {
+  // Try to read cache
+  try {
+    const { data: cached } = await supabase
+      .from("analytics_cache")
+      .select("data, report_count")
+      .eq("key", cacheKey)
+      .maybeSingle();
+
+    // Cache hit — report count matches (no new data since last categorization)
+    if (cached && cached.report_count === currentCount && cached.data) {
+      return cached.data;
+    }
+  } catch (e) {
+    // Table might not exist yet — proceed without cache
+    console.warn("analytics_cache read failed (table may not exist):", e.message);
+  }
+
+  // Cache miss or stale — run AI categorization
+  if (questions.length === 0) return [];
+
+  const aiResults = await categorizeWithAI(questions);
+
+  // Map results back to questions
+  const categorized = questions.map((q, i) => {
+    const aiResult = aiResults.find((r) => r.index === i + 1);
+    return { question: q, category: aiResult?.category || "General / Other" };
+  });
+
+  // Save to cache
+  try {
+    await supabase.from("analytics_cache").upsert({
+      key: cacheKey,
+      data: categorized,
+      report_count: currentCount,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "key" });
+  } catch (e) {
+    console.warn("analytics_cache write failed:", e.message);
+  }
+
+  return categorized;
 }
 
 export async function GET(request) {
@@ -65,7 +126,7 @@ export async function GET(request) {
       hourlyPaid[istHour]++;
     });
 
-    // Day of week analysis
+    // Day of week
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dailyLeads = Array(7).fill(0);
     const dailyPaid = Array(7).fill(0);
@@ -110,37 +171,33 @@ export async function GET(request) {
       .sort((a, b) => b.leads - a.leads)
       .slice(0, 15);
 
-    // ===== QUESTIONS ANALYSIS =====
+    // ===== QUESTIONS (AI CATEGORIZED) =====
     const paidQuestions = paid.filter((r) => r.personal_question && r.personal_question.trim()).map((r) => r.personal_question.trim());
     const unpaidQuestions = unpaid.filter((r) => r.personal_question && r.personal_question.trim()).map((r) => r.personal_question.trim());
+    const paidWithoutQuestion = paid.length - paidQuestions.length;
+    const unpaidWithoutQuestion = unpaid.length - unpaidQuestions.length;
 
-    // Categorize
-    const paidCategories = {};
-    paidQuestions.forEach((q) => {
-      const cat = categorizeQuestion(q);
-      if (!paidCategories[cat]) paidCategories[cat] = { count: 0, examples: [] };
-      paidCategories[cat].count++;
-      if (paidCategories[cat].examples.length < 5) paidCategories[cat].examples.push(q);
-    });
+    // AI categorize with caching (separate caches for paid vs unpaid)
+    const paidCategorized = await getCachedCategories(supabase, "questions_paid", paid.length, paidQuestions);
+    const unpaidCategorized = await getCachedCategories(supabase, "questions_unpaid", unpaid.length, unpaidQuestions);
 
-    const unpaidCategories = {};
-    unpaidQuestions.forEach((q) => {
-      const cat = categorizeQuestion(q);
-      if (!unpaidCategories[cat]) unpaidCategories[cat] = { count: 0, examples: [] };
-      unpaidCategories[cat].count++;
-      if (unpaidCategories[cat].examples.length < 5) unpaidCategories[cat].examples.push(q);
-    });
+    // Group into categories with ALL questions shown
+    function groupByCategory(categorized) {
+      const groups = {};
+      categorized.forEach(({ question, category }) => {
+        if (!groups[category]) groups[category] = { count: 0, questions: [] };
+        groups[category].count++;
+        groups[category].questions.push(question);
+      });
+      return Object.entries(groups)
+        .map(([category, data]) => ({ category, ...data }))
+        .sort((a, b) => b.count - a.count);
+    }
 
-    // Sort categories by count
-    const paidCatsSorted = Object.entries(paidCategories)
-      .map(([category, data]) => ({ category, ...data }))
-      .sort((a, b) => b.count - a.count);
-    const unpaidCatsSorted = Object.entries(unpaidCategories)
-      .map(([category, data]) => ({ category, ...data }))
-      .sort((a, b) => b.count - a.count);
+    const paidCatsSorted = groupByCategory(paidCategorized);
+    const unpaidCatsSorted = groupByCategory(unpaidCategorized);
 
     // ===== CONVERSION FUNNEL =====
-    // Time to pay (minutes)
     const timesToPay = paid
       .filter((r) => r.paid_at && r.created_at)
       .map((r) => Math.round((new Date(r.paid_at) - new Date(r.created_at)) / 60000));
@@ -172,6 +229,8 @@ export async function GET(request) {
       questions: {
         paidTotal: paidQuestions.length,
         unpaidTotal: unpaidQuestions.length,
+        paidWithoutQuestion,
+        unpaidWithoutQuestion,
         paidCategories: paidCatsSorted,
         unpaidCategories: unpaidCatsSorted,
       },
