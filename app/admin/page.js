@@ -665,17 +665,20 @@ function AnalyticsTab({ password }) {
       {subTab === "questions-paid" && (
         <div>
           <SectionTitle>What Paying Customers Ask ({data.questions.paidTotal} questions)</SectionTitle>
-          <p className="text-gray-400 text-sm mb-4">These are the pain points people will actually PAY to solve. Use these themes in your ad copy.</p>
+          <p className="text-gray-400 text-sm mb-2">These are the pain points people will actually PAY to solve. Use these themes in your ad copy.</p>
+          {data.questions.paidWithoutQuestion > 0 && (
+            <p className="text-gray-500 text-xs mb-4">{data.questions.paidWithoutQuestion} paid customer(s) didn&apos;t ask a question.</p>
+          )}
           <div className="space-y-3">
             {data.questions.paidCategories.map((cat) => (
               <div key={cat.category} className="bg-[#11111f] border border-white/10 rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-green-400">{cat.category}</h3>
                   <span className="px-2 py-0.5 rounded-full text-[11px] bg-green-500/20 text-green-400 font-medium">{cat.count} paid</span>
                 </div>
-                <div className="space-y-1.5">
-                  {cat.examples.map((q, i) => (
-                    <p key={i} className="text-xs text-gray-400 pl-3 border-l-2 border-green-500/30">&ldquo;{q}&rdquo;</p>
+                <div className="space-y-2">
+                  {cat.questions.map((q, i) => (
+                    <p key={i} className="text-xs text-gray-300 pl-3 border-l-2 border-green-500/30 py-1">&ldquo;{q}&rdquo;</p>
                   ))}
                 </div>
               </div>
@@ -688,17 +691,20 @@ function AnalyticsTab({ password }) {
       {subTab === "questions-unpaid" && (
         <div>
           <SectionTitle>What Non-Paying Leads Ask ({data.questions.unpaidTotal} questions)</SectionTitle>
-          <p className="text-gray-400 text-sm mb-4">These people were interested but didn&apos;t convert. Compare with paid questions to understand what&apos;s different.</p>
+          <p className="text-gray-400 text-sm mb-2">These people were interested but didn&apos;t convert. Compare with paid questions to understand what&apos;s different.</p>
+          {data.questions.unpaidWithoutQuestion > 0 && (
+            <p className="text-gray-500 text-xs mb-4">{data.questions.unpaidWithoutQuestion} lead(s) didn&apos;t ask a question.</p>
+          )}
           <div className="space-y-3">
             {data.questions.unpaidCategories.map((cat) => (
               <div key={cat.category} className="bg-[#11111f] border border-white/10 rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-amber-400">{cat.category}</h3>
                   <span className="px-2 py-0.5 rounded-full text-[11px] bg-amber-500/20 text-amber-400 font-medium">{cat.count} unpaid</span>
                 </div>
-                <div className="space-y-1.5">
-                  {cat.examples.map((q, i) => (
-                    <p key={i} className="text-xs text-gray-400 pl-3 border-l-2 border-amber-500/30">&ldquo;{q}&rdquo;</p>
+                <div className="space-y-2">
+                  {cat.questions.map((q, i) => (
+                    <p key={i} className="text-xs text-gray-300 pl-3 border-l-2 border-amber-500/30 py-1">&ldquo;{q}&rdquo;</p>
                   ))}
                 </div>
               </div>
