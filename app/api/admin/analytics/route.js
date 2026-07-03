@@ -140,6 +140,25 @@ export async function GET(request) {
       dailyPaid[day]++;
     });
 
+    // Per-DATE breakdown (each unique calendar date in IST)
+    const dateMap = {};
+    function istDateKey(ts) {
+      const d = new Date(new Date(ts).getTime() + IST_OFFSET);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    }
+    all.forEach((r) => {
+      const key = istDateKey(r.created_at);
+      if (!dateMap[key]) dateMap[key] = { date: key, leads: 0, paid: 0, revenue: 0 };
+      dateMap[key].leads++;
+    });
+    paid.forEach((r) => {
+      const key = istDateKey(r.paid_at || r.created_at);
+      if (!dateMap[key]) dateMap[key] = { date: key, leads: 0, paid: 0, revenue: 0 };
+      dateMap[key].paid++;
+      dateMap[key].revenue += 299 + (r.is_founder_member ? 999 : 0) + (r.has_12_month_guidance ? 149 : 0);
+    });
+    const dailyBreakdown = Object.values(dateMap).sort((a, b) => new Date(b.date) - new Date(a.date));
+
     // ===== DEMOGRAPHICS =====
     const genderStats = { male: { leads: 0, paid: 0 }, female: { leads: 0, paid: 0 }, other: { leads: 0, paid: 0 } };
     all.forEach((r) => {
@@ -265,7 +284,7 @@ export async function GET(request) {
       .sort((a, b) => b.leads - a.leads);
 
     return NextResponse.json({
-      peakHours: { hourlyLeads, hourlyPaid, dailyLeads, dailyPaid, dayNames },
+      peakHours: { hourlyLeads, hourlyPaid, dailyLeads, dailyPaid, dayNames, dailyBreakdown },
       demographics: { genderStats, deviceStats },
       geography: { topCities },
       questions: {

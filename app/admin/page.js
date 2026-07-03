@@ -614,6 +614,44 @@ function AnalyticsTab({ password }) {
               </div>
             ))}
           </div>
+
+          {/* Per-date breakdown */}
+          <div className="mt-6">
+            <SectionTitle>Daily Breakdown (Each Date)</SectionTitle>
+            <p className="text-[10px] text-gray-500 mb-3 -mt-2">Every individual date, newest first. Leads, paid customers, and revenue that day.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {(data.peakHours.dailyBreakdown || []).map((d) => {
+                const dateObj = new Date(d.date + "T00:00:00+05:30");
+                const dayName = dateObj.toLocaleDateString("en-IN", { weekday: "short" });
+                const dateLabel = dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                return (
+                  <div key={d.date} className="bg-[#11111f] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition-colors">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <p className="text-sm font-semibold text-gray-200">{dateLabel}</p>
+                      <p className="text-[10px] text-gray-500">{dayName}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-gray-400">Leads</span>
+                        <span className="text-sm font-bold text-blue-400">{d.leads}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-gray-400">Paid</span>
+                        <span className="text-sm font-bold text-green-400">{d.paid}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-white/5 pt-1 mt-1">
+                        <span className="text-[11px] text-gray-400">Revenue</span>
+                        <span className="text-xs font-bold text-purple-300">₹{d.revenue.toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {(!data.peakHours.dailyBreakdown || data.peakHours.dailyBreakdown.length === 0) && (
+              <p className="text-gray-500 text-center py-8">No data yet.</p>
+            )}
+          </div>
         </div>
       )}
 
