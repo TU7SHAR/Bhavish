@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (authed && tab !== "actions") fetchData(tab);
+    if (authed && tab !== "actions" && tab !== "analytics") fetchData(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -123,6 +123,7 @@ export default function AdminDashboard() {
 
   const tabs = [
     { id: "overview", label: "Overview", icon: "📊" },
+    { id: "analytics", label: "Analytics", icon: "🔬" },
     { id: "leads", label: "Leads", icon: "👥" },
     { id: "paid-details", label: "Paid People", icon: "💎" },
     { id: "all-details", label: "Everyone", icon: "🔍" },
@@ -196,6 +197,7 @@ export default function AdminDashboard() {
         {!loading && data && !data.error && (
           <>
             {tab === "overview" && <OverviewTab data={data.overview} />}
+            {tab === "analytics" && <AnalyticsTab password={password} />}
             {tab === "leads" && <LeadsTab leads={data.leads} />}
             {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
             {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
@@ -504,6 +506,267 @@ function Pill({ active, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+
+// ---------- ANALYTICS ----------
+function AnalyticsTab({ password }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [subTab, setSubTab] = useState("peak");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/admin/analytics", { headers: { Authorization: `Bearer ${password}` } });
+        if (res.ok) setData(await res.json());
+      } catch (e) { console.error(e); }
+      setLoading(false);
+    })();
+  }, [password]);
+
+  if (loading) return <LoadingState />;
+  if (!data) return <p className="text-gray-500 text-center py-12">Failed to load analytics.</p>;
+
+  const subTabs = [
+    { id: "peak", label: "Peak Hours", icon: "⏰" },
+    { id: "demographics", label: "Demographics", icon: "👤" },
+    { id: "geography", label: "Geography", icon: "📍" },
+    { id: "questions-paid", label: "Questions (Paid)", icon: "💰" },
+    { id: "questions-unpaid", label: "Questions (Unpaid)", icon: "👀" },
+    { id: "funnel", label: "Conversion Speed", icon: "⚡" },
+    { id: "sources", label: "Source Performance", icon: "📣" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Sub-tab nav */}
+      <div className="flex flex-wrap gap-2">
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${
+              subTab === t.id
+                ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white"
+                : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+            }`}
+          >
+            <span className="mr-1">{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Peak Hours */}
+      {subTab === "peak" && (
+        <div className="space-y-6">
+          <SectionTitle>Hourly Activity (IST)</SectionTitle>
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+            <p className="text-xs text-gray-400 mb-4">Leads (blue) vs Conversions (green) by hour of day</p>
+            <div className="flex items-end gap-1 h-40">
+              {data.peakHours.hourlyLeads.map((count, i) => {
+                const maxVal = Math.max(...data.peakHours.hourlyLeads, 1);
+                const paidCount = data.peakHours.hourlyPaid[i] || 0;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5" title={`${i}:00 IST — ${count} leads, ${paidCount} paid`}>
+                    <div className="w-full flex flex-col items-center justify-end h-32">
+                      <div className="w-full bg-blue-500/40 rounded-t" style={{ height: `${(count / maxVal) * 100}%`, minHeight: count > 0 ? "2px" : "0" }}></div>
+                      {paidCount > 0 && <div className="w-full bg-green-500 rounded-t mt-0.5" style={{ height: `${(paidCount / maxVal) * 100}%`, minHeight: "2px" }}></div>}
+                    </div>
+                    <span className="text-[9px] text-gray-600">{i}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-3 h-2 bg-blue-500/40 rounded"></span> Leads</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-500 rounded"></span> Paid</span>
+            </div>
+          </div>
+
+          <SectionTitle>Day of Week</SectionTitle>
+          <div className="grid grid-cols-7 gap-2">
+            {data.peakHours.dayNames.map((day, i) => (
+              <div key={day} className="bg-[#11111f] border border-white/10 rounded-xl p-3 text-center">
+                <p className="text-xs text-gray-400 font-medium">{day}</p>
+                <p className="text-lg font-bold mt-1">{data.peakHours.dailyLeads[i]}</p>
+                <p className="text-[10px] text-green-400">{data.peakHours.dailyPaid[i]} paid</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Demographics */}
+      {subTab === "demographics" && (
+        <div className="space-y-6">
+          <SectionTitle>Gender Breakdown</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Object.entries(data.demographics.genderStats).map(([gender, stats]) => (
+              <div key={gender} className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+                <p className="text-gray-400 text-xs uppercase tracking-wider capitalize">{gender}</p>
+                <p className="text-3xl font-bold mt-2">{stats.leads}</p>
+                <p className="text-sm text-green-400 mt-1">{stats.paid} paid ({stats.leads > 0 ? ((stats.paid / stats.leads) * 100).toFixed(1) : 0}%)</p>
+              </div>
+            ))}
+          </div>
+
+          <SectionTitle>Device Breakdown</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(data.demographics.deviceStats).map(([device, stats]) => (
+              <div key={device} className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+                <p className="text-gray-400 text-xs uppercase tracking-wider">{device === "mobile" ? "📱 Mobile" : "💻 Desktop"}</p>
+                <p className="text-3xl font-bold mt-2">{stats.leads} <span className="text-lg text-gray-500">leads</span></p>
+                <p className="text-sm text-green-400 mt-1">{stats.paid} converted ({stats.leads > 0 ? ((stats.paid / stats.leads) * 100).toFixed(1) : 0}% conv rate)</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Geography */}
+      {subTab === "geography" && (
+        <div>
+          <SectionTitle>Top Cities (Leads vs Conversions)</SectionTitle>
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
+                  <th className="p-3">#</th>
+                  <th className="p-3">City</th>
+                  <th className="p-3 text-center">Leads</th>
+                  <th className="p-3 text-center">Paid</th>
+                  <th className="p-3 text-center">Conv %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.geography.topCities.map((c, i) => (
+                  <tr key={c.city} className="border-t border-white/5 hover:bg-white/5">
+                    <td className="p-3 text-gray-500">{i + 1}</td>
+                    <td className="p-3 font-medium">{c.city}</td>
+                    <td className="p-3 text-center">{c.leads}</td>
+                    <td className="p-3 text-center text-green-400">{c.paid}</td>
+                    <td className="p-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${parseFloat(c.convRate) > 5 ? "bg-green-500/20 text-green-400" : parseFloat(c.convRate) > 0 ? "bg-amber-500/20 text-amber-400" : "bg-white/10 text-gray-500"}`}>
+                        {c.convRate}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Questions (Paid) */}
+      {subTab === "questions-paid" && (
+        <div>
+          <SectionTitle>What Paying Customers Ask ({data.questions.paidTotal} questions)</SectionTitle>
+          <p className="text-gray-400 text-sm mb-4">These are the pain points people will actually PAY to solve. Use these themes in your ad copy.</p>
+          <div className="space-y-3">
+            {data.questions.paidCategories.map((cat) => (
+              <div key={cat.category} className="bg-[#11111f] border border-white/10 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-green-400">{cat.category}</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] bg-green-500/20 text-green-400 font-medium">{cat.count} paid</span>
+                </div>
+                <div className="space-y-1.5">
+                  {cat.examples.map((q, i) => (
+                    <p key={i} className="text-xs text-gray-400 pl-3 border-l-2 border-green-500/30">&ldquo;{q}&rdquo;</p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Questions (Unpaid) */}
+      {subTab === "questions-unpaid" && (
+        <div>
+          <SectionTitle>What Non-Paying Leads Ask ({data.questions.unpaidTotal} questions)</SectionTitle>
+          <p className="text-gray-400 text-sm mb-4">These people were interested but didn&apos;t convert. Compare with paid questions to understand what&apos;s different.</p>
+          <div className="space-y-3">
+            {data.questions.unpaidCategories.map((cat) => (
+              <div key={cat.category} className="bg-[#11111f] border border-white/10 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-amber-400">{cat.category}</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] bg-amber-500/20 text-amber-400 font-medium">{cat.count} unpaid</span>
+                </div>
+                <div className="space-y-1.5">
+                  {cat.examples.map((q, i) => (
+                    <p key={i} className="text-xs text-gray-400 pl-3 border-l-2 border-amber-500/30">&ldquo;{q}&rdquo;</p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Conversion Speed */}
+      {subTab === "funnel" && (
+        <div className="space-y-6">
+          <SectionTitle>How Fast Do People Pay?</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Average Time" value={data.funnel.avgTimeToPay ? `${data.funnel.avgTimeToPay}m` : "—"} sub="minutes from preview" accent="purple" icon="⏱" />
+            <StatCard label="Median Time" value={data.funnel.medianTimeToPay ? `${data.funnel.medianTimeToPay}m` : "—"} sub="half pay faster than this" accent="blue" icon="📊" />
+            <StatCard label="Under 5 min" value={data.funnel.under5min} sub={`of ${data.funnel.total} (${data.funnel.total ? Math.round(data.funnel.under5min / data.funnel.total * 100) : 0}%)`} accent="green" icon="⚡" />
+            <StatCard label="Over 1 hour" value={data.funnel.over1hr} sub="slow deciders" accent="amber" icon="🐢" />
+          </div>
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+            <p className="text-sm text-gray-300 mb-2">Insight:</p>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              {data.funnel.under5min > data.funnel.total * 0.5
+                ? "Most of your customers are impulse buyers — they decide within 5 minutes. Your preview/paywall is working well for quick conversions."
+                : data.funnel.over1hr > data.funnel.total * 0.3
+                ? "A significant portion takes over an hour to decide. Your email nurture sequence is important for these slow deciders."
+                : "Your customers have mixed decision speeds. Both the immediate paywall and the nurture emails are contributing to conversions."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Source Performance */}
+      {subTab === "sources" && (
+        <div>
+          <SectionTitle>Traffic Source Performance</SectionTitle>
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
+                  <th className="p-3">Source</th>
+                  <th className="p-3 text-center">Leads</th>
+                  <th className="p-3 text-center">Paid</th>
+                  <th className="p-3 text-center">Conv %</th>
+                  <th className="p-3 text-center">Revenue (net)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.sources.map((s) => (
+                  <tr key={s.source} className="border-t border-white/5 hover:bg-white/5">
+                    <td className="p-3 font-medium">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                        s.source === "facebook" || s.source === "fb" || s.source === "ig" ? "bg-blue-600/20 text-blue-400" :
+                        s.source === "google" ? "bg-red-500/20 text-red-400" :
+                        "bg-white/10 text-gray-400"
+                      }`}>{s.source}</span>
+                    </td>
+                    <td className="p-3 text-center">{s.leads}</td>
+                    <td className="p-3 text-center text-green-400">{s.paid}</td>
+                    <td className="p-3 text-center">{s.convRate}%</td>
+                    <td className="p-3 text-center text-green-400">₹{Math.round(s.paid * 299 * 0.9764).toLocaleString("en-IN")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
