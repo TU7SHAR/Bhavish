@@ -237,7 +237,7 @@ export default function FullReport() {
                 🖨️ Print Report
               </button>
               <a
-                href="mailto:?subject=Check out BhavishAI - AI Astrology&body=I just got my Vedic astrology report from BhavishAI. Check it out: https://bhavishai.in"
+                href="mailto:?subject=Check out BhavishAI - AI Astrology&body=I just got my Vedic astrology report from BhavishAI. Check it out: https://www.bhavishai.in"
                 className="bg-surface-light hover:bg-border text-foreground px-6 py-2 rounded-full text-sm font-medium transition-all border border-border"
               >
                 📨 Share with Friends
