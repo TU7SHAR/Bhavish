@@ -58,7 +58,7 @@ export async function POST(request) {
 
     // Step 3: Build the full report prompt
     const planetaryTable = Object.entries(chartData.planets)
-      .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | ${data.dignity}`)
+      .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | Navamsa D9: ${data.navamsa} | ${data.dignity}`)
       .join("\n");
     const dashaTable = (chartData.dasha || [])
       .map((d, i) => `${i + 1}. ${d.planet} Mahadasha: ${d.years} years`)
@@ -75,7 +75,7 @@ export async function POST(request) {
 BIRTH DATA: ${name} | ${report.gender} | ${report.date_of_birth} | ${report.time_of_birth} | ${report.place_of_birth}
 
 CHART:
-Ascendant: ${chartData.ascendant.sign} at ${chartData.ascendant.degree}
+Ascendant: ${chartData.ascendant.sign} at ${chartData.ascendant.degree} | Navamsa D9: ${chartData.ascendant.navamsa}
 Moon Nakshatra: ${chartData.nakshatra.name} (Pada ${chartData.nakshatra.pada}), Lord: ${chartData.nakshatra.ruler}
 Rashi: ${chartData.rashi}
 
@@ -88,6 +88,8 @@ ${dashaTable}
 CURRENT DASHA (USE THIS EXACTLY — do NOT guess or recalculate):
 ${chartData.dashaTimeline?.summary || "Not available"}
 CRITICAL TIMELINE INSTRUCTION: The Mahadasha/Antardasha period stated above is a HARD FACT computed from the Moon's exact birth degree — treat it as ground truth. You MUST use this exact running period and its dates in Sections 12, 13, 16, 19, and 21. You are strictly forbidden from calculating, inferring, or guessing the current dasha from the person's age or from the dasha sequence years. Every timeline-based prediction in those sections must be anchored to the period stated above.
+
+NAVAMSA (D9) INSTRUCTION: Each planet's and the Ascendant's Navamsa (D9) sign is listed above as a HARD FACT. The Nakshatra pada's navamsa equals the Moon's Navamsa (D9) sign shown above. Whenever you reference a navamsa (e.g. Section 4), you MUST use these exact D9 signs and are strictly forbidden from computing or guessing any navamsa yourself.
 
 Generate a 20-section report. Each section 250-350 words referencing specific planets/houses/degrees.
 
