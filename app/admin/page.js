@@ -308,7 +308,23 @@ function OverviewTab({ data }) {
   };
 
   const filtered = getFilteredStats();
-  const showFiltered = dateFilter !== "all";
+
+  // When a filter is active, use filtered stats for the hero banner
+  const display = dateFilter === "all" ? {
+    revenue: data.totalRevenue || 0,
+    net: data.netRevenue || 0,
+    fees: data.totalFees || 0,
+    paid: data.totalPaid,
+    leads: data.totalLeads,
+    conversion: data.conversionRate,
+  } : {
+    revenue: filtered.gross,
+    net: filtered.net,
+    fees: filtered.fees,
+    paid: filtered.paid,
+    leads: filtered.leads,
+    conversion: filtered.conversion,
+  };
 
   return (
     <div className="space-y-8">
@@ -351,61 +367,35 @@ function OverviewTab({ data }) {
             />
           </div>
         )}
+        {dateFilter !== "all" && (
+          <span className="text-[11px] text-purple-400 ml-2">Showing filtered stats</span>
+        )}
       </div>
 
-      {/* Filtered stats banner (only shows when a filter is active) */}
-      {showFiltered && (
-        <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-600/10 to-transparent p-5">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div>
-              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Filtered Revenue</p>
-              <p className="text-2xl font-bold mt-1 text-green-400">₹{filtered.net.toLocaleString("en-IN")}</p>
-              <p className="text-[10px] text-gray-500">gross ₹{filtered.gross.toLocaleString("en-IN")}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Leads</p>
-              <p className="text-2xl font-bold mt-1">{filtered.leads}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Paid</p>
-              <p className="text-2xl font-bold mt-1">{filtered.paid}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Conversion</p>
-              <p className="text-2xl font-bold mt-1 text-green-400">{filtered.conversion}%</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Fees Lost</p>
-              <p className="text-2xl font-bold mt-1 text-red-400">₹{filtered.fees.toLocaleString("en-IN")}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hero revenue banner (all-time totals always shown) */}
+      {/* Hero revenue banner — updates based on date filter */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-purple-600/20 via-indigo-600/10 to-transparent p-6">
         <div className="absolute -right-10 -top-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
         <div className="relative grid grid-cols-2 md:grid-cols-5 gap-6">
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Gross Revenue</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1 bg-gradient-to-r from-purple-300 to-indigo-300 bg-clip-text text-transparent">₹{(data.totalRevenue || 0).toLocaleString("en-IN")}</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1 bg-gradient-to-r from-purple-300 to-indigo-300 bg-clip-text text-transparent">₹{display.revenue.toLocaleString("en-IN")}</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">In Your Account</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1 text-green-400">₹{(data.netRevenue || 0).toLocaleString("en-IN")}</p>
-            <p className="text-[10px] text-gray-500 mt-0.5">after Razorpay fees (₹{(data.totalFees || 0).toLocaleString("en-IN")})</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1 text-green-400">₹{display.net.toLocaleString("en-IN")}</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">after Razorpay fees (₹{display.fees.toLocaleString("en-IN")})</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Paid Customers</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1">{data.totalPaid}</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1">{display.paid}</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Total Leads</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1">{data.totalLeads}</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1">{display.leads}</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Conversion</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1 text-green-400">{data.conversionRate}%</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1 text-green-400">{display.conversion}%</p>
           </div>
         </div>
       </div>
@@ -519,10 +509,32 @@ function Pill({ active, onClick, children }) {
 
 
 // ---------- LEADS ----------
+const ALL_COLUMNS = [
+  { id: "name", label: "Name", default: true },
+  { id: "email", label: "Email", default: true },
+  { id: "city", label: "City", default: true },
+  { id: "status", label: "Status", default: true },
+  { id: "device", label: "Device", default: true },
+  { id: "emails", label: "Emails", default: true },
+  { id: "opens", label: "Opens", default: true },
+  { id: "source", label: "Source", default: true },
+  { id: "question", label: "Question", default: true },
+  { id: "generated", label: "Generated At", default: true },
+  { id: "gender", label: "Gender", default: false },
+  { id: "dob", label: "DOB", default: false },
+  { id: "place", label: "Place", default: false },
+];
+
 function LeadsTab({ leads }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("recent");
+  const [visibleCols, setVisibleCols] = useState(() => ALL_COLUMNS.filter((c) => c.default).map((c) => c.id));
+  const [showColPicker, setShowColPicker] = useState(false);
+
+  const toggleCol = (id) => {
+    setVisibleCols((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
+  };
 
   const filtered = useMemo(() => {
     if (!leads) return [];
@@ -550,11 +562,12 @@ function LeadsTab({ leads }) {
     return out;
   }, [leads, search, status, sort]);
 
-  // Helper: get source from attribution
   function getSource(lead) {
     if (!lead.attribution) return null;
     return lead.attribution.utm_source || (lead.attribution.fbclid ? "facebook" : lead.attribution.gclid ? "google" : null);
   }
+
+  const show = (id) => visibleCols.includes(id);
 
   if (!leads) return null;
   return (
@@ -578,23 +591,50 @@ function LeadsTab({ leads }) {
           <option value="emails">Most emails sent</option>
           <option value="opens">Most opens</option>
         </select>
+        {/* Column picker toggle */}
+        <button
+          onClick={() => setShowColPicker(!showColPicker)}
+          className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${showColPicker ? "bg-purple-600 border-purple-500 text-white" : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white"}`}
+        >
+          ⚙️ Columns
+        </button>
       </FilterBar>
+
+      {/* Column visibility picker */}
+      {showColPicker && (
+        <div className="mb-4 bg-[#11111f] border border-white/10 rounded-xl p-3 flex flex-wrap gap-2">
+          {ALL_COLUMNS.map((col) => (
+            <label key={col.id} className="flex items-center gap-1.5 cursor-pointer text-xs">
+              <input
+                type="checkbox"
+                checked={visibleCols.includes(col.id)}
+                onChange={() => toggleCol(col.id)}
+                className="w-3 h-3 accent-purple-500"
+              />
+              <span className={visibleCols.includes(col.id) ? "text-gray-200" : "text-gray-500"}>{col.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
 
       <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
-                <th className="p-3 font-medium">Name</th>
-                <th className="p-3 font-medium">Email</th>
-                <th className="p-3 font-medium">City</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium text-center">Device</th>
-                <th className="p-3 font-medium text-center">Emails</th>
-                <th className="p-3 font-medium text-center">Opens</th>
-                <th className="p-3 font-medium">Source</th>
-                <th className="p-3 font-medium">Question</th>
-                <th className="p-3 font-medium">Generated At</th>
+                {show("name") && <th className="p-3 font-medium">Name</th>}
+                {show("email") && <th className="p-3 font-medium">Email</th>}
+                {show("city") && <th className="p-3 font-medium">City</th>}
+                {show("status") && <th className="p-3 font-medium">Status</th>}
+                {show("device") && <th className="p-3 font-medium text-center">Device</th>}
+                {show("emails") && <th className="p-3 font-medium text-center">Emails</th>}
+                {show("opens") && <th className="p-3 font-medium text-center">Opens</th>}
+                {show("source") && <th className="p-3 font-medium">Source</th>}
+                {show("question") && <th className="p-3 font-medium">Question</th>}
+                {show("generated") && <th className="p-3 font-medium">Generated At</th>}
+                {show("gender") && <th className="p-3 font-medium">Gender</th>}
+                {show("dob") && <th className="p-3 font-medium">DOB</th>}
+                {show("place") && <th className="p-3 font-medium">Place</th>}
               </tr>
             </thead>
             <tbody>
@@ -602,53 +642,42 @@ function LeadsTab({ leads }) {
                 const source = getSource(lead);
                 return (
                   <tr key={lead.report_id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="p-3 font-medium whitespace-nowrap">{lead.name}</td>
-                    <td className="p-3 text-gray-400 text-xs">{lead.email || "—"}</td>
-                    <td className="p-3 text-gray-300 text-xs whitespace-nowrap">{lead.city || "—"}</td>
-                    <td className="p-3 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                        lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
-                      }`}>{lead.payment_status}</span>
+                    {show("name") && <td className="p-3 font-medium whitespace-nowrap">{lead.name}</td>}
+                    {show("email") && <td className="p-3 text-gray-400 text-xs">{lead.email || "—"}</td>}
+                    {show("city") && <td className="p-3 text-gray-300 text-xs whitespace-nowrap">{lead.city || "—"}</td>}
+                    {show("status") && <td className="p-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>{lead.payment_status}</span>
                       {lead.is_founder_member && <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">F</span>}
-                    </td>
-                    <td className="p-3 text-center">
-                      {lead.device_type === "mobile" ? (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">📱</span>
-                      ) : lead.device_type === "desktop" ? (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">💻</span>
-                      ) : (
-                        <span className="text-gray-600">—</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center text-gray-300">{lead.emails_sent_count || 0}<span className="text-gray-600">/10</span></td>
-                    <td className="p-3 text-center">
-                      {Array.isArray(lead.email_opens) && lead.email_opens.length > 0
-                        ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span>
-                        : <span className="text-gray-600">0</span>}
-                    </td>
-                    <td className="p-3 text-xs whitespace-nowrap">
-                      {source ? (
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          source === "facebook" || source === "fb" || source === "ig" ? "bg-blue-600/20 text-blue-400" :
-                          source === "google" ? "bg-red-500/20 text-red-400" :
-                          "bg-white/10 text-gray-400"
-                        }`}>{source}</span>
-                      ) : <span className="text-gray-600">organic</span>}
-                    </td>
-                    <td className="p-3 text-xs max-w-[200px]">
+                    </td>}
+                    {show("device") && <td className="p-3 text-center">
+                      {lead.device_type === "mobile" ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">📱</span>
+                      : lead.device_type === "desktop" ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">💻</span>
+                      : <span className="text-gray-600">—</span>}
+                    </td>}
+                    {show("emails") && <td className="p-3 text-center text-gray-300">{lead.emails_sent_count || 0}<span className="text-gray-600">/10</span></td>}
+                    {show("opens") && <td className="p-3 text-center">
+                      {Array.isArray(lead.email_opens) && lead.email_opens.length > 0 ? <span className="text-green-400 font-medium">{lead.email_opens.length}</span> : <span className="text-gray-600">0</span>}
+                    </td>}
+                    {show("source") && <td className="p-3 text-xs whitespace-nowrap">
+                      {source ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${source === "facebook" || source === "fb" || source === "ig" ? "bg-blue-600/20 text-blue-400" : source === "google" ? "bg-red-500/20 text-red-400" : "bg-white/10 text-gray-400"}`}>{source}</span> : <span className="text-gray-600">organic</span>}
+                    </td>}
+                    {show("question") && <td className="p-3 text-xs max-w-[200px]">
                       {lead.personal_question ? (
                         <details className="cursor-pointer">
                           <summary className="text-gray-400 truncate list-none">{lead.personal_question.length > 35 ? lead.personal_question.substring(0, 35) + "..." : lead.personal_question}</summary>
                           <p className="text-gray-300 mt-1 whitespace-normal bg-black/40 rounded-lg p-2 text-[11px] leading-relaxed">{lead.personal_question}</p>
                         </details>
                       ) : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="p-3 text-gray-500 text-xs whitespace-nowrap">{new Date(lead.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
+                    </td>}
+                    {show("generated") && <td className="p-3 text-gray-500 text-xs whitespace-nowrap">{new Date(lead.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>}
+                    {show("gender") && <td className="p-3 text-gray-400 text-xs capitalize">{lead.gender || "—"}</td>}
+                    {show("dob") && <td className="p-3 text-gray-400 text-xs">{lead.date_of_birth || "—"}</td>}
+                    {show("place") && <td className="p-3 text-gray-400 text-xs">{lead.place_of_birth || "—"}</td>}
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={10} className="p-8 text-center text-gray-500">No leads match your filters.</td></tr>
+                <tr><td colSpan={visibleCols.length} className="p-8 text-center text-gray-500">No leads match your filters.</td></tr>
               )}
             </tbody>
           </table>
