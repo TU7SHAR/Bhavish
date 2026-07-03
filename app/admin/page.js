@@ -635,11 +635,12 @@ function LeadsTab({ leads }) {
                         }`}>{source}</span>
                       ) : <span className="text-gray-600">organic</span>}
                     </td>
-                    <td className="p-3 text-xs max-w-[120px]">
+                    <td className="p-3 text-xs max-w-[200px]">
                       {lead.personal_question ? (
-                        <span className="text-gray-400 truncate block" title={lead.personal_question}>
-                          {lead.personal_question.length > 30 ? lead.personal_question.substring(0, 30) + "..." : lead.personal_question}
-                        </span>
+                        <details className="cursor-pointer">
+                          <summary className="text-gray-400 truncate list-none">{lead.personal_question.length > 35 ? lead.personal_question.substring(0, 35) + "..." : lead.personal_question}</summary>
+                          <p className="text-gray-300 mt-1 whitespace-normal bg-black/40 rounded-lg p-2 text-[11px] leading-relaxed">{lead.personal_question}</p>
+                        </details>
                       ) : <span className="text-gray-600">—</span>}
                     </td>
                     <td className="p-3 text-gray-500 text-xs whitespace-nowrap">{new Date(lead.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
