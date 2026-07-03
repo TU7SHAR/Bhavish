@@ -149,6 +149,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <LiveClock />
             {lastRefresh && (
               <span className="text-[11px] text-gray-500 hidden sm:block">
                 Updated {lastRefresh.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
@@ -212,6 +213,22 @@ export default function AdminDashboard() {
   );
 }
 
+
+// ---------- LIVE CLOCK (IST) ----------
+function LiveClock() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setTime(now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
+  if (!time) return null;
+  return <span className="text-[11px] text-purple-400 font-mono hidden sm:block">{time} IST</span>;
+}
 
 // ---------- SHARED ----------
 function LoadingState() {
@@ -586,7 +603,8 @@ function AnalyticsTab({ password }) {
             </div>
           </div>
 
-          <SectionTitle>Day of Week</SectionTitle>
+          <SectionTitle>Day of Week (All Time)</SectionTitle>
+          <p className="text-[10px] text-gray-500 mb-3 -mt-2">Total leads/paid across ALL weeks combined — not just this week.</p>
           <div className="grid grid-cols-7 gap-2">
             {data.peakHours.dayNames.map((day, i) => (
               <div key={day} className="bg-[#11111f] border border-white/10 rounded-xl p-3 text-center">
