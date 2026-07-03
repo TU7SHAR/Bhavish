@@ -101,8 +101,12 @@ Rashi: ${chartData.rashi}
 PLANETS:
 ${planetaryTable}
 
-DASHA:
+DASHA SEQUENCE (from birth):
 ${dashaTable}
+
+CURRENT DASHA (USE THIS EXACTLY — do NOT guess or recalculate):
+${chartData.dashaTimeline?.summary || "Not available"}
+IMPORTANT: In Section 12 (Current Mahadasha) and Section 13 (Upcoming Dasha), you MUST use the CURRENT DASHA stated above. Do not infer the period from age. The person is currently in the Mahadasha stated above.
 
 Generate a 20-section report. Each section 250-350 words referencing specific planets/houses/degrees.
 
