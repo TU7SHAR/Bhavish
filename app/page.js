@@ -13,7 +13,7 @@ export const metadata = {
     title: "BhavishAI - Your Future, Revealed by AI",
     description:
       "Get a detailed 20-page Vedic astrology report personalized to your exact birth details. Powered by AI + ancient wisdom.",
-    url: "https://bhavishai.in",
+    url: "https://www.bhavishai.in",
     siteName: "BhavishAI",
     type: "website",
     locale: "en_IN",
@@ -25,7 +25,7 @@ export const metadata = {
       "Your personalized 20-page birth chart report in 60 seconds. Career, love, health & spiritual guidance.",
   },
   alternates: {
-    canonical: "https://bhavishai.in",
+    canonical: "https://www.bhavishai.in",
   },
 };
 
@@ -88,7 +88,7 @@ const productSchema = {
     price: "299",
     priceCurrency: "INR",
     availability: "https://schema.org/InStock",
-    url: "https://bhavishai.in/get-report",
+    url: "https://www.bhavishai.in/get-report",
   },
   aggregateRating: {
     "@type": "AggregateRating",
@@ -112,7 +112,7 @@ const serviceSchema = {
     price: "299",
     priceCurrency: "INR",
     availability: "https://schema.org/InStock",
-    url: "https://bhavishai.in/get-report",
+    url: "https://www.bhavishai.in/get-report",
   },
 };
 
