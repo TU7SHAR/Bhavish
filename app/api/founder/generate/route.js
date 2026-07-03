@@ -106,7 +106,7 @@ ${dashaTable}
 
 CURRENT DASHA (USE THIS EXACTLY — do NOT guess or recalculate):
 ${chartData.dashaTimeline?.summary || "Not available"}
-IMPORTANT: In Section 12 (Current Mahadasha) and Section 13 (Upcoming Dasha), you MUST use the CURRENT DASHA stated above. Do not infer the period from age. The person is currently in the Mahadasha stated above.
+CRITICAL TIMELINE INSTRUCTION: The Mahadasha/Antardasha period stated above is a HARD FACT computed from the Moon's exact birth degree — treat it as ground truth. You MUST use this exact running period and its dates in Sections 12, 13, 16, 19, and 21. You are strictly forbidden from calculating, inferring, or guessing the current dasha from the person's age or from the dasha sequence years. Every timeline-based prediction in those sections must be anchored to the period stated above.
 
 Generate a 20-section report. Each section 250-350 words referencing specific planets/houses/degrees.
 
