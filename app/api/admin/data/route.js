@@ -219,15 +219,30 @@ export async function GET(request) {
       return NextResponse.json({ paid: excludeTest(paid, getTestEmails()) });
     }
 
-    if (tab === "founder-details") {
-      // Free founder-generated reports (unlimited) — kept separate from paid revenue
-      const { data: founder } = await supabase
+    if (tab === "founders") {
+      // ALL founder-related rows: paying members (₹999) + their free generations.
+      // Split into sub-tabs on the client. Test accounts excluded.
+      const { data: founders } = await supabase
         .from("reports")
         .select("*")
-        .or("payment_status.eq.founder,is_founder_free.eq.true")
+        .or("is_founder_member.eq.true,payment_status.eq.founder,is_founder_free.eq.true")
         .order("created_at", { ascending: false });
 
-      return NextResponse.json({ founder: excludeTest(founder, getTestEmails()) });
+      return NextResponse.json({ founders: excludeTest(founders, getTestEmails()) });
+    }
+
+    if (tab === "test") {
+      // Everything tied to the test/QA account(s) — isolated here, out of all metrics.
+      const testEmails = getTestEmails();
+      if (!testEmails.length) return NextResponse.json({ test: [] });
+      const { data: allRows } = await supabase
+        .from("reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+      const testRows = (allRows || []).filter(
+        (r) => r.email && testEmails.includes(r.email.toLowerCase())
+      );
+      return NextResponse.json({ test: testRows });
     }
 
     if (tab === "all-details") {

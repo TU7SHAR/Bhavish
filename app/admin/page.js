@@ -126,11 +126,12 @@ export default function AdminDashboard() {
     { id: "analytics", label: "Analytics", icon: "🔬" },
     { id: "leads", label: "Leads", icon: "👥" },
     { id: "paid-details", label: "Paid People", icon: "💎" },
-    { id: "founder-details", label: "Founder Reports", icon: "🏆" },
+    { id: "founders", label: "Founders", icon: "🏆" },
     { id: "all-details", label: "Everyone", icon: "🔍" },
     { id: "payments", label: "Payments", icon: "💰" },
     { id: "emails", label: "Emails", icon: "📧" },
     { id: "blog", label: "Blog", icon: "📝" },
+    { id: "test", label: "Test", icon: "🧪" },
     { id: "actions", label: "Actions", icon: "⚡" },
   ];
 
@@ -202,7 +203,8 @@ export default function AdminDashboard() {
             {tab === "analytics" && <AnalyticsTab password={password} />}
             {tab === "leads" && <LeadsTab leads={data.leads} />}
             {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
-            {tab === "founder-details" && <FounderDetailsTab founder={data.founder} password={password} />}
+            {tab === "founders" && <FoundersTab founders={data.founders} password={password} />}
+            {tab === "test" && <TestTab test={data.test} password={password} />}
             {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
@@ -1895,37 +1897,28 @@ function PaidDetailsTab({ paid, password }) {
 }
 
 // ---------- FOUNDER REPORTS (free unlimited founder generations, kept separate) ----------
-function FounderDetailsTab({ founder, password }) {
+// Shared: a searchable list of DetailCards
+function DetailCardList({ rows, password, placeholder, emptyText, noun }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(null);
-
-  const filtered = useMemo(() => {
-    if (!founder) return [];
-    const q = search.toLowerCase();
-    return founder.filter((p) => {
-      return !q || (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.report_id || "").includes(q);
-    });
-  }, [founder, search]);
-
-  if (!founder) return null;
+  const q = search.toLowerCase();
+  const filtered = (rows || []).filter(
+    (p) => !q || (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.report_id || "").includes(q)
+  );
   return (
     <div>
-      <div className="mb-3 bg-pink-500/10 border border-pink-500/20 rounded-xl px-4 py-2.5">
-        <p className="text-[11px] text-pink-300">🏆 Free founder-generated reports (unlimited). These do NOT count toward revenue or paid customers.</p>
-      </div>
       <div className="mb-4 flex items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search founder reports..."
+            placeholder={placeholder}
             className="w-full bg-[#11111f] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
-        <span className="text-xs text-gray-500">{filtered.length} founder reports</span>
+        <span className="text-xs text-gray-500">{filtered.length} {noun}</span>
       </div>
-
       <div className="space-y-3">
         {filtered.map((person) => (
           <DetailCard
@@ -1936,10 +1929,127 @@ function FounderDetailsTab({ founder, password }) {
             password={password}
           />
         ))}
-        {filtered.length === 0 && (
-          <div className="text-center text-gray-500 py-12">No founder reports yet.</div>
-        )}
+        {filtered.length === 0 && <div className="text-center text-gray-500 py-12">{emptyText}</div>}
       </div>
+    </div>
+  );
+}
+
+// ---------- FOUNDERS (paying members + their free generations, with sub-tabs) ----------
+function FoundersTab({ founders, password }) {
+  const [sub, setSub] = useState("members");
+  if (!founders) return null;
+
+  const members = founders.filter((p) => p.is_founder_member);
+  const freeReports = founders.filter((p) => p.payment_status === "founder" || p.is_founder_free);
+
+  // Per-founder generation counts (who is pulling reports like crazy)
+  const byEmail = {};
+  for (const r of freeReports) {
+    const key = r.email || "unknown";
+    byEmail[key] = (byEmail[key] || 0) + 1;
+  }
+  const topGenerators = Object.entries(byEmail).sort((a, b) => b[1] - a[1]);
+
+  const subTabs = [
+    { id: "members", label: `Founder Members (${members.length})`, icon: "👑" },
+    { id: "reports", label: `Free Reports (${freeReports.length})`, icon: "📜" },
+    { id: "usage", label: "Usage", icon: "📈" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-pink-500/10 border border-pink-500/20 rounded-xl px-4 py-2.5">
+        <p className="text-[11px] text-pink-300">🏆 All founder data. Members bought the ₹999 upgrade; their free report generations are unlimited and do NOT count toward revenue.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSub(t.id)}
+            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${sub === t.id ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white" : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white hover:border-white/20"}`}
+          >
+            <span className="mr-1">{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+
+      {sub === "members" && (
+        <DetailCardList rows={members} password={password} placeholder="Search founder members..." noun="members" emptyText="No founder members yet." />
+      )}
+      {sub === "reports" && (
+        <DetailCardList rows={freeReports} password={password} placeholder="Search founder reports..." noun="reports" emptyText="No founder-generated reports yet." />
+      )}
+      {sub === "usage" && (
+        <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
+                <th className="p-3">Founder (email)</th>
+                <th className="p-3 text-center">Free reports generated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topGenerators.map(([email, count]) => (
+                <tr key={email} className="border-t border-white/5 hover:bg-white/5">
+                  <td className="p-3">{email}</td>
+                  <td className="p-3 text-center text-pink-400 font-medium">{count}</td>
+                </tr>
+              ))}
+              {topGenerators.length === 0 && (
+                <tr><td colSpan="2" className="p-6 text-center text-gray-600">No founder generations yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- TEST (QA account data, isolated from all metrics) ----------
+function TestTab({ test, password }) {
+  const [sub, setSub] = useState("all");
+  if (!test) return null;
+
+  if (test.length === 0) {
+    return (
+      <div className="text-center py-12 space-y-2">
+        <p className="text-gray-500">No test data.</p>
+        <p className="text-xs text-gray-600">Set <code className="text-purple-300">TEST_ACCOUNT_EMAILS</code> in your environment to route a test account&apos;s data here.</p>
+      </div>
+    );
+  }
+
+  const paid = test.filter((p) => p.payment_status === "paid");
+  const unpaid = test.filter((p) => p.payment_status === "unpaid");
+  const gen = test.filter((p) => p.payment_status === "founder" || p.is_founder_free);
+
+  const subTabs = [
+    { id: "all", label: `All (${test.length})`, icon: "🧪" },
+    { id: "paid", label: `Paid (${paid.length})`, icon: "💎" },
+    { id: "unpaid", label: `Unpaid (${unpaid.length})`, icon: "👀" },
+    { id: "gen", label: `Founder Gen (${gen.length})`, icon: "📜" },
+  ];
+  const rows = sub === "paid" ? paid : sub === "unpaid" ? unpaid : sub === "gen" ? gen : test;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5">
+        <p className="text-[11px] text-amber-300">🧪 Test/QA account data. This is fully excluded from revenue, leads, analytics and every other tab.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSub(t.id)}
+            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${sub === t.id ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white" : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white hover:border-white/20"}`}
+          >
+            <span className="mr-1">{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+      <DetailCardList rows={rows} password={password} placeholder="Search test data..." noun="rows" emptyText="No rows in this view." />
     </div>
   );
 }
