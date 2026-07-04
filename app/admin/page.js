@@ -126,6 +126,7 @@ export default function AdminDashboard() {
     { id: "analytics", label: "Analytics", icon: "🔬" },
     { id: "leads", label: "Leads", icon: "👥" },
     { id: "paid-details", label: "Paid People", icon: "💎" },
+    { id: "founder-details", label: "Founder Reports", icon: "🏆" },
     { id: "all-details", label: "Everyone", icon: "🔍" },
     { id: "payments", label: "Payments", icon: "💰" },
     { id: "emails", label: "Emails", icon: "📧" },
@@ -201,6 +202,7 @@ export default function AdminDashboard() {
             {tab === "analytics" && <AnalyticsTab password={password} />}
             {tab === "leads" && <LeadsTab leads={data.leads} />}
             {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
+            {tab === "founder-details" && <FounderDetailsTab founder={data.founder} password={password} />}
             {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
@@ -463,6 +465,7 @@ function OverviewTab({ data }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard label="Unpaid Leads" value={data.totalUnpaid} accent="amber" />
           <StatCard label="Founder Members" value={data.founderMembers} sub="₹999 upgrade" accent="pink" />
+          <StatCard label="Founder Reports" value={data.totalFounderFree || 0} sub="free · not revenue" accent="pink" />
           <StatCard label="12-Mo Guidance" value={data.with12MonthGuidance} sub="₹149 add-on" accent="blue" />
           <StatCard label="Avg / Customer" value={`₹${data.totalPaid ? Math.round(data.totalRevenue / data.totalPaid) : 0}`} accent="green" />
         </div>
@@ -1885,6 +1888,56 @@ function PaidDetailsTab({ paid, password }) {
         ))}
         {filtered.length === 0 && (
           <div className="text-center text-gray-500 py-12">No paid customers found.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- FOUNDER REPORTS (free unlimited founder generations, kept separate) ----------
+function FounderDetailsTab({ founder, password }) {
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(null);
+
+  const filtered = useMemo(() => {
+    if (!founder) return [];
+    const q = search.toLowerCase();
+    return founder.filter((p) => {
+      return !q || (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.report_id || "").includes(q);
+    });
+  }, [founder, search]);
+
+  if (!founder) return null;
+  return (
+    <div>
+      <div className="mb-3 bg-pink-500/10 border border-pink-500/20 rounded-xl px-4 py-2.5">
+        <p className="text-[11px] text-pink-300">🏆 Free founder-generated reports (unlimited). These do NOT count toward revenue or paid customers.</p>
+      </div>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search founder reports..."
+            className="w-full bg-[#11111f] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+        <span className="text-xs text-gray-500">{filtered.length} founder reports</span>
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map((person) => (
+          <DetailCard
+            key={person.report_id}
+            person={person}
+            expanded={expanded === person.report_id}
+            onToggle={() => setExpanded(expanded === person.report_id ? null : person.report_id)}
+            password={password}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center text-gray-500 py-12">No founder reports yet.</div>
         )}
       </div>
     </div>

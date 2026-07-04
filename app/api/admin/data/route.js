@@ -1,6 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+// Test/QA accounts to exclude from ALL admin metrics and lists.
+// Set TEST_ACCOUNT_EMAILS in env as a comma-separated list, e.g.
+//   TEST_ACCOUNT_EMAILS="my-test@gmail.com, qa@bhavishai.in"
+function getTestEmails() {
+  return (process.env.TEST_ACCOUNT_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+function excludeTest(rows, testEmails) {
+  if (!testEmails.length) return rows || [];
+  return (rows || []).filter((r) => !(r.email && testEmails.includes(r.email.toLowerCase())));
+}
+
 // Super admin API — returns ALL data for the admin dashboard.
 // Protected by ADMIN_SECRET env var (or falls back to CRON_SECRET).
 //
@@ -32,11 +46,13 @@ export async function GET(request) {
 
     if (tab === "overview") {
       // Aggregated stats
-      const { data: allReports, count: totalLeads } = await supabase
+      const { data: allReports } = await supabase
         .from("reports")
         .select("*", { count: "exact" });
 
-      const reports = allReports || [];
+      // Exclude test/QA accounts from every metric
+      const reports = excludeTest(allReports, getTestEmails());
+      const totalLeads = reports.length;
       const totalPaid = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free).length;
       const totalUnpaid = reports.filter((r) => r.payment_status === "unpaid").length;
       const totalFounderFree = reports.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
@@ -167,7 +183,7 @@ export async function GET(request) {
         .order("created_at", { ascending: false });
 
       // Strip heavy fields to keep response small
-      const slim = (leads || []).map(({ sections, email_drafts, summary, ...rest }) => rest);
+      const slim = excludeTest(leads, getTestEmails()).map(({ sections, email_drafts, summary, ...rest }) => rest);
       return NextResponse.json({ leads: slim });
     }
 
@@ -178,18 +194,29 @@ export async function GET(request) {
         .eq("payment_status", "paid")
         .order("created_at", { ascending: false });
 
-      return NextResponse.json({ payments: payments || [] });
+      return NextResponse.json({ payments: excludeTest(payments, getTestEmails()) });
     }
 
     if (tab === "paid-details") {
-      // EVERY column for paid customers + founder free reports
+      // Genuinely PAID customers only — founder-free reports live in their own tab
       const { data: paid } = await supabase
         .from("reports")
         .select("*")
-        .in("payment_status", ["paid", "founder"])
+        .eq("payment_status", "paid")
         .order("created_at", { ascending: false });
 
-      return NextResponse.json({ paid: paid || [] });
+      return NextResponse.json({ paid: excludeTest(paid, getTestEmails()) });
+    }
+
+    if (tab === "founder-details") {
+      // Free founder-generated reports (unlimited) — kept separate from paid revenue
+      const { data: founder } = await supabase
+        .from("reports")
+        .select("*")
+        .or("payment_status.eq.founder,is_founder_free.eq.true")
+        .order("created_at", { ascending: false });
+
+      return NextResponse.json({ founder: excludeTest(founder, getTestEmails()) });
     }
 
     if (tab === "all-details") {
@@ -199,7 +226,7 @@ export async function GET(request) {
         .select("*")
         .order("created_at", { ascending: false });
 
-      return NextResponse.json({ all: all || [] });
+      return NextResponse.json({ all: excludeTest(all, getTestEmails()) });
     }
 
     if (tab === "blog") {
@@ -220,7 +247,7 @@ export async function GET(request) {
         .order("created_at", { ascending: false });
 
       // Simplify email_drafts to just subjects (full drafts are too large)
-      const simplified = (emails || []).map((e) => ({
+      const simplified = excludeTest(emails, getTestEmails()).map((e) => ({
         ...e,
         email_drafts: Array.isArray(e.email_drafts)
           ? e.email_drafts.map((d) => ({ num: d.num, subject: d.subject, psychology: d.psychology }))

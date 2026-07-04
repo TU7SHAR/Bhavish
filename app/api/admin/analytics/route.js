@@ -103,10 +103,13 @@ export async function GET(request) {
 
     const { data: reports } = await supabase
       .from("reports")
-      .select("created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, sections")
+      .select("email, created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, sections")
       .order("created_at", { ascending: false });
 
-    const all = reports || [];
+    // Exclude test/QA accounts (TEST_ACCOUNT_EMAILS) from all analytics
+    const testEmails = (process.env.TEST_ACCOUNT_EMAILS || "")
+      .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+    const all = (reports || []).filter((r) => !(r.email && testEmails.includes(r.email.toLowerCase())));
     const paid = all.filter((r) => r.payment_status === "paid");
     const unpaid = all.filter((r) => r.payment_status === "unpaid");
 
