@@ -15,6 +15,15 @@ function excludeTest(rows, testEmails) {
   return (rows || []).filter((r) => !(r.email && testEmails.includes(r.email.toLowerCase())));
 }
 
+// Free founder-generated reports are NOT genuine leads/customers — they're an
+// existing founder using their unlimited perk. Exclude them from lead-observation
+// views (Leads, Everyone). NOTE: this only removes payment_status='founder' /
+// is_founder_free rows; real paying founders (payment_status='paid' with
+// is_founder_member=true) are kept, since they ARE real customers.
+function excludeFounderGen(rows) {
+  return (rows || []).filter((r) => r.payment_status !== "founder" && !r.is_founder_free);
+}
+
 // Super admin API — returns ALL data for the admin dashboard.
 // Protected by ADMIN_SECRET env var (or falls back to CRON_SECRET).
 //
@@ -182,8 +191,10 @@ export async function GET(request) {
         .select("*")
         .order("created_at", { ascending: false });
 
-      // Strip heavy fields to keep response small
-      const slim = excludeTest(leads, getTestEmails()).map(({ sections, email_drafts, summary, ...rest }) => rest);
+      // Strip heavy fields to keep response small. Exclude test accounts AND
+      // free founder generations (they aren't genuine leads).
+      const cleanLeads = excludeFounderGen(excludeTest(leads, getTestEmails()));
+      const slim = cleanLeads.map(({ sections, email_drafts, summary, ...rest }) => rest);
       return NextResponse.json({ leads: slim });
     }
 
@@ -220,13 +231,14 @@ export async function GET(request) {
     }
 
     if (tab === "all-details") {
-      // EVERY column for EVERY single lead — the raw dump
+      // Every genuine lead — excludes test accounts and free founder generations
+      // (founder generations have their own "Founder Reports" tab).
       const { data: all } = await supabase
         .from("reports")
         .select("*")
         .order("created_at", { ascending: false });
 
-      return NextResponse.json({ all: excludeTest(all, getTestEmails()) });
+      return NextResponse.json({ all: excludeFounderGen(excludeTest(all, getTestEmails())) });
     }
 
     if (tab === "blog") {
