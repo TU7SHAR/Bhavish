@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Suspense } from "react";
 import AttributionCapture from "./components/AttributionCapture";
+import VisitorTracker from "./components/VisitorTracker";
 import { organizationSchema, websiteSchema } from "../lib/schema";
 
 const geistSans = Geist({
@@ -148,6 +149,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <Suspense fallback={null}><AttributionCapture /></Suspense>
+        <Suspense fallback={null}><VisitorTracker /></Suspense>
         <Analytics />
         <SpeedInsights />
         {children}

@@ -556,6 +556,7 @@ function AnalyticsTab({ password }) {
     { id: "questions-unpaid", label: "Questions (Unpaid)", icon: "👀" },
     { id: "funnel", label: "Conversion Speed", icon: "⚡" },
     { id: "sources", label: "Source Performance", icon: "📣" },
+    { id: "journey", label: "Buyer Journey", icon: "🛤️" },
   ];
 
   return (
@@ -835,6 +836,148 @@ function AnalyticsTab({ password }) {
           </div>
         </div>
       )}
+
+      {subTab === "journey" && <JourneySubTab password={password} />}
+    </div>
+  );
+}
+
+
+// ---------- JOURNEY SUB-TAB ----------
+function JourneySubTab({ password }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/journey", { headers: { Authorization: `Bearer ${password}` } });
+        if (res.ok) setData(await res.json());
+      } catch (e) { console.error(e); }
+      setLoading(false);
+    })();
+  }, [password]);
+
+  if (loading) return <LoadingState />;
+  if (!data || data.error) return (
+    <div className="text-center py-12 space-y-2">
+      <p className="text-gray-500">No journey data yet.</p>
+      <p className="text-xs text-gray-600">Data will appear once visitors are tracked. Make sure you&apos;ve run the SQL migration.</p>
+    </div>
+  );
+
+  const { summary, timeBuckets, sessionBuckets, topPages, recentJourneys } = data;
+
+  return (
+    <div className="space-y-6">
+      <SectionTitle>Buyer Journey Overview (Last 90 Days)</SectionTitle>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Visitors Tracked" value={summary.totalVisitorsTracked} icon="👁" accent="blue" />
+        <StatCard label="Linked Journeys" value={summary.linkedJourneys} sub={`${summary.paidJourneys} paid`} icon="🔗" accent="purple" />
+        <StatCard label="Impulse Buyers" value={summary.impulseBuyers} sub="< 1hr, 1 session" icon="⚡" accent="green" />
+        <StatCard label="Returning Buyers" value={summary.returningBuyers} sub="> 1hr or multi-session" icon="🔄" accent="amber" />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Avg Consideration" value={summary.avgConsiderationHours < 24 ? `${summary.avgConsiderationHours}h` : `${Math.round(summary.avgConsiderationHours / 24)}d`} sub="First visit → Payment" icon="⏳" accent="purple" />
+        <StatCard label="Avg Decision Speed" value={`${summary.avgDecisionMinutes}m`} sub="Preview → Payment" icon="🎯" accent="green" />
+        <StatCard label="Avg Sessions" value={summary.avgSessionsBeforePurchase} sub="Before purchase" icon="📊" accent="blue" />
+        <StatCard label="Avg Page Views" value={summary.avgPageViewsBeforePurchase} sub="Before purchase" icon="📄" accent="amber" />
+      </div>
+
+      {/* Consideration time distribution */}
+      <SectionTitle>How Long Do Buyers Think? (First Visit → Payment)</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <div className="space-y-2">
+          {Object.entries(timeBuckets).map(([label, count]) => {
+            const max = Math.max(...Object.values(timeBuckets), 1);
+            const pct = Math.round((count / max) * 100);
+            return (
+              <div key={label} className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 w-20 shrink-0">{label}</span>
+                <div className="flex-1 bg-white/5 rounded h-5 overflow-hidden">
+                  <div className="bg-gradient-to-r from-purple-600 to-indigo-500 h-full rounded flex items-center pl-2" style={{ width: `${Math.max(pct, 2)}%` }}>
+                    {count > 0 && <span className="text-[10px] text-white font-medium">{count}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Sessions before purchase */}
+      <SectionTitle>Sessions Before Purchase</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <div className="grid grid-cols-4 gap-3">
+          {Object.entries(sessionBuckets).map(([label, count]) => (
+            <div key={label} className="text-center p-3 bg-white/5 rounded-xl">
+              <p className="text-2xl font-bold text-purple-300">{count}</p>
+              <p className="text-[10px] text-gray-500 mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top pages visited before payment */}
+      <SectionTitle>Pages Visited Before Payment</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-4">
+        <div className="space-y-1">
+          {topPages.map((p, i) => (
+            <div key={p.page} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-white/5">
+              <span className="text-xs text-gray-300"><span className="text-gray-600 mr-2">#{i + 1}</span>{p.page}</span>
+              <span className="text-xs text-purple-400 font-medium">{p.count} views</span>
+            </div>
+          ))}
+          {topPages.length === 0 && <p className="text-xs text-gray-600 text-center py-4">No data yet</p>}
+        </div>
+      </div>
+
+      {/* Recent journeys table */}
+      <SectionTitle>Recent Buyer Journeys</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-white/5 text-gray-400 text-left uppercase tracking-wider">
+              <th className="p-3">Status</th>
+              <th className="p-3">Sessions</th>
+              <th className="p-3">Pages</th>
+              <th className="p-3">Consideration</th>
+              <th className="p-3">Decision</th>
+              <th className="p-3">First Visit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentJourneys.map((j) => (
+              <tr key={j.reportId} className="border-t border-white/5 hover:bg-white/5">
+                <td className="p-3">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${j.paid ? "bg-green-600/20 text-green-400" : "bg-gray-600/20 text-gray-400"}`}>
+                    {j.paid ? "Paid" : "Unpaid"}
+                  </span>
+                </td>
+                <td className="p-3 text-center">{j.uniqueSessions}</td>
+                <td className="p-3 text-center">{j.totalViews}</td>
+                <td className="p-3">
+                  {j.considerationHours !== null
+                    ? j.considerationHours < 1
+                      ? `${Math.round(j.considerationHours * 60)}m`
+                      : j.considerationHours < 24
+                        ? `${j.considerationHours}h`
+                        : `${Math.round(j.considerationHours / 24)}d`
+                    : "—"}
+                </td>
+                <td className="p-3">{j.decisionMinutes !== null ? `${j.decisionMinutes}m` : "—"}</td>
+                <td className="p-3 text-gray-500">{new Date(j.firstVisit).toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" })}</td>
+              </tr>
+            ))}
+            {recentJourneys.length === 0 && (
+              <tr><td colSpan="6" className="p-6 text-center text-gray-600">No journey data yet. Data appears after visitors are tracked and linked to reports.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
