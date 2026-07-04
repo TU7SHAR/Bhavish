@@ -75,6 +75,9 @@ NAVAMSA (D9) INSTRUCTION: Each planet's and the Ascendant's Navamsa (D9) sign is
 MANGLIK (MANGAL DOSHA) STATUS (computed — USE EXACTLY): ${chartData.manglik?.summary || "Not available"}
 MANGLIK INSTRUCTION: In Section 14 you MUST use the Manglik verdict and reasoning stated above. Do NOT decide Manglik status yourself or invent which house triggers it — Manglik houses are only 1, 2, 4, 7, 8, and 12 (never the 9th).
 
+YOGAS (computed — USE EXACTLY): ${chartData.yogas?.summary || "Not available"}
+YOGA INSTRUCTION: In Section 15 (Kaal Sarp & Other Yoga Analysis) you MUST use the exact Kaal Sarp verdict and the exact list of yogas stated above. If Kaal Sarp is ABSENT, clearly state it is absent — never claim a full or partial Kaal Sarp. Do NOT invent, add, or imply any yoga that is not in the list above, and do NOT contradict it. Only describe the yogas listed.
+
 Generate a 20-section report. Each section 250-350 words referencing specific planets/houses/degrees.
 
 Format JSON:
