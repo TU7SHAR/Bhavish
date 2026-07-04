@@ -6,8 +6,8 @@ import { NextResponse } from "next/server";
 // returning vs impulse buyers, session breakdowns.
 export async function GET(request) {
   const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "");
-  if (token !== process.env.ADMIN_PASSWORD) {
+  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+  if (secret && authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
