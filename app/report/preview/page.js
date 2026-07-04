@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import { getVisitorId } from "../../components/VisitorTracker";
 import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 
 const previewLoadingMessages = [
@@ -252,6 +253,7 @@ export default function ReportPreview() {
                 sections: finalSections,
                 paymentId: response.razorpay_payment_id,
                 paymentStatus: "paid",
+                visitorId: getVisitorId(),
               }),
             }).catch(console.error);
 

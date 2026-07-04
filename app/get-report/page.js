@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { getAttribution } from "../components/AttributionCapture";
+import { getVisitorId } from "../components/VisitorTracker";
 
 const loadingMessages = [
   "Mapping planetary positions at your birth time...",
@@ -135,6 +136,7 @@ export default function GetReport() {
           attribution: getAttribution(),
           personalQuestion: formData.personalQuestion || "",
           city: data.city || "",
+          visitorId: getVisitorId(),
         }),
       })
         .then(() => {

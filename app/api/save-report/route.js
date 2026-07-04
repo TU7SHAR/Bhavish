@@ -28,6 +28,7 @@ export async function POST(request) {
       attribution,
       personalQuestion,
       city,
+      visitorId,
     } = await request.json();
 
     if (!reportId || !name || !sections) {
@@ -86,6 +87,7 @@ export async function POST(request) {
     // Enhanced tracking fields — only include when provided (prevents wipe)
     if (personalQuestion) data.personal_question = personalQuestion;
     if (city) data.city = city;
+    if (visitorId) data.visitor_id = visitorId;
     if (deviceType && deviceType !== "unknown") data.device_type = deviceType;
     if (paymentStatus !== "paid") data.preview_generated_at = new Date().toISOString();
 
