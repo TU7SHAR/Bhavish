@@ -174,6 +174,7 @@ Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
       place_of_birth: placeOfBirth,
       summary: reportData.summary,
       sections: reportData.sections,
+      chart_data: chartData, // kundli charts, planet table, lucky factors, remedies
       payment_status: "founder", // free founder generation — NOT paid revenue
       personal_question: personalQuestion || null,
     };
@@ -181,8 +182,15 @@ Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
     // Try with is_founder_free flag; fall back if column doesn't exist
     let { error: insertErr } = await supabase.from("reports").insert({ ...insertData, is_founder_free: true });
     if (insertErr) {
+      // Retry without is_founder_free
       const retry = await supabase.from("reports").insert(insertData);
       insertErr = retry.error;
+      // If still failing (e.g. chart_data column missing), retry without it too
+      if (insertErr) {
+        const { chart_data, ...withoutChart } = insertData;
+        const retry2 = await supabase.from("reports").insert(withoutChart);
+        insertErr = retry2.error;
+      }
     }
 
     if (insertErr) {

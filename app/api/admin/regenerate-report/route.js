@@ -142,14 +142,24 @@ Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
       return NextResponse.json({ error: `Only ${reportData.sections?.length || 0} sections generated. Try again.` }, { status: 500 });
     }
 
-    // Step 4: Save the regenerated report to DB
-    const { error: updateErr } = await supabase
+    // Step 4: Save the regenerated report to DB (incl. chart_data for kundli/lucky/remedies)
+    let { error: updateErr } = await supabase
       .from("reports")
       .update({
         summary: reportData.summary,
         sections: reportData.sections,
+        chart_data: chartData,
       })
       .eq("report_id", reportId);
+
+    // If chart_data column doesn't exist yet, retry without it
+    if (updateErr) {
+      const retry = await supabase
+        .from("reports")
+        .update({ summary: reportData.summary, sections: reportData.sections })
+        .eq("report_id", reportId);
+      updateErr = retry.error;
+    }
 
     if (updateErr) {
       return NextResponse.json({ error: "Report generated but DB save failed: " + updateErr.message }, { status: 500 });
