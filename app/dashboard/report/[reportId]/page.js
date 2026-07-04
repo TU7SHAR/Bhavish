@@ -32,7 +32,7 @@ export default async function ViewReport({ params }) {
     .select("*")
     .eq("report_id", reportId)
     .eq("user_id", user.id)
-    .eq("payment_status", "paid")
+    .in("payment_status", ["paid", "founder"])
     .single();
 
   if (!report) notFound();

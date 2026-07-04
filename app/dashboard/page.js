@@ -36,7 +36,7 @@ export default async function Dashboard() {
     .from("reports")
     .select("*")
     .eq("user_id", user.id)
-    .eq("payment_status", "paid")
+    .in("payment_status", ["paid", "founder"])
     .order("created_at", { ascending: false });
 
   // Is this user a Founder Member? (any of their reports has is_founder_member)
