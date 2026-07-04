@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Header from "../../../components/Header";
 import Footer from "../../../components/Footer";
+import KundliChartsSection from "../../../components/KundliCharts";
 
 export async function generateMetadata({ params }) {
   return { title: "View Report - Dashboard" };
@@ -65,6 +66,11 @@ export default async function ViewReport({ params }) {
               <h2 className="text-lg font-bold text-primary-light mb-2">Chart Summary</h2>
               <p className="text-muted italic leading-relaxed">{report.summary}</p>
             </div>
+          )}
+
+          {/* Kundli Charts, Planet Table, Lucky Factors, Upay (Remedies) */}
+          {report.chart_data && (
+            <KundliChartsSection chartData={report.chart_data} />
           )}
 
           {/* All Sections */}

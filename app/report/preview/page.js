@@ -254,6 +254,7 @@ export default function ReportPreview() {
                 paymentId: response.razorpay_payment_id,
                 paymentStatus: "paid",
                 visitorId: getVisitorId(),
+                chartData: reportData.chartData,
               }),
             }).catch(console.error);
 

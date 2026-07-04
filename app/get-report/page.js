@@ -137,6 +137,7 @@ export default function GetReport() {
           personalQuestion: formData.personalQuestion || "",
           city: data.city || "",
           visitorId: getVisitorId(),
+          chartData: data.chartData || null,
         }),
       })
         .then(() => {
