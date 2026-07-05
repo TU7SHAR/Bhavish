@@ -530,28 +530,34 @@ export default function ReportPreview() {
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
 
-                {/* Priority 9: Uniqueness / confidence banner */}
+                {/* Priority 9: Personalization banner — references their chart */}
                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-2.5 mb-5 text-left">
                   <p className="text-xs text-purple-300 leading-relaxed">
-                    🔍 During analysis, your chart matched <span className="font-bold text-purple-200">3 uncommon planetary combinations</span>. These influence the personalized predictions in your complete report.
+                    ✓ Your chart has been fully analyzed. Your <span className="font-bold text-purple-200">{reportData.chartData?.dashaTimeline?.currentMahadasha || "current"} Mahadasha</span> period and its influence on your question is covered in your complete report.
                   </p>
                 </div>
 
-                {/* Priority 6: Emotional headline */}
+                {/* Priority 6: Emotional headline — answer-focused, not mystical */}
                 <h3 className="text-xl font-bold mb-1">
-                  Your Chart Revealed Several Rare Patterns
+                  Your Full Answer Is Ready
                 </h3>
-                <p className="text-muted text-xs mb-5">Generated from your exact birth time, coordinates &amp; Vedic calculations.</p>
+                <p className="text-muted text-xs mb-5">Analyzed from your exact birth time, coordinates &amp; Vedic calculations.</p>
 
-                {/* Priority 7: Emotional summary — what was found */}
+                {/* Priority 7: What the user will GET — outcome-focused, not feature-focused */}
                 <div className="text-left bg-background/50 border border-border rounded-xl p-4 mb-5">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">During analysis we found:</p>
+                  {userData.personalQuestion && (
+                    <div className="mb-3 pb-3 border-b border-border">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Your question:</p>
+                      <p className="text-sm text-primary-light font-medium">&ldquo;{userData.personalQuestion.length > 80 ? userData.personalQuestion.substring(0, 80) + "..." : userData.personalQuestion}&rdquo;</p>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Inside your complete report:</p>
                   <div className="space-y-1.5 text-sm text-foreground">
-                    <p>✓ A major career timing window</p>
-                    <p>✓ One relationship cycle that stands out</p>
-                    <p>✓ Your strongest financial period</p>
-                    <p>✓ A hidden strength in your chart</p>
-                    <p>✓ One repeating life challenge mapped</p>
+                    <p>✓ Direct answer to your question with timing</p>
+                    <p>✓ Best period to take action</p>
+                    <p>✓ What may delay or block your result</p>
+                    <p>✓ Your current planetary period and what it means</p>
+                    <p>✓ Personalized remedies and next steps</p>
                   </div>
                 </div>
 
@@ -615,7 +621,7 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? (retryMessage ? "Analyzing deeper..." : "Generating your report...")
-                    : `Reveal My Hidden Predictions — ₹${includeBump ? "448" : "299"} →`}
+                    : `Unlock My Full Answer — ₹${includeBump ? "448" : "299"} →`}
                 </button>
 
                 {/* Retry message — shows when Gemini needs extra time */}
@@ -627,6 +633,9 @@ export default function ReportPreview() {
                 )}
 
                 {/* Priority 4: ₹149 upsell — extremely minimal */}
+                <p className="mt-2 text-[10px] text-gray-600 text-center">
+                  Secure Razorpay payment · Instant access · Sent to your email
+                </p>
                 <p className="mt-3 text-[11px] text-gray-500 text-center">
                   <label className="cursor-pointer hover:text-gray-300 transition-colors">
                     <input
