@@ -79,23 +79,32 @@ export async function GET(request) {
       const totalFees = Math.round(totalRevenue * RAZORPAY_FEE_PERCENT / 100);
       const netRevenue = totalRevenue - totalFees;
 
-      // Settlement calculation: Razorpay settles T+2 business days
-      // We use 3 calendar days as a safe buffer (covers weekends)
-      const SETTLEMENT_DAYS = 3;
-      const settlementCutoff = new Date(Date.now() - SETTLEMENT_DAYS * 24 * 3600 * 1000).toISOString();
+      // Settlement calculation — Razorpay settles a WHOLE DAY's money together,
+      // T+N days after the payment date (default T+2). We batch by IST calendar
+      // day, NOT a rolling hourly clock. So all of e.g. Thursday's payments flip
+      // to "settled" together on Saturday — never a partial amount.
+      // Tune SETTLEMENT_DELAY_DAYS in env if your Razorpay cycle differs (T+1, etc).
+      const SETTLEMENT_DELAY_DAYS = parseInt(process.env.SETTLEMENT_DELAY_DAYS || "2");
+      const IST_MS = 5.5 * 60 * 60 * 1000;
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      // Midnight (IST) of the day a given timestamp falls on, returned as a UTC ms value
+      const istDayStart = (ts) => {
+        const ist = new Date(new Date(ts).getTime() + IST_MS);
+        return Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - IST_MS;
+      };
+      const todayStartMs = istDayStart(Date.now());
 
       const paidReports = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free);
 
-      // Settled = paid before cutoff date
-      const settledReports = paidReports.filter((r) => {
+      // A payment is settled once (its payment day + delay) has arrived.
+      const isSettled = (r) => {
         const payDate = r.paid_at || r.created_at;
-        return payDate && payDate < settlementCutoff;
-      });
-      // Pending = paid after cutoff date (recent payments)
-      const pendingReports = paidReports.filter((r) => {
-        const payDate = r.paid_at || r.created_at;
-        return !payDate || payDate >= settlementCutoff;
-      });
+        if (!payDate) return false;
+        const settleDayMs = istDayStart(payDate) + SETTLEMENT_DELAY_DAYS * DAY_MS;
+        return settleDayMs <= todayStartMs;
+      };
+      const settledReports = paidReports.filter(isSettled);
+      const pendingReports = paidReports.filter((r) => !isSettled(r));
 
       // Calculate settled/pending amounts per product
       function calcRevenue(list) {
