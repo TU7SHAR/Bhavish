@@ -7,6 +7,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { getVisitorId } from "../../components/VisitorTracker";
 import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
+import { track } from "@vercel/analytics";
 
 const previewLoadingMessages = [
   "Aligning Swiss Ephemeris data...",
@@ -88,6 +89,8 @@ export default function ReportPreview() {
     if (typeof window !== "undefined" && window.gtag) {
       window.gtag("event", "view_item", { event_category: "funnel", event_label: "preview_generated" });
     }
+    // Vercel Analytics funnel event
+    track("preview_viewed");
   }, [router]);
 
   const handlePayment = async () => {
@@ -111,6 +114,8 @@ export default function ReportPreview() {
         items: [{ item_name: "vedic_report", price: includeBump ? 448 : 299 }],
       });
     }
+    // Vercel Analytics funnel event
+    track("buy_now_clicked", { value: includeBump ? 448 : 299 });
 
     try {
       // Create Razorpay order
@@ -177,6 +182,8 @@ export default function ReportPreview() {
                 items: [{ item_name: "vedic_report", price: 299 }, ...(includeBump ? [{ item_name: "12_month_guidance", price: 149 }] : [])],
               });
             }
+            // Vercel Analytics funnel event — payment successful
+            track("purchase", { value: includeBump ? 448 : 299 });
 
             // PHASE 2: Now generate the FULL 20-section report (only after payment)
             // Includes retry on timeout — Gemini can sometimes take >60s
@@ -340,6 +347,8 @@ export default function ReportPreview() {
 
       const rzp = new window.Razorpay(options);
       rzp.open();
+      // Vercel Analytics funnel event — Razorpay checkout actually opened
+      track("payment_opened", { value: includeBump ? 448 : 299 });
     } catch (error) {
       alert(error.message || "Something went wrong. Please try again.");
     } finally {

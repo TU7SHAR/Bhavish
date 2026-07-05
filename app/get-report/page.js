@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { getAttribution } from "../components/AttributionCapture";
 import { getVisitorId } from "../components/VisitorTracker";
+import { track } from "@vercel/analytics";
 
 const loadingMessages = [
   "Mapping planetary positions at your birth time...",
@@ -71,6 +72,8 @@ export default function GetReport() {
     if (typeof window !== "undefined" && window.gtag) {
       window.gtag("event", "generate_lead", { event_category: "funnel", event_label: "birth_details_submitted" });
     }
+    // Vercel Analytics funnel event
+    track("lead_submitted");
 
     setLoading(true);
     setError("");
