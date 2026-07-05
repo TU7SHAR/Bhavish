@@ -1,0 +1,111 @@
+Yes. For your **first ₹10k–₹15k test**, I would keep it simple:
+
+**1 ad creative = 1 image.**
+
+Don't make carousels yet. Don't make 5-slide stories. Don't make complicated funnels.
+
+Your job is to answer:
+
+> Which single message makes a stranger stop scrolling and click?
+
+---
+
+### Your initial testing structure:
+
+## Campaign: BhavishAI Launch
+
+### Ad Set A — Broad Audience
+
+* India
+* Age 21–40
+* Instagram Feed/Reels/Stories
+
+Ads inside:
+
+* Ad 1: Career/Life Questions Image
+* Ad 2: Exact Birth Chart / Personalized Report Image
+* Ad 3: Pandit vs Other Apps vs BhavishAI Comparison Image
+
+---
+
+### Ad Set B — Astrology Interest Audience
+
+Same 3 images:
+
+* Ad 1: Questions
+* Ad 2: Personalization
+* Ad 3: Price Comparison
+
+---
+
+So Meta tests:
+
+**6 combinations:**
+
+| Audience  | Creative        |
+| --------- | --------------- |
+| Broad     | Questions       |
+| Broad     | Personalization |
+| Broad     | Comparison      |
+| Astrology | Questions       |
+| Astrology | Personalization |
+| Astrology | Comparison      |
+
+---
+
+## Why not a carousel?
+
+Because with your budget:
+
+* ₹500/day total
+* ₹250 per audience
+
+You need data quickly.
+
+If you use a 5-image carousel, you won't know:
+
+* Did the first slide work?
+* Did people swipe?
+* Which message attracted them?
+
+A single image gives cleaner data.
+
+---
+
+## My recommendation for the first image (highest confidence)
+
+A dark premium image with just:
+
+```
+Will I get promoted?
+
+Will I get married?
+
+Should I switch careers?
+
+Your birth chart may reveal the answers.
+
+Personalized 20-page Kundli Report
+₹299 • Ready in 60 seconds
+```
+
+No logo at the top.
+No 10 bullet points.
+No "AI-powered Swiss Ephemeris" headline.
+
+Your ad has about **1 second to interrupt a thumb scroll**.
+
+---
+
+### One small trick I would do
+
+Make each image in **two formats**:
+
+1. **1080 × 1080** (Instagram Feed)
+2. **1080 × 1920** (Stories/Reels)
+
+The message should be identical. Just adapt the layout.
+
+---
+
+If I were launching BhavishAI with ₹15,000, I would probably spend **80% of my creative effort on the first "questions" ad**, because psychologically it hits the exact reason someone buys astrology: **uncertainty about the future**.
