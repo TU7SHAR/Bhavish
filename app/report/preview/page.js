@@ -368,6 +368,76 @@ export default function ReportPreview() {
   const firstSection = allSections[0];
   const lockedSections = allSections.slice(1);
 
+  // Categorize the user's question so the paywall teaser matches their intent.
+  // Pure keyword match — instant, no AI, no cost. Order matters (most specific first).
+  const categorizeQuestion = (q) => {
+    if (!q) return "general";
+    const t = q.toLowerCase();
+    const has = (arr) => arr.some((w) => t.includes(w));
+    if (has(["marriage", "married", "shadi", "spouse", "wife", "husband", "rishta", "engaged", "vivah"])) return "marriage";
+    if (has(["love", "relationship", "girlfriend", "boyfriend", " ex", "partner", "crush", "breakup", "soulmate", "affair"])) return "love";
+    if (has(["exam", "upsc", "cfa", "study", "college", "degree", "master", "admission", "cma", "neet", "gate"])) return "education";
+    if (has(["job", "career", "promot", "business", "work", "interview", "freelance", "salary", "office", "startup"])) return "career";
+    if (has(["money", "financ", "wealth", "fund", "debt", "loan", "income", "property"])) return "money";
+    return "general";
+  };
+
+  const questionCategory = categorizeQuestion(userData.personalQuestion);
+
+  const CATEGORY_CONTENT = {
+    career: {
+      label: "Career",
+      cards: [
+        { t: "Whether this is the right time to make your move", s: "Your 10th house and current dasha indicate that between..." },
+        { t: "Your strongest career window in the coming period", s: "The transit through your career houses points to a phase where..." },
+        { t: "Risks and delays to avoid before you decide", s: "One planetary influence signals caution around..." },
+      ],
+    },
+    love: {
+      label: "Love",
+      cards: [
+        { t: "Whether this connection has real future potential", s: "Venus and the 5th/7th house pattern suggests that..." },
+        { t: "The strongest period for progress in this relationship", s: "An upcoming transit opens a window where..." },
+        { t: "What may cause distance, delay, or misunderstanding", s: "One influence in your chart points to friction around..." },
+      ],
+    },
+    marriage: {
+      label: "Marriage",
+      cards: [
+        { t: "The timing your chart favours for marriage", s: "Your 7th house and dasha sequence indicate a window around..." },
+        { t: "Love or arranged — what your chart leans toward", s: "The placement of Venus and the 7th lord suggests..." },
+        { t: "What may cause delay before it happens", s: "One planetary influence points to a hurdle around..." },
+      ],
+    },
+    money: {
+      label: "Money",
+      cards: [
+        { t: "Your strongest financial growth periods", s: "Jupiter's movement through your wealth houses indicates..." },
+        { t: "When money delays ease and recovery begins", s: "Your current dasha suggests a turning point around..." },
+        { t: "Risk periods to protect your finances", s: "One transit signals caution with money around..." },
+      ],
+    },
+    education: {
+      label: "Exam",
+      cards: [
+        { t: "Whether your chart supports success this attempt", s: "Your 5th house and Mercury/Jupiter influence indicate..." },
+        { t: "The period that favours your results most", s: "An upcoming transit points to a strong window around..." },
+        { t: "What to watch for that could cause a setback", s: "One planetary influence signals caution around..." },
+      ],
+    },
+    general: {
+      label: "",
+      cards: [
+        { t: "One career decision could shape your next five years.", s: "Your 10th house indicates that between..." },
+        { t: "A relationship period appears much stronger than others.", s: "Venus and Moon conjunction suggests a window where..." },
+        { t: "Your strongest wealth cycle is closer than you think.", s: "Jupiter's upcoming transit through your 2nd house..." },
+      ],
+    },
+  };
+
+  const catContent = CATEGORY_CONTENT[questionCategory];
+  const answerHeadline = catContent.label ? `Your ${catContent.label} Answer Is Ready` : "Your Full Answer Is Ready";
+
   // Guard: if no sections generated, show error state
   if (!firstSection) {
     return (
@@ -537,9 +607,9 @@ export default function ReportPreview() {
                   </p>
                 </div>
 
-                {/* Priority 6: Emotional headline — answer-focused, not mystical */}
+                {/* Priority 6: Emotional headline — answer-focused, matches their question topic */}
                 <h3 className="text-xl font-bold mb-1">
-                  Your Full Answer Is Ready
+                  {answerHeadline}
                 </h3>
                 <p className="text-muted text-xs mb-5">Analyzed from your exact birth time, coordinates &amp; Vedic calculations.</p>
 
@@ -561,23 +631,15 @@ export default function ReportPreview() {
                   </div>
                 </div>
 
-                {/* Priority 1: Curiosity-driven locked cards — tease, don't reveal */}
+                {/* Priority 1: Curiosity-driven locked cards — matched to the user's question topic */}
                 <div className="text-left space-y-2.5 mb-5">
-                  <div className="bg-background/50 border border-border rounded-xl p-3">
-                    <p className="text-sm font-semibold text-foreground mb-0.5">🔒 One career decision could shape your next five years.</p>
-                    <p className="text-xs text-muted italic">&ldquo;Your 10th house indicates that between...&rdquo;</p>
-                    <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
-                  </div>
-                  <div className="bg-background/50 border border-border rounded-xl p-3">
-                    <p className="text-sm font-semibold text-foreground mb-0.5">🔒 A relationship period appears much stronger than others.</p>
-                    <p className="text-xs text-muted italic">&ldquo;Venus and Moon conjunction suggests a window where...&rdquo;</p>
-                    <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
-                  </div>
-                  <div className="bg-background/50 border border-border rounded-xl p-3">
-                    <p className="text-sm font-semibold text-foreground mb-0.5">🔒 Your strongest wealth cycle is closer than you think.</p>
-                    <p className="text-xs text-muted italic">&ldquo;Jupiter&apos;s upcoming transit through your 2nd house...&rdquo;</p>
-                    <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
-                  </div>
+                  {catContent.cards.map((card, i) => (
+                    <div key={i} className="bg-background/50 border border-border rounded-xl p-3">
+                      <p className="text-sm font-semibold text-foreground mb-0.5">🔒 {card.t}</p>
+                      <p className="text-xs text-muted italic">&ldquo;{card.s}&rdquo;</p>
+                      <div className="h-2.5 bg-gradient-to-r from-muted/30 to-transparent rounded mt-1.5"></div>
+                    </div>
+                  ))}
                   {/* Priority 8: Personal question teaser */}
                   {userData.personalQuestion && (
                     <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
