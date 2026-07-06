@@ -128,7 +128,7 @@ export async function GET(request) {
       .not("email", "is", null)
       .neq("email", "")
       .not("email_drafts", "is", null)
-      .or("email_sequence_status.is.null,email_sequence_status.neq.completed")
+      .or("email_sequence_status.is.null,email_sequence_status.not.in.(completed,unsubscribed)")
       .order("created_at", { ascending: true });
 
     if (fetchError) {
