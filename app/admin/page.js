@@ -173,7 +173,7 @@ export default function AdminDashboard() {
           </div>
         </div>
         {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto pb-2">
+        <div className="max-w-7xl mx-auto px-4 flex gap-1 flex-wrap pb-2">
           {tabs.map((t) => (
             <button
               key={t.id}
