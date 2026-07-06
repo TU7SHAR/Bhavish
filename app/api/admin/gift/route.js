@@ -117,10 +117,12 @@ export async function POST(request) {
         has_12_month_guidance: true,
         guidance_start_date: now.toISOString(),
         guidance_end_date: endDate.toISOString(),
+        is_guidance_gifted: true,
       };
     } else {
       updateData = {
         is_founder_member: true,
+        is_founder_gifted: true,
       };
     }
 
