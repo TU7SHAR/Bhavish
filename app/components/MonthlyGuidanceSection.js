@@ -63,11 +63,26 @@ export default function MonthlyGuidanceSection({ reportId, startDate, currentMon
     );
   }
 
+  // Calculate the date when the next month becomes available
+  const nextMonthDate = currentMonth < 12
+    ? new Date(start.getTime() + currentMonth * 30.44 * 24 * 60 * 60 * 1000)
+    : null;
+
   return (
     <div className="mt-6">
       <h3 className="text-sm font-semibold text-blue-300 uppercase tracking-wider mb-3 flex items-center gap-2">
         <span className="w-5 h-px bg-blue-500/50" />Monthly Guidance Reports
       </h3>
+
+      {/* Live countdown to next report */}
+      {nextMonthDate && currentMonth < 12 && (
+        <NextReportTimer nextDate={nextMonthDate} nextMonth={currentMonth + 1} />
+      )}
+      {currentMonth >= 12 && (
+        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 mb-4 text-center">
+          <p className="text-sm text-green-300">All 12 months of your guidance period are now available.</p>
+        </div>
+      )}
 
       {/* Month cards grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
@@ -159,6 +174,57 @@ export default function MonthlyGuidanceSection({ reportId, startDate, currentMon
           <p className="text-sm text-muted">Your first monthly guidance report will be generated and sent to your email soon. Check back here to read it anytime.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+
+
+// Live countdown timer showing when the next monthly report becomes available
+function NextReportTimer({ nextDate, nextMonth }) {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const calc = () => {
+      const now = new Date();
+      const diff = nextDate - now;
+      if (diff <= 0) {
+        setTimeLeft("Available now!");
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h ${minutes}m`);
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      } else {
+        setTimeLeft(`${minutes}m ${seconds}s`);
+      }
+    };
+    calc();
+    const interval = setInterval(calc, 1000);
+    return () => clearInterval(interval);
+  }, [nextDate]);
+
+  return (
+    <div className="bg-blue-500/10 border border-blue-400/20 rounded-xl p-4 mb-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+          <span className="text-lg">⏳</span>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Next report: Month {nextMonth}</p>
+          <p className="text-xs text-muted">Your next monthly guidance will be ready in</p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-lg font-bold text-blue-300 font-mono">{timeLeft}</p>
+        <p className="text-[10px] text-gray-500">{nextDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+      </div>
     </div>
   );
 }

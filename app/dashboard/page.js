@@ -70,7 +70,7 @@ export default async function Dashboard() {
                   <div className="text-4xl">🎖️</div>
                   <div>
                     <h2 className="text-xl font-bold text-accent">Founding Member</h2>
-                    <p className="text-muted text-sm mt-1">You have <strong className="text-foreground">free unlimited reports</strong>. Generate a new report for yourself, family, or friends — no charge.</p>
+                    <p className="text-muted text-sm mt-1">You have <strong className="text-foreground">5 free reports every month</strong> for 2 years. Generate a new report for yourself, family, or friends — no charge.</p>
                   </div>
                 </div>
                 <Link
