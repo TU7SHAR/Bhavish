@@ -1820,6 +1820,129 @@ function DetailCard({ person, expanded, onToggle, password }) {
             </div>
           )}
 
+          {/* Complete Email History — chronological timeline of ALL emails sent + opened */}
+          {person.email && (
+            <div>
+              <SectionTitle>Complete Email History</SectionTitle>
+              <div className="bg-black/20 rounded-xl p-4">
+                {(() => {
+                  // Build a chronological list of all emails
+                  const emailHistory = [];
+
+                  // Report delivery email
+                  if (person.payment_status === "paid") {
+                    const reportOpen = opens.find((o) => o.type === "report");
+                    emailHistory.push({
+                      type: "📄 Report Delivery",
+                      sentAt: person.created_at, // approximation — sent immediately after payment
+                      opened: !!reportOpen,
+                      openedAt: reportOpen?.opened_at,
+                    });
+                  }
+
+                  // Thank you email
+                  if (person.thankyou_sent_at) {
+                    const tyOpen = opens.find((o) => o.type === "thankyou");
+                    emailHistory.push({
+                      type: "🙏 Thank You (from Founder)",
+                      sentAt: person.thankyou_sent_at,
+                      opened: !!tyOpen,
+                      openedAt: tyOpen?.opened_at,
+                    });
+                  }
+
+                  // Guidance confirmation
+                  if (person.guidance_email_sent_at) {
+                    const gOpen = opens.find((o) => o.type === "guidance");
+                    emailHistory.push({
+                      type: "📅 Guidance Confirmation",
+                      sentAt: person.guidance_email_sent_at,
+                      opened: !!gOpen,
+                      openedAt: gOpen?.opened_at,
+                    });
+                  }
+
+                  // How-to email
+                  if (person.howto_sent_at) {
+                    const hOpen = opens.find((o) => o.type === "howto");
+                    emailHistory.push({
+                      type: "📖 How to use BhavishAI",
+                      sentAt: person.howto_sent_at,
+                      opened: !!hOpen,
+                      openedAt: hOpen?.opened_at,
+                    });
+                  }
+
+                  // Nurture sequence emails
+                  const nurtureSent = person.emails_sent_count || 0;
+                  for (let i = 1; i <= nurtureSent; i++) {
+                    const nOpen = opens.find((o) => o.num === i);
+                    const draft = Array.isArray(person.email_drafts) ? person.email_drafts.find((d) => d.num === i) : null;
+                    emailHistory.push({
+                      type: `📬 Nurture #${i}${draft ? ` — "${draft.subject}"` : ""}`,
+                      sentAt: null, // we don't have per-email sent timestamps
+                      opened: !!nOpen,
+                      openedAt: nOpen?.opened_at,
+                      psychology: draft?.psychology,
+                    });
+                  }
+
+                  // Monthly guidance emails
+                  const guidanceOpens = opens.filter((o) => o.type && o.type.startsWith("guidance_m"));
+                  guidanceOpens.forEach((go) => {
+                    const monthNum = go.type.replace("guidance_m", "");
+                    emailHistory.push({
+                      type: `📅 Monthly Guidance (Month ${monthNum})`,
+                      sentAt: null,
+                      opened: true,
+                      openedAt: go.opened_at,
+                    });
+                  });
+
+                  // Sort by sentAt or openedAt (most recent first)
+                  emailHistory.sort((a, b) => {
+                    const dateA = a.sentAt || a.openedAt || "";
+                    const dateB = b.sentAt || b.openedAt || "";
+                    return new Date(dateB) - new Date(dateA);
+                  });
+
+                  if (emailHistory.length === 0) {
+                    return <p className="text-xs text-gray-500 text-center py-2">No emails sent yet.</p>;
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {emailHistory.map((e, i) => (
+                        <div key={i} className="flex items-start gap-3 py-2 border-b border-white/5 last:border-0">
+                          <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${e.opened ? "bg-green-500" : "bg-gray-600"}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-200">{e.type}</p>
+                            {e.psychology && <p className="text-[10px] text-gray-500">Strategy: {e.psychology}</p>}
+                          </div>
+                          <div className="text-right shrink-0">
+                            {e.sentAt && (
+                              <p className="text-[10px] text-gray-400">
+                                Sent {new Date(e.sentAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}{" "}
+                                {new Date(e.sentAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                              </p>
+                            )}
+                            {e.opened ? (
+                              <p className="text-[10px] text-green-400">
+                                Opened {e.openedAt ? new Date(e.openedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + " " + new Date(e.openedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "✓"}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-gray-600">Not opened</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Email Sequence */}
           <div>
             <SectionTitle>Email Sequence</SectionTitle>
