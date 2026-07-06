@@ -322,8 +322,8 @@ function OverviewTab({ data }) {
 
     const leads = filtered.length;
     const paid = filtered.filter((r) => r.payment_status === "paid" && !r.is_founder_free).length;
-    const founders = filtered.filter((r) => r.is_founder_member).length;
-    const guidance = filtered.filter((r) => r.has_12_month_guidance).length;
+    const founders = filtered.filter((r) => r.is_founder_member && !r.is_founder_gifted).length;
+    const guidance = filtered.filter((r) => r.has_12_month_guidance && !r.is_guidance_gifted).length;
     const founderFreeReports = filtered.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
     const gross = (paid * 299) + (founders * 999) + (guidance * 149);
     const fees = Math.round(gross * 2.36 / 100);
@@ -1191,8 +1191,8 @@ function PaymentsTab({ payments }) {
 
   if (!payments) return null;
   const totalRevenue = payments.length * 299;
-  const founderRevenue = payments.filter((p) => p.is_founder_member).length * 999;
-  const guidanceRevenue = payments.filter((p) => p.has_12_month_guidance).length * 149;
+  const founderRevenue = payments.filter((p) => p.is_founder_member && !p.is_founder_gifted).length * 999;
+  const guidanceRevenue = payments.filter((p) => p.has_12_month_guidance && !p.is_guidance_gifted).length * 149;
 
   return (
     <div>

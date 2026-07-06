@@ -67,11 +67,14 @@ export async function GET(request) {
       const totalFounderFree = reports.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
 
       // Accurate revenue calculation (accounts for all products)
+      // IMPORTANT: exclude gifted items from revenue — they didn't pay
       const founderMembers = reports.filter((r) => r.is_founder_member).length;
+      const founderMembersPaid = reports.filter((r) => r.is_founder_member && !r.is_founder_gifted).length;
       const with12MonthGuidance = reports.filter((r) => r.has_12_month_guidance).length;
+      const with12MonthGuidancePaid = reports.filter((r) => r.has_12_month_guidance && !r.is_guidance_gifted).length;
       const baseRevenue = totalPaid * 299;
-      const founderRevenue = founderMembers * 999;
-      const guidanceRevenue = with12MonthGuidance * 149;
+      const founderRevenue = founderMembersPaid * 999;
+      const guidanceRevenue = with12MonthGuidancePaid * 149;
       const totalRevenue = baseRevenue + founderRevenue + guidanceRevenue;
 
       // Razorpay fee: 2% + 18% GST on the 2% = 2.36% effective
@@ -106,11 +109,11 @@ export async function GET(request) {
       const settledReports = paidReports.filter(isSettled);
       const pendingReports = paidReports.filter((r) => !isSettled(r));
 
-      // Calculate settled/pending amounts per product
+      // Calculate settled/pending amounts per product (exclude gifted from revenue)
       function calcRevenue(list) {
         const base = list.length * 299;
-        const founder = list.filter((r) => r.is_founder_member).length * 999;
-        const guidance = list.filter((r) => r.has_12_month_guidance).length * 149;
+        const founder = list.filter((r) => r.is_founder_member && !r.is_founder_gifted).length * 999;
+        const guidance = list.filter((r) => r.has_12_month_guidance && !r.is_guidance_gifted).length * 149;
         const gross = base + founder + guidance;
         const fees = Math.round(gross * RAZORPAY_FEE_PERCENT / 100);
         return { gross, net: gross - fees, fees };
@@ -186,7 +189,9 @@ export async function GET(request) {
             created_at: r.created_at,
             payment_status: r.payment_status,
             is_founder_member: !!r.is_founder_member,
+            is_founder_gifted: !!r.is_founder_gifted,
             has_12_month_guidance: !!r.has_12_month_guidance,
+            is_guidance_gifted: !!r.is_guidance_gifted,
             paid_at: r.paid_at || null,
           })),
         },
@@ -210,7 +215,7 @@ export async function GET(request) {
     if (tab === "payments") {
       const { data: payments } = await supabase
         .from("reports")
-        .select("report_id, name, email, payment_status, payment_id, created_at, has_12_month_guidance, is_founder_member, founder_upgrade_payment_id")
+        .select("report_id, name, email, payment_status, payment_id, created_at, has_12_month_guidance, is_founder_member, founder_upgrade_payment_id, is_guidance_gifted, is_founder_gifted")
         .eq("payment_status", "paid")
         .order("created_at", { ascending: false });
 
