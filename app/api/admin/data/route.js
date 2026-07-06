@@ -253,6 +253,28 @@ export async function GET(request) {
       return NextResponse.json({ guidanceCustomers: excludeTest(guidance, getTestEmails()) });
     }
 
+    if (tab === "guidance-monthly") {
+      // Fetch monthly guidance reports for a specific customer (by reportId query param)
+      const reportId = searchParams.get("reportId");
+      if (!reportId) return NextResponse.json({ monthlyReports: [] });
+
+      const { data: monthlyReports, error: mrErr } = await supabase
+        .from("guidance_reports")
+        .select("*")
+        .eq("parent_report_id", reportId)
+        .order("month_number", { ascending: true });
+
+      if (mrErr) {
+        // Table might not exist yet — return empty gracefully
+        if (mrErr.message?.includes("relation") || mrErr.code === "42P01") {
+          return NextResponse.json({ monthlyReports: [] });
+        }
+        return NextResponse.json({ error: mrErr.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ monthlyReports: monthlyReports || [] });
+    }
+
     if (tab === "test") {
       // Everything tied to the test/QA account(s) — isolated here, out of all metrics.
       const testEmails = getTestEmails();

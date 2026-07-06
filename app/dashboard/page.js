@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import MonthlyGuidanceSection from "../components/MonthlyGuidanceSection";
 
 export const metadata = {
   title: "My Reports - Dashboard",
@@ -152,38 +153,16 @@ export default async function Dashboard() {
                     </div>
                     <div className="bg-surface/50 border border-border rounded-xl p-3">
                       <p className="text-[10px] text-gray-400 uppercase tracking-wider">Delivery</p>
-                      <p className="text-sm font-medium text-foreground">Included in report</p>
+                      <p className="text-sm font-medium text-foreground">Monthly via email</p>
                     </div>
                   </div>
 
-                  {/* What they received + when first guidance */}
-                  <div className="bg-surface/40 border border-border rounded-xl p-4">
-                    <h3 className="text-sm font-semibold text-foreground mb-2">What you received</h3>
-                    <ul className="space-y-1.5 text-sm text-muted">
-                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Month-by-month forecast (career, money, love, health) for 12 months</li>
-                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Best months for action &amp; caution months to stay careful</li>
-                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Key timing windows — when to move, when to wait</li>
-                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Practical monthly action plan &amp; personal remedies</li>
-                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> 12-month yearly summary &amp; overall theme</li>
-                    </ul>
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <p className="text-xs text-muted">
-                        <span className="text-blue-300 font-medium">Your guidance pack is included as a dedicated section in your full report.</span>{" "}
-                        Open your report below to view the full month-by-month breakdown.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* View button */}
-                  <div className="mt-4">
-                    <Link
-                      href={`/dashboard/report/${guidanceReport.report_id}`}
-                      className="inline-flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-5 py-2.5 rounded-full text-sm font-medium transition-all border border-blue-400/30 hover:border-blue-400/50"
-                    >
-                      📅 View My 12-Month Guidance
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    </Link>
-                  </div>
+                  {/* Monthly Guidance Reports — client component that fetches and displays individual months */}
+                  <MonthlyGuidanceSection
+                    reportId={guidanceReport.report_id}
+                    startDate={startDate.toISOString()}
+                    currentMonth={currentMonth}
+                  />
                 </div>
               </div>
             );
