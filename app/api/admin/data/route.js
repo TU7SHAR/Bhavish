@@ -312,20 +312,20 @@ export async function GET(request) {
     if (tab === "emails") {
       const { data: emails } = await supabase
         .from("reports")
-        .select("report_id, name, email, created_at, emails_sent_count, last_email_sent_at, email_sequence_status, email_opens, email_drafts")
+        .select("report_id, name, email, created_at, payment_status, emails_sent_count, last_email_sent_at, email_sequence_status, email_opens, email_drafts, thankyou_sent_at, guidance_email_sent_at, howto_sent_at, has_12_month_guidance")
         .not("email", "is", null)
         .neq("email", "")
         .order("created_at", { ascending: false });
 
-      // Simplify email_drafts to just subjects (full drafts are too large)
-      const simplified = excludeTest(emails, getTestEmails()).map((e) => ({
+      // Include full drafts (subject + body + psychology) so admin can read the actual email text
+      const enriched = excludeTest(emails, getTestEmails()).map((e) => ({
         ...e,
         email_drafts: Array.isArray(e.email_drafts)
-          ? e.email_drafts.map((d) => ({ num: d.num, subject: d.subject, psychology: d.psychology }))
+          ? e.email_drafts.map((d) => ({ num: d.num, subject: d.subject, body: d.body, psychology: d.psychology }))
           : null,
       }));
 
-      return NextResponse.json({ emails: simplified });
+      return NextResponse.json({ emails: enriched });
     }
 
     return NextResponse.json({ error: "Invalid tab" }, { status: 400 });
