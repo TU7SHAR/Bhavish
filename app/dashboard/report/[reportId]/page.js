@@ -4,6 +4,9 @@ import { redirect, notFound } from "next/navigation";
 import Header from "../../../components/Header";
 import Footer from "../../../components/Footer";
 import KundliChartsSection from "../../../components/KundliCharts";
+import GuidancePack from "../../../components/GuidancePack";
+
+const isGuidanceSection = (title) => /guidance pack|12-month|12 month/i.test(title || "");
 
 export async function generateMetadata({ params }) {
   return { title: "View Report - Dashboard" };
@@ -39,6 +42,8 @@ export default async function ViewReport({ params }) {
   if (!report) notFound();
 
   const sections = report.sections || [];
+  const guidanceIndex = sections.findIndex((s) => isGuidanceSection(s.title));
+  const hasGuidance = guidanceIndex >= 0;
 
   return (
     <>
@@ -68,6 +73,23 @@ export default async function ViewReport({ params }) {
             </div>
           )}
 
+          {/* 12-Month Guidance Pack callout — only when the ₹149 add-on was purchased */}
+          {hasGuidance && (
+            <a
+              href="#guidance-pack"
+              className="block bg-gradient-to-br from-blue-500/15 via-primary/10 to-transparent border border-blue-400/30 rounded-2xl p-5 mb-8 hover:border-blue-400/60 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📅</span>
+                <div className="flex-1">
+                  <p className="font-bold text-blue-300">You have the 12-Month Guidance Pack</p>
+                  <p className="text-muted text-sm">Your month-by-month guide is included below.</p>
+                </div>
+                <span className="text-blue-300 text-sm font-medium group-hover:translate-x-0.5 transition-transform">View ↓</span>
+              </div>
+            </a>
+          )}
+
           {/* Kundli Charts, Planet Table, Lucky Factors, Upay (Remedies) */}
           {report.chart_data && (
             <KundliChartsSection chartData={report.chart_data} />
@@ -75,22 +97,31 @@ export default async function ViewReport({ params }) {
 
           {/* All Sections */}
           <div className="space-y-8">
-            {sections.map((section, i) => (
-              <div
-                key={i}
-                className="bg-surface border border-border rounded-2xl p-6 md:p-8"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                  <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
+            {sections.map((section, i) => {
+              if (isGuidanceSection(section.title)) {
+                return (
+                  <div key={i} id="guidance-pack" className="scroll-mt-24">
+                    <GuidancePack title={section.title} content={section.content} />
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={i}
+                  className="bg-surface border border-border rounded-2xl p-6 md:p-8"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
+                  </div>
+                  <div className="text-muted leading-relaxed whitespace-pre-line">
+                    {section.content}
+                  </div>
                 </div>
-                <div className="text-muted leading-relaxed whitespace-pre-line">
-                  {section.content}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
