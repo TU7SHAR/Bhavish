@@ -67,11 +67,14 @@ export async function GET(request) {
       const totalFounderFree = reports.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
 
       // Accurate revenue calculation (accounts for all products)
-      // IMPORTANT: exclude gifted items from revenue — they didn't pay
+      // BULLETPROOF: founder revenue counts ONLY rows with founder_upgrade_payment_id
+      // (proof of real ₹999 payment — gifts never set this field).
+      // Guidance revenue counts ONLY rows where has_12_month_guidance=true AND
+      // is_guidance_gifted is NOT true (gifted ones excluded).
       const founderMembers = reports.filter((r) => r.is_founder_member).length;
-      const founderMembersPaid = reports.filter((r) => r.is_founder_member && !r.is_founder_gifted).length;
+      const founderMembersPaid = reports.filter((r) => r.founder_upgrade_payment_id).length;
       const with12MonthGuidance = reports.filter((r) => r.has_12_month_guidance).length;
-      const with12MonthGuidancePaid = reports.filter((r) => r.has_12_month_guidance && !r.is_guidance_gifted).length;
+      const with12MonthGuidancePaid = reports.filter((r) => r.has_12_month_guidance && r.is_guidance_gifted !== true && r.payment_status === "paid").length;
       const baseRevenue = totalPaid * 299;
       const founderRevenue = founderMembersPaid * 999;
       const guidanceRevenue = with12MonthGuidancePaid * 149;
@@ -112,8 +115,8 @@ export async function GET(request) {
       // Calculate settled/pending amounts per product (exclude gifted from revenue)
       function calcRevenue(list) {
         const base = list.length * 299;
-        const founder = list.filter((r) => r.is_founder_member && !r.is_founder_gifted).length * 999;
-        const guidance = list.filter((r) => r.has_12_month_guidance && !r.is_guidance_gifted).length * 149;
+        const founder = list.filter((r) => r.founder_upgrade_payment_id).length * 999;
+        const guidance = list.filter((r) => r.has_12_month_guidance && r.is_guidance_gifted !== true).length * 149;
         const gross = base + founder + guidance;
         const fees = Math.round(gross * RAZORPAY_FEE_PERCENT / 100);
         return { gross, net: gross - fees, fees };
@@ -190,6 +193,7 @@ export async function GET(request) {
             payment_status: r.payment_status,
             is_founder_member: !!r.is_founder_member,
             is_founder_gifted: !!r.is_founder_gifted,
+            founder_upgrade_payment_id: r.founder_upgrade_payment_id || null,
             has_12_month_guidance: !!r.has_12_month_guidance,
             is_guidance_gifted: !!r.is_guidance_gifted,
             paid_at: r.paid_at || null,
