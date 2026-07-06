@@ -163,7 +163,7 @@ function buildReportHtml({ name, reportId, summary, sections, chartData }) {
 
 export async function POST(request) {
   try {
-    const { email, name, reportId, sections, summary, chartData, dateOfBirth, timeOfBirth, placeOfBirth } = await request.json();
+    const { email, name, reportId, sections, summary, chartData, dateOfBirth, timeOfBirth, placeOfBirth, includeBump } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -253,6 +253,26 @@ export async function POST(request) {
           { error: "Email delivery failed. Your report is still available on-screen and can be downloaded." },
           { status: 500 }
         );
+      }
+    }
+
+    // Auto-send the "12-Month Guidance Pack confirmed" email when the ₹149 add-on
+    // was purchased. Reuses the admin route (single source of truth — it re-validates
+    // has_12_month_guidance from the DB and stamps guidance_email_sent_at). Best-effort:
+    // never block the report email response on it.
+    if (includeBump) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+        const adminSecret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+        if (adminSecret) {
+          await fetch(`${baseUrl}/api/admin/send-guidance-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminSecret}` },
+            body: JSON.stringify({ reportId }),
+          });
+        }
+      } catch (guidanceErr) {
+        console.warn("Guidance confirmation auto-send failed (non-critical):", guidanceErr.message);
       }
     }
 

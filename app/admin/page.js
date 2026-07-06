@@ -127,6 +127,7 @@ export default function AdminDashboard() {
     { id: "leads", label: "Leads", icon: "👥" },
     { id: "paid-details", label: "Paid People", icon: "💎" },
     { id: "founders", label: "Founders", icon: "🏆" },
+    { id: "guidance-customers", label: "12-Mo Guidance", icon: "📅" },
     { id: "all-details", label: "Everyone", icon: "🔍" },
     { id: "payments", label: "Payments", icon: "💰" },
     { id: "emails", label: "Emails", icon: "📧" },
@@ -204,6 +205,7 @@ export default function AdminDashboard() {
             {tab === "leads" && <LeadsTab leads={data.leads} />}
             {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
             {tab === "founders" && <FoundersTab founders={data.founders} password={password} />}
+            {tab === "guidance-customers" && <GuidanceTab guidance={data.guidanceCustomers} password={password} />}
             {tab === "test" && <TestTab test={data.test} password={password} />}
             {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
@@ -1485,7 +1487,19 @@ function DetailCard({ person, expanded, onToggle, password }) {
     setEmailLoading(action);
     setEmailAction(null);
     try {
-      const url = action === "resend-report" ? "/api/admin/resend-report" : "/api/admin/send-thankyou";
+      const urlMap = {
+        "resend-report": "/api/admin/resend-report",
+        "thankyou": "/api/admin/send-thankyou",
+        "guidance-email": "/api/admin/send-guidance-email",
+        "howto-email": "/api/admin/send-howto-email",
+      };
+      const successMap = {
+        "resend-report": (e) => `✅ Report re-sent to ${e}`,
+        "thankyou": (e) => `✅ Thank you email sent to ${e}`,
+        "guidance-email": (e) => `✅ 12-Month Guidance confirmation sent to ${e}`,
+        "howto-email": (e) => `✅ "How to use BhavishAI" email sent to ${e}`,
+      };
+      const url = urlMap[action] || "/api/admin/send-thankyou";
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
@@ -1493,12 +1507,12 @@ function DetailCard({ person, expanded, onToggle, password }) {
       });
       const json = await res.json();
       if (res.ok) {
-        const msg = action === "resend-report"
-          ? `✅ Report re-sent to ${json.email}`
-          : `✅ Thank you email sent to ${json.email}`;
+        const msg = (successMap[action] || ((e) => `✅ Sent to ${e}`))(json.email);
         setEmailAction({ status: "success", message: msg });
-        // Update local state to show thank you was sent
+        // Update local state to reflect sent timestamps
         if (action === "thankyou") person.thankyou_sent_at = new Date().toISOString();
+        if (action === "guidance-email") person.guidance_email_sent_at = new Date().toISOString();
+        if (action === "howto-email") person.howto_sent_at = new Date().toISOString();
       } else {
         setEmailAction({ status: "error", message: `❌ ${json.error}` });
       }
@@ -1591,6 +1605,20 @@ function DetailCard({ person, expanded, onToggle, password }) {
                     >
                       {emailLoading === "regenerate" ? "Regenerating... (~30s)" : "🔄 Regenerate Full Report"}
                     </button>
+                    {/* 12-Month Guidance confirmation — only for customers who bought the ₹149 add-on */}
+                    {person.has_12_month_guidance && (
+                      <button
+                        onClick={() => sendAdminAction("guidance-email")}
+                        disabled={!!emailLoading}
+                        className="px-3 py-2 rounded-xl text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white transition-colors"
+                      >
+                        {emailLoading === "guidance-email"
+                          ? "Sending..."
+                          : person.guidance_email_sent_at
+                            ? `📅 Resend Guidance Confirmation (sent ${new Date(person.guidance_email_sent_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })})`
+                            : "📅 Send Guidance Confirmation"}
+                      </button>
+                    )}
                   </>
                 )}
                 {/* Nurture sequence actions (for unpaid or all) */}
@@ -1607,6 +1635,17 @@ function DetailCard({ person, expanded, onToggle, password }) {
                   className="px-3 py-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white transition-colors"
                 >
                   {emailLoading === "force" ? "Sending..." : `🚀 Force Next (#${(person.emails_sent_count || 0) + 1})`}
+                </button>
+                <button
+                  onClick={() => sendAdminAction("howto-email")}
+                  disabled={!!emailLoading}
+                  className="px-3 py-2 rounded-xl text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white transition-colors"
+                >
+                  {emailLoading === "howto-email"
+                    ? "Sending..."
+                    : person.howto_sent_at
+                      ? `📖 Resend How-to (sent ${new Date(person.howto_sent_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })})`
+                      : "📖 How to use BhavishAI"}
                 </button>
                 <button
                   onClick={() => setShowCustom(!showCustom)}
@@ -1712,6 +1751,43 @@ function DetailCard({ person, expanded, onToggle, password }) {
                     return reportOpen ? new Date(reportOpen.opened_at).toLocaleString("en-IN") : "—";
                   })()}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Add-on / Guide Emails (guidance confirmation + how-to) */}
+          {(person.has_12_month_guidance || person.guidance_email_sent_at || person.howto_sent_at) && (
+            <div>
+              <SectionTitle>Guidance & Guide Emails</SectionTitle>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {person.has_12_month_guidance && (
+                  <>
+                    <InfoItem
+                      label="Guidance Confirmation"
+                      value={
+                        !person.guidance_email_sent_at ? "Not sent" :
+                        opens.some((o) => o.type === "guidance") ? "Opened ✅" : "Sent, not opened"
+                      }
+                      badge={
+                        !person.guidance_email_sent_at ? null :
+                        opens.some((o) => o.type === "guidance") ? "green" : "amber"
+                      }
+                    />
+                    <InfoItem label="Guidance Sent At" value={person.guidance_email_sent_at ? new Date(person.guidance_email_sent_at).toLocaleString("en-IN") : "—"} />
+                  </>
+                )}
+                <InfoItem
+                  label="How-to Email"
+                  value={
+                    !person.howto_sent_at ? "Not sent" :
+                    opens.some((o) => o.type === "howto") ? "Opened ✅" : "Sent, not opened"
+                  }
+                  badge={
+                    !person.howto_sent_at ? null :
+                    opens.some((o) => o.type === "howto") ? "green" : "amber"
+                  }
+                />
+                <InfoItem label="How-to Sent At" value={person.howto_sent_at ? new Date(person.howto_sent_at).toLocaleString("en-IN") : "—"} />
               </div>
             </div>
           )}
@@ -2005,6 +2081,41 @@ function FoundersTab({ founders, password }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- 12-MONTH GUIDANCE (everyone who bought the ₹149 add-on) ----------
+function GuidanceTab({ guidance, password }) {
+  if (!guidance) return null;
+
+  const total = guidance.length;
+  const confirmationsSent = guidance.filter((p) => p.guidance_email_sent_at).length;
+  const confirmationsOpened = guidance.filter(
+    (p) => Array.isArray(p.email_opens) && p.email_opens.some((o) => o.type === "guidance")
+  ).length;
+  const revenue = total * 149;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5">
+        <p className="text-[11px] text-blue-300">📅 Everyone who bought the ₹149 12-Month Guidance Pack. Each buyer should get a confirmation email automatically on purchase — use the <span className="font-semibold">📅 Send / Resend Guidance Confirmation</span> button inside a card if it failed.</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Guidance Buyers" value={total} sub="₹149 add-on" accent="blue" icon="📅" />
+        <StatCard label="Guidance Revenue" value={`₹${revenue.toLocaleString("en-IN")}`} accent="green" />
+        <StatCard label="Confirmations Sent" value={`${confirmationsSent} / ${total}`} accent="purple" icon="✉️" />
+        <StatCard label="Confirmations Opened" value={confirmationsOpened} sub={confirmationsSent ? `${Math.round((confirmationsOpened / confirmationsSent) * 100)}% open rate` : "—"} accent="pink" icon="👁" />
+      </div>
+
+      <DetailCardList
+        rows={guidance}
+        password={password}
+        placeholder="Search guidance customers..."
+        noun="guidance customers"
+        emptyText="No one has bought the 12-Month Guidance add-on yet."
+      />
     </div>
   );
 }
