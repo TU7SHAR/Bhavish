@@ -1492,18 +1492,27 @@ function DetailCard({ person, expanded, onToggle, password }) {
         "thankyou": "/api/admin/send-thankyou",
         "guidance-email": "/api/admin/send-guidance-email",
         "howto-email": "/api/admin/send-howto-email",
+        "gift-guidance": "/api/admin/gift",
+        "gift-founder": "/api/admin/gift",
       };
       const successMap = {
         "resend-report": (e) => `✅ Report re-sent to ${e}`,
         "thankyou": (e) => `✅ Thank you email sent to ${e}`,
         "guidance-email": (e) => `✅ 12-Month Guidance confirmation sent to ${e}`,
         "howto-email": (e) => `✅ "How to use BhavishAI" email sent to ${e}`,
+        "gift-guidance": (e) => `🎁 Gifted 12-Month Guidance Pack to ${e} + email sent`,
+        "gift-founder": (e) => `🎁 Gifted Founder Membership to ${e} + email sent`,
       };
       const url = urlMap[action] || "/api/admin/send-thankyou";
+      const bodyPayload = action === "gift-guidance"
+        ? { reportId: person.report_id, type: "guidance" }
+        : action === "gift-founder"
+          ? { reportId: person.report_id, type: "founder" }
+          : { reportId: person.report_id };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
-        body: JSON.stringify({ reportId: person.report_id }),
+        body: JSON.stringify(bodyPayload),
       });
       const json = await res.json();
       if (res.ok) {
@@ -1513,6 +1522,8 @@ function DetailCard({ person, expanded, onToggle, password }) {
         if (action === "thankyou") person.thankyou_sent_at = new Date().toISOString();
         if (action === "guidance-email") person.guidance_email_sent_at = new Date().toISOString();
         if (action === "howto-email") person.howto_sent_at = new Date().toISOString();
+        if (action === "gift-guidance") person.has_12_month_guidance = true;
+        if (action === "gift-founder") person.is_founder_member = true;
       } else {
         setEmailAction({ status: "error", message: `❌ ${json.error}` });
       }
@@ -1653,9 +1664,26 @@ function DetailCard({ person, expanded, onToggle, password }) {
                 >
                   ✏️ Custom Email
                 </button>
+                {/* Gift buttons — only show when they DON'T already have the thing */}
+                {!person.has_12_month_guidance && (
+                  <button
+                    onClick={() => { if (confirm(`Gift 12-Month Guidance Pack to ${person.name}? This will mark them as having it and send them a notification email.`)) sendAdminAction("gift-guidance"); }}
+                    disabled={!!emailLoading}
+                    className="px-3 py-2 rounded-xl text-xs font-medium bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-90 disabled:opacity-50 text-white transition-colors"
+                  >
+                    {emailLoading === "gift-guidance" ? "Gifting..." : "🎁 Gift 12-Mo Guidance"}
+                  </button>
+                )}
+                {!person.is_founder_member && (
+                  <button
+                    onClick={() => { if (confirm(`Gift Founder Membership to ${person.name}? This upgrades them to Founding Member and sends them a notification email.`)) sendAdminAction("gift-founder"); }}
+                    disabled={!!emailLoading}
+                    className="px-3 py-2 rounded-xl text-xs font-medium bg-gradient-to-r from-pink-600 to-rose-600 hover:opacity-90 disabled:opacity-50 text-white transition-colors"
+                  >
+                    {emailLoading === "gift-founder" ? "Gifting..." : "🎁 Gift Founder Upgrade"}
+                  </button>
+                )}
               </div>
-
-              {/* Custom email form */}
               {showCustom && (
                 <div className="bg-black/30 rounded-xl p-3 space-y-2 mb-2">
                   <input
