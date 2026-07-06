@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import KundliChartsSection from "../../components/KundliCharts";
+import GuidancePack from "../../components/GuidancePack";
 
 export default function FullReport() {
   const router = useRouter();
@@ -86,6 +87,12 @@ export default function FullReport() {
     );
   }
 
+  // Detect the ₹149 "12-Month Personal Guidance Pack" section (only present when
+  // the add-on was purchased). Used to give the buyer a distinct on-screen experience.
+  const isGuidanceSection = (title) => /guidance pack|12-month|12 month/i.test(title || "");
+  const guidanceIndex = (reportData.sections || []).findIndex((s) => isGuidanceSection(s.title));
+  const hasGuidance = guidanceIndex >= 0;
+
   return (
     <>
       <Header />
@@ -100,6 +107,32 @@ export default function FullReport() {
               {userData.email && " A backup copy has been sent to your email."}
             </p>
           </div>
+
+          {/* 12-Month Guidance Pack — buyer callout. Only shows when the ₹149 add-on was purchased. */}
+          {hasGuidance && (
+            <a
+              href={`#section-${guidanceIndex}`}
+              className="block bg-gradient-to-br from-blue-500/15 via-primary/10 to-transparent border border-blue-400/30 rounded-2xl p-6 mb-8 hover:border-blue-400/60 transition-colors group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-3xl shrink-0">📅</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h2 className="text-lg font-bold text-blue-300">Your 12-Month Guidance Pack is included</h2>
+                    <span className="text-[10px] uppercase tracking-wider bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-semibold">₹149 add-on</span>
+                  </div>
+                  <p className="text-muted text-sm leading-relaxed">
+                    A dedicated month-by-month guide for the next 12 months — best months, caution periods,
+                    key timing windows and a practical monthly action plan for your career, money, relationships and health.
+                  </p>
+                  <span className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-blue-300 group-hover:gap-2 transition-all">
+                    Jump to your guidance pack
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                  </span>
+                </div>
+              </div>
+            </a>
+          )}
 
           {/* Report Header */}
           <div className="bg-surface border border-border rounded-2xl p-8 mb-8 text-center">
@@ -132,38 +165,51 @@ export default function FullReport() {
           <div className="bg-surface border border-border rounded-2xl p-6 mb-8">
             <h2 className="text-lg font-bold mb-4">Table of Contents</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {reportData.sections.map((section, i) => (
-                <a
-                  key={i}
-                  href={`#section-${i}`}
-                  className="flex items-center gap-2 text-sm text-muted hover:text-primary-light transition-colors py-1"
-                >
-                  <span className="text-primary font-mono text-xs w-6">{String(i + 1).padStart(2, "0")}</span>
-                  {section.title.replace(/^\d+\.\s*/, "")}
-                </a>
-              ))}
+              {reportData.sections.map((section, i) => {
+                const guide = isGuidanceSection(section.title);
+                return (
+                  <a
+                    key={i}
+                    href={`#section-${i}`}
+                    className={`flex items-center gap-2 text-sm transition-colors py-1 ${guide ? "text-blue-300 hover:text-blue-200 font-medium" : "text-muted hover:text-primary-light"}`}
+                  >
+                    <span className={`font-mono text-xs w-6 ${guide ? "text-blue-400" : "text-primary"}`}>{String(i + 1).padStart(2, "0")}</span>
+                    {section.title.replace(/^\d+\.\s*/, "")}
+                    {guide && <span className="text-[9px] uppercase tracking-wider bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full font-semibold">📅 Guidance</span>}
+                  </a>
+                );
+              })}
             </div>
           </div>
 
           {/* All Sections */}
           <div className="space-y-8">
-            {reportData.sections.map((section, i) => (
-              <div
-                key={i}
-                id={`section-${i}`}
-                className="bg-surface border border-border rounded-2xl p-6 md:p-8 scroll-mt-24"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                  <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
+            {reportData.sections.map((section, i) => {
+              if (isGuidanceSection(section.title)) {
+                return (
+                  <div key={i} id={`section-${i}`} className="scroll-mt-24">
+                    <GuidancePack title={section.title} content={section.content} />
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={i}
+                  id={`section-${i}`}
+                  className="bg-surface border border-border rounded-2xl p-6 md:p-8 scroll-mt-24"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
+                  </div>
+                  <div className="text-muted leading-relaxed whitespace-pre-line">
+                    {section.content}
+                  </div>
                 </div>
-                <div className="text-muted leading-relaxed whitespace-pre-line">
-                  {section.content}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Footer note */}
