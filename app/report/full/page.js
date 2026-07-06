@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import KundliChartsSection from "../../components/KundliCharts";
+import GuidancePack from "../../components/GuidancePack";
 
 export default function FullReport() {
   const router = useRouter();
@@ -184,21 +185,21 @@ export default function FullReport() {
           {/* All Sections */}
           <div className="space-y-8">
             {reportData.sections.map((section, i) => {
-              const guide = isGuidanceSection(section.title);
+              if (isGuidanceSection(section.title)) {
+                return (
+                  <div key={i} id={`section-${i}`} className="scroll-mt-24">
+                    <GuidancePack title={section.title} content={section.content} />
+                  </div>
+                );
+              }
               return (
                 <div
                   key={i}
                   id={`section-${i}`}
-                  className={`rounded-2xl p-6 md:p-8 scroll-mt-24 ${guide ? "bg-gradient-to-br from-blue-500/10 via-primary/5 to-surface border-2 border-blue-400/40" : "bg-surface border border-border"}`}
+                  className="bg-surface border border-border rounded-2xl p-6 md:p-8 scroll-mt-24"
                 >
-                  {guide && (
-                    <div className="inline-flex items-center gap-2 bg-blue-500/20 border border-blue-400/30 rounded-full px-3 py-1 mb-4">
-                      <span className="text-sm">📅</span>
-                      <span className="text-blue-300 text-xs font-semibold uppercase tracking-wider">Premium Add-on · 12-Month Guidance</span>
-                    </div>
-                  )}
                   <div className="flex items-center gap-3 mb-4">
-                    <span className={`text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center ${guide ? "bg-blue-500/30 text-blue-200" : "bg-primary/20 text-primary"}`}>
+                    <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
                       {i + 1}
                     </span>
                     <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
