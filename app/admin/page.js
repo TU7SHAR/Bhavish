@@ -1548,6 +1548,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
             person.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
           }`}>{person.payment_status}</span>
+          {person.report_status === "failed" && <span className="px-2 py-0.5 rounded-full text-[11px] bg-red-500/20 text-red-400 font-semibold">⚠️ Report Failed</span>}
           {person.is_founder_member && <span className="px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">Founder</span>}
           <span className="text-gray-500 text-lg">{expanded ? "▾" : "▸"}</span>
         </div>
@@ -1670,6 +1671,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
             <SectionTitle>Payment & Revenue</SectionTitle>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <InfoItem label="Payment Status" value={person.payment_status} badge={person.payment_status === "paid" ? "green" : "amber"} />
+              <InfoItem label="Report Status" value={person.report_status || (person.payment_status === "paid" ? "completed (legacy)" : "—")} badge={person.report_status === "failed" ? "amber" : person.report_status === "completed" ? "green" : null} />
               <InfoItem label="Payment ID" value={person.payment_id || "—"} mono />
               <InfoItem label="Founder Member" value={person.is_founder_member ? "Yes ₹999" : "No"} badge={person.is_founder_member ? "pink" : null} />
               <InfoItem label="Founder Payment" value={person.founder_upgrade_payment_id || "—"} mono />

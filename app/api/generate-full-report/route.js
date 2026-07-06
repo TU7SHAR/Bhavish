@@ -30,7 +30,7 @@ const inputSchema = z.object({
 // PHASE 2 — Full 20-section report, only called AFTER payment is verified
 export async function POST(request) {
   try {
-    const { reportId, name, gender, dateOfBirth, timeOfBirth, placeOfBirth, chartData, personalQuestion } =
+    const { reportId, name, gender, dateOfBirth, timeOfBirth, placeOfBirth, chartData, personalQuestion, includeBump } =
       await request.json();
 
     if (!reportId || !name || !chartData) {
@@ -106,7 +106,7 @@ Sections:
 17. Remedies & Spiritual Guidance
 18. Lucky Factors (Numbers, Colors, Gems, Days)
 19. Monthly Predictions for 2026-2027
-20. Life Purpose & Spiritual Path${personalQuestion ? `\n21. Personal Concern: Answer "${personalQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}
+20. Life Purpose & Spiritual Path${personalQuestion ? `\n21. Personal Concern: Answer "${personalQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}${includeBump ? `\n${personalQuestion ? "22" : "21"}. 12-Month Personal Guidance Pack — THIS IS A PAID ADD-ON THE CUSTOMER PURCHASED. Make it substantial (500-700 words). Include ALL of: (a) a brief month-by-month forecast for the next 12 months covering career, money, love, and health each month; (b) which months are BEST for action/decisions and which are CAUTION months; (c) key timing windows (e.g. "good for career movement", "avoid impulsive spending", "focus on health", "relationship clarity period"); (d) a simple practical monthly action plan; (e) safe personal remedies/suggestions (journaling, meditation, discipline, charity, mantra); (f) a final 12-month yearly-theme summary. Anchor timing to the computed dasha/antardasha above.` : ""}
 
 Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
 
@@ -126,7 +126,11 @@ Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
       );
     }
 
-    if (!reportData.sections || reportData.sections.length < 15) {
+    // Quality gate: enough sections, and the paid guidance section must exist if bought
+    const hasGuidanceSection =
+      Array.isArray(reportData.sections) &&
+      reportData.sections.some((s) => /guidance pack|12-month/i.test(s.title || ""));
+    if (!reportData.sections || reportData.sections.length < 15 || (includeBump && !hasGuidanceSection)) {
       return NextResponse.json(
         { error: "Incomplete report. Please try again." },
         { status: 500 }

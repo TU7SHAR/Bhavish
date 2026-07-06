@@ -202,6 +202,7 @@ export default function ReportPreview() {
                   placeOfBirth: userData.placeOfBirth,
                   chartData: reportData.chartData,
                   personalQuestion: userData.personalQuestion || "",
+                  includeBump,
                 }),
               });
               if (!fullRes.ok) throw new Error(`Status ${fullRes.status}`);
@@ -229,22 +230,32 @@ export default function ReportPreview() {
               setRetryMessage(null);
             }
 
-            // Use full report if generated, otherwise fall back to preview sections
-            const finalSections = (fullData && fullData.sections) ? fullData.sections : reportData.sections;
-            const finalSummary = (fullData && fullData.summary) ? fullData.summary : reportData.summary;
+            // ── QUALITY LOCK ── never treat an incomplete report as delivered.
+            // Complete = generated, enough sections, has a summary, and (if the
+            // ₹149 add-on was bought) includes the 12-Month Guidance Pack section.
+            const REQUIRED_SECTIONS = 18;
+            const hasGuidance = fullData?.sections?.some((s) => /guidance pack|12-month/i.test(s.title || ""));
+            const isComplete = Boolean(
+              fullData &&
+              Array.isArray(fullData.sections) &&
+              fullData.sections.length >= REQUIRED_SECTIONS &&
+              fullData.summary &&
+              (!includeBump || hasGuidance)
+            );
 
-            // Build the full report object and store it
-            const fullReport = {
-              ...reportData,
-              sections: finalSections,
-              summary: finalSummary,
-            };
-            sessionStorage.setItem("reportData", JSON.stringify(fullReport));
+            // Never pass off the 2-section preview as the full report.
+            const finalSections = isComplete ? fullData.sections : reportData.sections;
+            const finalSummary = isComplete ? fullData.summary : reportData.summary;
+
+            sessionStorage.setItem("reportData", JSON.stringify({ ...reportData, sections: finalSections, summary: finalSummary }));
             sessionStorage.setItem("paymentVerified", "true");
             localStorage.setItem("paymentVerified_backup", "true");
             sessionStorage.setItem("paymentId", response.razorpay_payment_id);
+            // Flag so /report/full shows an honest "being prepared" screen instead of a partial report
+            if (isComplete) sessionStorage.removeItem("reportPending");
+            else sessionStorage.setItem("reportPending", "true");
 
-            // Save full report to database (mark as paid)
+            // Always persist the payment; record report_status so admin knows delivery state.
             fetch("/api/save-report", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -260,13 +271,14 @@ export default function ReportPreview() {
                 sections: finalSections,
                 paymentId: response.razorpay_payment_id,
                 paymentStatus: "paid",
+                reportStatus: isComplete ? "completed" : "failed",
                 visitorId: getVisitorId(),
                 chartData: reportData.chartData,
               }),
             }).catch(console.error);
 
-            // Send email to customer in background
-            if (userData.email) {
+            // Email the customer ONLY if the report passed the quality check.
+            if (isComplete && userData.email) {
               fetch("/api/send-report-email", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -284,7 +296,8 @@ export default function ReportPreview() {
               }).catch(console.error);
             }
 
-            // Notify YOU (owner) about the sale
+            // Notify owner about the sale — flag failures so YOU can regenerate
+            // and resend before the customer even notices.
             fetch("/api/notify-sale", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -297,11 +310,11 @@ export default function ReportPreview() {
                 placeOfBirth: userData.placeOfBirth,
                 dateOfBirth: userData.dateOfBirth,
                 includeBump,
+                reportComplete: isComplete,
               }),
             }).catch(console.error);
 
             // Redirect to founder upgrade page (post-purchase upsell)
-            // Store reportId so the upgrade page knows which report
             sessionStorage.setItem("upgradeReportId", reportData.reportId);
             router.push("/founder-upgrade");
           } else {
@@ -685,8 +698,8 @@ export default function ReportPreview() {
                       className="mt-0.5 w-4 h-4 accent-accent shrink-0"
                     />
                     <div>
-                      <p className="text-sm font-medium text-foreground">Add 12-Month Personalized Forecast — ₹149</p>
-                      <p className="text-xs text-muted mt-0.5">Month-by-month guidance for career, love, money, health, and key timing windows.</p>
+                      <p className="text-sm font-medium text-foreground">Add 12-Month Personal Guidance Pack — ₹149</p>
+                      <p className="text-xs text-muted mt-0.5">A dedicated month-by-month guidance section in your report — career, money, relationships, health, key timing windows, caution periods, and practical monthly advice for the next 12 months.</p>
                     </div>
                   </div>
                 </label>

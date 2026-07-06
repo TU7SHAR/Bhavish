@@ -4,8 +4,11 @@ import { NextResponse } from "next/server";
 // Sends YOU (the owner) a notification whenever someone buys a report
 export async function POST(request) {
   try {
-    const { reportId, customerName, customerEmail, paymentId, amount, placeOfBirth, dateOfBirth, includeBump, isUpgrade } =
+    const { reportId, customerName, customerEmail, paymentId, amount, placeOfBirth, dateOfBirth, includeBump, isUpgrade, reportComplete } =
       await request.json();
+
+    // A paid sale whose report did NOT pass the quality check — needs YOUR action.
+    const reportFailed = reportComplete === false && !isUpgrade;
 
     const ownerEmail = process.env.GMAIL_USER;
     if (!ownerEmail || !process.env.GMAIL_APP_PASSWORD) {
@@ -49,10 +52,18 @@ export async function POST(request) {
       </tr>`;
     }
 
+    const failBanner = reportFailed
+      ? `<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:8px;padding:14px;margin-bottom:16px;">
+           <p style="margin:0;color:#dc2626;font-weight:bold;font-size:15px;">⚠️ REPORT FAILED QUALITY CHECK — customer was NOT emailed.</p>
+           <p style="margin:6px 0 0;color:#374151;font-size:13px;">This customer paid but the full report was incomplete. Regenerate it in the admin panel and resend BEFORE they notice. Report ID: <strong>${reportId}</strong></p>
+         </div>`
+      : "";
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+        ${failBanner}
         <h2 style="color: #7c3aed; border-bottom: 2px solid #7c3aed; padding-bottom: 10px;">
-          ${isUpgrade ? "🎖️ Founder Upgrade!" : "💰 New Sale on BhavishAI!"}
+          ${isUpgrade ? "🎖️ Founder Upgrade!" : reportFailed ? "💰 New Sale (⚠️ report failed)" : "💰 New Sale on BhavishAI!"}
         </h2>
         
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -87,7 +98,9 @@ export async function POST(request) {
 
     const subject = isUpgrade
       ? `🎖️ FOUNDER UPGRADE! ${customerName} paid ₹${amount || "999"} — BhavishAI`
-      : `💰 New Sale! ${customerName} paid ₹${amount || "299"}${includeBump ? " (includes 12-mo guidance)" : ""} — BhavishAI`;
+      : reportFailed
+        ? `⚠️ ACTION NEEDED: ${customerName} paid ₹${amount || "299"} but report FAILED — regenerate & resend`
+        : `💰 New Sale! ${customerName} paid ₹${amount || "299"}${includeBump ? " (includes 12-mo guidance)" : ""} — BhavishAI`;
 
     await transporter.sendMail({
       from: `BhavishAI Sales <${ownerEmail}>`,
