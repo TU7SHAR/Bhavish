@@ -30,7 +30,7 @@ export async function POST(request) {
   }
 
   try {
-    const { reportId, monthNumber } = await request.json();
+    const { reportId, monthNumber, force } = await request.json();
 
     if (!reportId || !monthNumber || monthNumber < 1 || monthNumber > 12) {
       return NextResponse.json({ error: "reportId and monthNumber (1-12) required." }, { status: 400 });
@@ -61,8 +61,17 @@ export async function POST(request) {
       .eq("month_number", monthNumber)
       .single();
 
-    if (existing) {
-      return NextResponse.json({ error: `Month ${monthNumber} guidance already exists for this customer. Delete it first to regenerate.` }, { status: 400 });
+    if (existing && !force) {
+      return NextResponse.json({ error: `Month ${monthNumber} guidance already exists for this customer. Use force=true to regenerate.` }, { status: 400 });
+    }
+
+    // If regenerating, delete the old one first
+    if (existing && force) {
+      await supabase
+        .from("guidance_reports")
+        .delete()
+        .eq("parent_report_id", reportId)
+        .eq("month_number", monthNumber);
     }
 
     // Determine the actual calendar month for this guidance month

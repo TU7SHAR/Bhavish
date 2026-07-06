@@ -2208,6 +2208,28 @@ function GuidanceCustomerCard({ person, password }) {
     setGenerating(null);
   };
 
+  const regenerateMonth = async (monthNum) => {
+    setGenerating(monthNum);
+    setGenResult(null);
+    try {
+      const res = await fetch("/api/admin/generate-guidance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ reportId: person.report_id, monthNumber: monthNum, force: true }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setGenResult({ status: "success", message: `🔄 Month ${monthNum} (${json.calendarMonth}) regenerated${json.emailSent ? " + emailed" : " (email failed)"}.` });
+        loadMonthlyReports();
+      } else {
+        setGenResult({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (e) {
+      setGenResult({ status: "error", message: `❌ ${e.message}` });
+    }
+    setGenerating(null);
+  };
+
   return (
     <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
       {/* Header */}
@@ -2306,6 +2328,13 @@ function GuidanceCustomerCard({ person, password }) {
                     <div className="flex items-center gap-2">
                       {r.email_sent_at && <span className="text-[10px] text-green-400">✉️ Sent</span>}
                       {!r.email_sent_at && <span className="text-[10px] text-gray-500">Not emailed</span>}
+                      <button
+                        onClick={() => { if (confirm(`Regenerate Month ${r.month_number} for ${person.name}? This replaces the existing report and re-emails.`)) regenerateMonth(r.month_number); }}
+                        disabled={generating !== null}
+                        className="text-[10px] px-2 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/20 disabled:opacity-50 transition-colors"
+                      >
+                        🔄 Regenerate
+                      </button>
                     </div>
                   </div>
                 ))}
