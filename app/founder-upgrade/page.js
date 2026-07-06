@@ -201,7 +201,7 @@ export default function FounderUpgrade() {
 
             <button
               onClick={goToReport}
-              className="w-full text-muted hover:text-foreground text-sm transition-colors py-2"
+              className="w-full text-gray-400 hover:text-foreground text-sm underline underline-offset-4 transition-colors py-2"
             >
               No thanks, show my full report
             </button>
