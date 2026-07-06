@@ -1229,8 +1229,8 @@ function PaymentsTab({ payments }) {
                   <td className="p-3 text-gray-400 text-xs">{p.email || "—"}</td>
                   <td className="p-3 text-xs font-mono text-gray-500">{p.payment_id || "—"}</td>
                   <td className="p-3">
-                    {p.is_founder_member && <span className="px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400 mr-1">Founder ₹999</span>}
-                    {p.has_12_month_guidance && <span className="px-2 py-0.5 rounded-full text-[11px] bg-blue-500/20 text-blue-400">Guidance ₹149</span>}
+                    {p.is_founder_member && <span className={`px-2 py-0.5 rounded-full text-[11px] mr-1 ${p.is_founder_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-pink-500/20 text-pink-400"}`}>{p.is_founder_gifted ? "🎁 Founder (Gifted)" : "Founder ₹999"}</span>}
+                    {p.has_12_month_guidance && <span className={`px-2 py-0.5 rounded-full text-[11px] ${p.is_guidance_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-blue-500/20 text-blue-400"}`}>{p.is_guidance_gifted ? "🎁 Guidance (Gifted)" : "Guidance ₹149"}</span>}
                     {!p.is_founder_member && !p.has_12_month_guidance && <span className="text-gray-600 text-xs">Base only</span>}
                   </td>
                   <td className="p-3 text-gray-500 text-xs">{new Date(p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
@@ -1708,7 +1708,8 @@ function DetailCard({ person, expanded, onToggle, password }) {
             person.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
           }`}>{person.payment_status}</span>
           {person.report_status === "failed" && <span className="px-2 py-0.5 rounded-full text-[11px] bg-red-500/20 text-red-400 font-semibold">⚠️ Report Failed</span>}
-          {person.is_founder_member && <span className="px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">Founder</span>}
+          {person.is_founder_member && <span className={`px-2 py-0.5 rounded-full text-[11px] ${person.is_founder_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-pink-500/20 text-pink-400"}`}>{person.is_founder_gifted ? "🎁 Founder (Gifted)" : "Founder"}</span>}
+          {person.has_12_month_guidance && <span className={`px-2 py-0.5 rounded-full text-[11px] ${person.is_guidance_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-blue-500/20 text-blue-400"}`}>{person.is_guidance_gifted ? "🎁 12-Mo (Gifted)" : "📅 12-Mo"}</span>}
           <span className="text-gray-500 text-lg">{expanded ? "▾" : "▸"}</span>
         </div>
       </button>
