@@ -30,6 +30,7 @@ export async function POST(request) {
       city,
       visitorId,
       chartData,
+      reportStatus,
     } = await request.json();
 
     if (!reportId || !name || !sections) {
@@ -90,6 +91,7 @@ export async function POST(request) {
     if (city) data.city = city;
     if (visitorId) data.visitor_id = visitorId;
     if (chartData) data.chart_data = chartData;
+    if (reportStatus) data.report_status = reportStatus;
     if (deviceType && deviceType !== "unknown") data.device_type = deviceType;
     if (paymentStatus !== "paid") data.preview_generated_at = new Date().toISOString();
 
@@ -99,7 +101,7 @@ export async function POST(request) {
     // If enhanced columns don't exist yet, strip them and retry
     if (error) {
       console.warn("Enhanced save failed, falling back:", error.message);
-      const { personal_question, city: c, device_type, preview_generated_at, visitor_id, chart_data, ...coreOnly } = data;
+      const { personal_question, city: c, device_type, preview_generated_at, visitor_id, chart_data, report_status, ...coreOnly } = data;
       const fallback = await supabase.from("reports").upsert(coreOnly, { onConflict: "report_id" });
       error = fallback.error;
     }

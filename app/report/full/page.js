@@ -11,12 +11,14 @@ export default function FullReport() {
   const [reportData, setReportData] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     // Try sessionStorage first, then localStorage backup
     let storedReport = sessionStorage.getItem("reportData");
     let storedUser = sessionStorage.getItem("userData");
     const paymentVerified = sessionStorage.getItem("paymentVerified") || localStorage.getItem("paymentVerified_backup");
+    const reportPending = sessionStorage.getItem("reportPending") === "true";
 
     if (!storedReport) storedReport = localStorage.getItem("reportData_backup");
     if (!storedUser) storedUser = localStorage.getItem("userData_backup");
@@ -33,6 +35,7 @@ export default function FullReport() {
 
     setReportData(JSON.parse(storedReport));
     setUserData(JSON.parse(storedUser));
+    setPending(reportPending);
     setLoading(false);
   }, [router]);
 
@@ -52,6 +55,36 @@ export default function FullReport() {
   }
 
   if (!reportData) return null;
+
+  // Report failed the quality check — payment succeeded but the full report
+  // isn't ready. Show an honest "being prepared" screen instead of a partial one.
+  if (pending) {
+    return (
+      <>
+        <Header />
+        <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
+          <div className="max-w-lg mx-auto px-6 text-center">
+            <div className="text-4xl mb-4">✅</div>
+            <h1 className="text-2xl font-bold text-green-400 mb-3">Payment Successful</h1>
+            <div className="bg-surface border border-border rounded-2xl p-6 text-left">
+              <p className="text-foreground leading-relaxed mb-3">
+                Thank you, {userData.name}. Your personalised report is being prepared
+                and will be {userData.email ? <>emailed to <strong>{userData.email}</strong></> : "sent to you"} shortly,
+                after our final quality checks.
+              </p>
+              <p className="text-muted text-sm leading-relaxed">
+                Our system double-checks every report for completeness before delivery, so this can take a few extra minutes.
+                Your payment is confirmed{" "}
+                <span className="font-mono text-xs">(Report ID: {reportData.reportId})</span>.
+                If you don&apos;t receive it within a few hours, just reply to your confirmation email and we&apos;ll sort it out immediately.
+              </p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
