@@ -1252,6 +1252,7 @@ function PaymentsTab({ payments }) {
 function EmailsTab({ emails }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(null); // report_id of expanded row
 
   const filtered = useMemo(() => {
     if (!emails) return [];
@@ -1280,65 +1281,198 @@ function EmailsTab({ emails }) {
         <Pill active={filter === "completed"} onClick={() => setFilter("completed")}>Completed</Pill>
       </FilterBar>
 
-      <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
-                <th className="p-3 font-medium">Name</th>
-                <th className="p-3 font-medium">Email</th>
-                <th className="p-3 font-medium">Progress</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium">Last Sent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((e) => {
-                const opens = Array.isArray(e.email_opens) ? e.email_opens : [];
-                const openNums = opens.map((o) => o.num);
-                return (
-                  <tr key={e.report_id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="p-3 font-medium">{e.name}</td>
-                    <td className="p-3 text-gray-400 text-xs">{e.email}</td>
-                    <td className="p-3">
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 10 }, (_, i) => (
-                          <div
-                            key={i}
-                            title={`Email ${i + 1}: ${i < (e.emails_sent_count || 0) ? (openNums.includes(i + 1) ? "Opened ✓" : "Sent, not opened") : "Not sent"}`}
-                            className={`w-2.5 h-5 rounded-sm ${
-                              openNums.includes(i + 1) ? "bg-green-500"
-                              : i < (e.emails_sent_count || 0) ? "bg-amber-500/70"
-                              : "bg-white/10"
-                            }`}
+      <div className="space-y-2">
+        {filtered.map((e) => {
+          const opens = Array.isArray(e.email_opens) ? e.email_opens : [];
+          const openNums = opens.map((o) => o.num).filter(Boolean);
+          const isExpanded = expanded === e.report_id;
+          const drafts = Array.isArray(e.email_drafts) ? e.email_drafts : [];
+
+          return (
+            <div key={e.report_id} className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
+              {/* Summary row — click to expand */}
+              <button
+                onClick={() => setExpanded(isExpanded ? null : e.report_id)}
+                className="w-full p-4 flex items-center justify-between gap-4 text-left hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xs font-bold shrink-0">
+                    {(e.name || "?")[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{e.name}</p>
+                    <p className="text-gray-500 text-xs truncate">{e.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* Mini progress bar */}
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2 h-4 rounded-sm ${
+                          openNums.includes(i + 1) ? "bg-green-500"
+                          : i < (e.emails_sent_count || 0) ? "bg-amber-500/70"
+                          : "bg-white/10"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-gray-500 text-[11px]">{e.emails_sent_count || 0}/10</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                    e.email_sequence_status === "completed" ? "bg-green-500/20 text-green-400"
+                    : e.email_sequence_status === "active" ? "bg-blue-500/20 text-blue-400"
+                    : e.email_sequence_status === "unsubscribed" ? "bg-red-500/20 text-red-400"
+                    : "bg-gray-500/20 text-gray-400"
+                  }`}>{e.email_sequence_status || "pending"}</span>
+                  <span className="text-gray-500 text-lg">{isExpanded ? "▾" : "▸"}</span>
+                </div>
+              </button>
+
+              {/* Expanded: full email-by-email detail */}
+              {isExpanded && (
+                <div className="border-t border-white/10 p-4 space-y-3">
+                  {/* Transactional emails */}
+                  {(e.payment_status === "paid" || e.thankyou_sent_at || e.guidance_email_sent_at || e.howto_sent_at) && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Transactional Emails</p>
+                      <div className="space-y-1.5">
+                        {e.payment_status === "paid" && (
+                          <EmailRow
+                            icon="📄" label="Report Delivery"
+                            sentAt={e.created_at}
+                            opened={opens.some((o) => o.type === "report")}
+                            openedAt={opens.find((o) => o.type === "report")?.opened_at}
                           />
+                        )}
+                        {e.thankyou_sent_at && (
+                          <EmailRow
+                            icon="🙏" label="Thank You (from Founder)"
+                            sentAt={e.thankyou_sent_at}
+                            opened={opens.some((o) => o.type === "thankyou")}
+                            openedAt={opens.find((o) => o.type === "thankyou")?.opened_at}
+                          />
+                        )}
+                        {e.guidance_email_sent_at && (
+                          <EmailRow
+                            icon="📅" label="Guidance Confirmation"
+                            sentAt={e.guidance_email_sent_at}
+                            opened={opens.some((o) => o.type === "guidance")}
+                            openedAt={opens.find((o) => o.type === "guidance")?.opened_at}
+                          />
+                        )}
+                        {e.howto_sent_at && (
+                          <EmailRow
+                            icon="📖" label="How to use BhavishAI"
+                            sentAt={e.howto_sent_at}
+                            opened={opens.some((o) => o.type === "howto")}
+                            openedAt={opens.find((o) => o.type === "howto")?.opened_at}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nurture sequence — each email with full subject + body */}
+                  {drafts.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Nurture Sequence ({e.emails_sent_count || 0} sent of {drafts.length})</p>
+                      <div className="space-y-2">
+                        {drafts.map((d, i) => {
+                          const num = d.num || (i + 1);
+                          const isSent = num <= (e.emails_sent_count || 0);
+                          const isOpened = openNums.includes(num);
+                          const openEntry = opens.find((o) => o.num === num);
+                          return (
+                            <div key={i} className={`rounded-xl border p-3 ${isSent ? (isOpened ? "bg-green-500/5 border-green-500/20" : "bg-amber-500/5 border-amber-500/15") : "bg-white/[0.02] border-white/5 opacity-60"}`}>
+                              <div className="flex items-start justify-between gap-3 mb-1">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-5 h-5 rounded-full text-[9px] font-bold flex items-center justify-center ${isOpened ? "bg-green-500/30 text-green-300" : isSent ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-gray-600"}`}>
+                                    {num}
+                                  </span>
+                                  <span className="text-xs font-medium text-gray-200">{d.subject}</span>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  {isSent ? (
+                                    isOpened ? (
+                                      <span className="text-[10px] text-green-400">Opened {openEntry?.opened_at ? new Date(openEntry.opened_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + " " + new Date(openEntry.opened_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "✓"}</span>
+                                    ) : (
+                                      <span className="text-[10px] text-amber-400">Sent · not opened</span>
+                                    )
+                                  ) : (
+                                    <span className="text-[10px] text-gray-600">Not sent yet</span>
+                                  )}
+                                </div>
+                              </div>
+                              {d.psychology && <p className="text-[10px] text-purple-400 mb-1">Strategy: {d.psychology}</p>}
+                              {d.body && (
+                                <details className="cursor-pointer">
+                                  <summary className="text-[10px] text-gray-500 hover:text-gray-300 list-none">▸ View email body</summary>
+                                  <div className="mt-2 bg-black/30 rounded-lg p-3 text-[11px] text-gray-400 leading-relaxed whitespace-pre-line max-h-48 overflow-y-auto">
+                                    {d.body}
+                                  </div>
+                                </details>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Monthly guidance emails */}
+                  {opens.filter((o) => o.type && o.type.startsWith("guidance_m")).length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Monthly Guidance Emails</p>
+                      <div className="space-y-1.5">
+                        {opens.filter((o) => o.type && o.type.startsWith("guidance_m")).map((o, i) => (
+                          <EmailRow key={i} icon="📅" label={`Monthly Guidance (${o.type.replace("guidance_m", "Month ")})`} opened={true} openedAt={o.opened_at} />
                         ))}
                       </div>
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] ${
-                        e.email_sequence_status === "completed" ? "bg-green-500/20 text-green-400"
-                        : e.email_sequence_status === "active" ? "bg-blue-500/20 text-blue-400"
-                        : "bg-gray-500/20 text-gray-400"
-                      }`}>{e.email_sequence_status || "pending"}</span>
-                    </td>
-                    <td className="p-3 text-gray-500 text-xs">
-                      {e.last_email_sent_at ? new Date(e.last_email_sent_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-500">No emails match your filters.</td></tr>
+                    </div>
+                  )}
+
+                  {/* Last sent info */}
+                  {e.last_email_sent_at && (
+                    <p className="text-[10px] text-gray-600 pt-2 border-t border-white/5">
+                      Last email sent: {new Date(e.last_email_sent_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </p>
+                  )}
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="text-center text-gray-500 py-12">No emails match your filters.</div>
+        )}
       </div>
+
       <div className="text-xs text-gray-500 flex flex-wrap items-center gap-4 mt-3">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-5 bg-green-500 rounded-sm inline-block" /> Opened</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-5 bg-amber-500/70 rounded-sm inline-block" /> Sent, not opened</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-5 bg-white/10 rounded-sm inline-block" /> Not sent yet</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-4 bg-green-500 rounded-sm inline-block" /> Opened</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-4 bg-amber-500/70 rounded-sm inline-block" /> Sent, not opened</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-4 bg-white/10 rounded-sm inline-block" /> Not sent yet</span>
+      </div>
+    </div>
+  );
+}
+
+// Single email row for the transactional emails section
+function EmailRow({ icon, label, sentAt, opened, openedAt }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-white/[0.02] border border-white/5">
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${opened ? "bg-green-500" : "bg-gray-600"}`} />
+        <span className="text-xs">{icon}</span>
+        <span className="text-xs text-gray-300">{label}</span>
+      </div>
+      <div className="text-right">
+        {sentAt && <span className="text-[10px] text-gray-500 mr-3">Sent {new Date(sentAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} {new Date(sentAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>}
+        {opened ? (
+          <span className="text-[10px] text-green-400">Opened {openedAt ? new Date(openedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + " " + new Date(openedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "✓"}</span>
+        ) : (
+          <span className="text-[10px] text-gray-600">Not opened</span>
+        )}
       </div>
     </div>
   );
