@@ -91,7 +91,7 @@ export async function POST(request) {
 
     // Generate with Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
     const prompt = `You are a professional Vedic astrologer writing a MONTHLY guidance report.
 
