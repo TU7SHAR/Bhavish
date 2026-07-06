@@ -159,26 +159,28 @@ export default function FounderUpgrade() {
           <div className="bg-surface border-2 border-accent rounded-2xl p-8 text-center glow">
             <div className="text-5xl mb-4">🎖️</div>
             <h1 className="text-2xl md:text-3xl font-bold mb-2">Founding Member Upgrade</h1>
-            <p className="text-muted mb-6">Thank you for joining BhavishAI.</p>
+            <p className="text-muted mb-6">Your report is ready.</p>
 
             <p className="text-foreground mb-6 leading-relaxed">
-              Before you view your report, lock in <strong>lifetime access</strong> to all future reports and premium guidance.
+              Before you continue, you can upgrade to <strong>Founder Access</strong> and get 5 personalized reports every month for 2 years.
             </p>
 
             <div className="bg-background border border-border rounded-xl p-6 mb-6">
-              <p className="text-muted text-sm mb-1">Normal Value</p>
-              <p className="text-2xl text-muted line-through mb-2">₹3,599</p>
+              <p className="text-muted text-xs uppercase tracking-wider font-semibold mb-2">Founder Access</p>
+              <p className="text-foreground text-sm mb-3">5 reports/month × 24 months = up to <strong className="text-accent">120 personalized reports</strong></p>
               <p className="text-muted text-sm mb-1">Today Only</p>
               <p className="text-5xl font-bold gradient-text">₹999</p>
+              <p className="text-muted text-xs mt-2">That&apos;s less than ₹9 per report</p>
             </div>
 
-            <ul className="text-left space-y-2 mb-8 text-sm">
+            <ul className="text-left space-y-2.5 mb-8 text-sm">
               {[
-                "Lifetime access to all your reports",
-                "Unlimited report regenerations",
-                "Priority report generation",
-                "All future premium features included",
-                "Founding member badge",
+                "5 personalized reports every month",
+                "Valid for 2 full years",
+                "Ask about career, love, money, marriage, education, or family",
+                "Generate reports for yourself or close family",
+                "Priority support if your report needs regeneration",
+                "Early access to new BhavishAI features",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2 text-muted">
                   <svg className="w-5 h-5 text-green-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -194,14 +196,14 @@ export default function FounderUpgrade() {
               disabled={upgradeLoading}
               className="w-full bg-primary hover:bg-primary-dark disabled:opacity-50 text-white py-4 rounded-full font-semibold text-lg transition-all pulse-glow mb-3"
             >
-              {upgradeLoading ? "Processing..." : "Upgrade My Account — ₹999"}
+              {upgradeLoading ? "Processing..." : "Upgrade to Founder Access — ₹999"}
             </button>
 
             <button
               onClick={goToReport}
               className="w-full text-muted hover:text-foreground text-sm transition-colors py-2"
             >
-              No thanks, show my report
+              No thanks, show my full report
             </button>
           </div>
         </div>
