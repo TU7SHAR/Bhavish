@@ -666,7 +666,23 @@ export default function ReportPreview() {
                   <span>Avg 14 min read</span>
                 </div>
 
-                {/* Priority 2: Compelling CTA */}
+                {/* ₹149 add-on card — visible but optional, above CTA */}
+                <label className="block text-left bg-background/50 border border-border rounded-xl p-3 mb-4 cursor-pointer hover:border-accent/40 transition-colors">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={includeBump}
+                      onChange={(e) => setIncludeBump(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-accent shrink-0"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Add 12-Month Personalized Forecast — ₹149</p>
+                      <p className="text-xs text-muted mt-0.5">Month-by-month guidance for career, love, money, health, and key timing windows.</p>
+                    </div>
+                  </div>
+                </label>
+
+                {/* Priority 2: Compelling CTA — text changes with bump */}
                 <button
                   onClick={handlePayment}
                   disabled={paymentLoading}
@@ -674,7 +690,9 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? (retryMessage ? "Analyzing deeper..." : "Generating your report...")
-                    : `Unlock My Full Answer — ₹${includeBump ? "448" : "299"} →`}
+                    : includeBump
+                      ? "Unlock Report + 12-Month Forecast — ₹448 →"
+                      : "Unlock My Full Answer — ₹299 →"}
                 </button>
 
                 {/* Retry message — shows when Gemini needs extra time */}
@@ -685,20 +703,9 @@ export default function ReportPreview() {
                   </div>
                 )}
 
-                {/* Priority 4: ₹149 upsell — extremely minimal */}
+                {/* Trust line */}
                 <p className="mt-2 text-[10px] text-gray-600 text-center">
                   Secure Razorpay payment · Instant access · Sent to your email
-                </p>
-                <p className="mt-3 text-[11px] text-gray-500 text-center">
-                  <label className="cursor-pointer hover:text-gray-300 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={includeBump}
-                      onChange={(e) => setIncludeBump(e.target.checked)}
-                      className="w-3 h-3 accent-accent mr-1 align-middle"
-                    />
-                    Add 12-month guidance +₹149
-                  </label>
                 </p>
               </div>
             </div>
