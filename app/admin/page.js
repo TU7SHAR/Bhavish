@@ -2158,6 +2158,7 @@ function MonthlyGuidanceAdmin({ person, password }) {
   const [monthlyReports, setMonthlyReports] = useState(null);
   const [generating, setGenerating] = useState(null);
   const [genResult, setGenResult] = useState(null);
+  const [expandedReport, setExpandedReport] = useState(null); // month_number of the report being viewed
 
   const startDate = person.guidance_start_date ? new Date(person.guidance_start_date) : new Date(person.created_at);
   const now = new Date();
@@ -2246,24 +2247,46 @@ function MonthlyGuidanceAdmin({ person, password }) {
         {monthlyReports && monthlyReports.length === 12 && <p className="text-xs text-green-400 self-center">All 12 months generated ✓</p>}
       </div>
 
-      {/* Generated reports list */}
+      {/* Generated reports list — click to view full content */}
       {monthlyReports && monthlyReports.length > 0 && (
         <div className="space-y-2">
           {monthlyReports.map((r) => (
-            <div key={r.id} className="bg-black/30 rounded-xl p-3 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium mr-2">Month {r.month_number}</span>
-                <span className="text-sm text-gray-200">{r.calendar_month} {r.calendar_year}</span>
-                <span className="text-[10px] text-gray-500 ml-2">{new Date(r.generated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+            <div key={r.id} className="bg-black/30 rounded-xl overflow-hidden">
+              <div className="p-3 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors" onClick={() => setExpandedReport(expandedReport === r.month_number ? null : r.month_number)}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">Month {r.month_number}</span>
+                  <span className="text-sm text-gray-200">{r.calendar_month} {r.calendar_year}</span>
+                  <span className="text-[10px] text-gray-500">{new Date(r.generated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {r.email_sent_at && <span className="text-[10px] text-green-400">✉️ Sent</span>}
+                  {!r.email_sent_at && <span className="text-[10px] text-gray-500">Not emailed</span>}
+                  <button onClick={(e) => { e.stopPropagation(); generateMonth(r.month_number, true); }} disabled={generating !== null}
+                    className="text-[10px] px-2 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/20 disabled:opacity-50 transition-colors">
+                    🔄 Regenerate
+                  </button>
+                  <span className="text-gray-500 text-sm">{expandedReport === r.month_number ? "▾" : "▸"}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {r.email_sent_at && <span className="text-[10px] text-green-400">✉️ Sent</span>}
-                {!r.email_sent_at && <span className="text-[10px] text-gray-500">Not emailed</span>}
-                <button onClick={() => generateMonth(r.month_number, true)} disabled={generating !== null}
-                  className="text-[10px] px-2 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/20 disabled:opacity-50 transition-colors">
-                  🔄 Regenerate
-                </button>
-              </div>
+              {/* Expanded: show full report sections */}
+              {expandedReport === r.month_number && (
+                <div className="border-t border-white/10 p-4 space-y-3">
+                  {Array.isArray(r.sections) && r.sections.length > 0 ? (
+                    r.sections.map((s, i) => (
+                      <div key={i} className="bg-[#0d0d1a] border border-white/5 rounded-xl p-4">
+                        <h4 className="text-sm font-semibold text-blue-300 mb-2">{s.title}</h4>
+                        <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{s.content}</p>
+                      </div>
+                    ))
+                  ) : r.full_text ? (
+                    <div className="bg-[#0d0d1a] border border-white/5 rounded-xl p-4">
+                      <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{r.full_text}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">No content available.</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
