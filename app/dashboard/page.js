@@ -82,6 +82,113 @@ export default async function Dashboard() {
             </div>
           )}
 
+          {/* 12-Month Guidance Pack section — shown when any of their reports has the ₹149 add-on */}
+          {Array.isArray(reports) && reports.some((r) => r.has_12_month_guidance) && (() => {
+            const guidanceReport = reports.find((r) => r.has_12_month_guidance);
+            const startDate = guidanceReport.guidance_start_date ? new Date(guidanceReport.guidance_start_date) : new Date(guidanceReport.created_at);
+            const endDate = guidanceReport.guidance_end_date ? new Date(guidanceReport.guidance_end_date) : new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+            // Calculate current month number (1-12) in the guidance period
+            const now = new Date();
+            const monthsElapsed = Math.max(0, Math.floor((now - startDate) / (30.44 * 24 * 60 * 60 * 1000)));
+            const currentMonth = Math.min(monthsElapsed + 1, 12);
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const startMonthIdx = startDate.getMonth();
+
+            return (
+              <div className="relative overflow-hidden bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent border-2 border-blue-400/40 rounded-2xl p-6 mb-8">
+                <div className="absolute -right-6 -top-6 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
+                <div className="relative">
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
+                    <div className="flex items-center gap-4">
+                      <div className="text-4xl">📅</div>
+                      <div>
+                        <h2 className="text-xl font-bold text-blue-300">12-Month Guidance Pack</h2>
+                        <p className="text-muted text-sm mt-0.5">Your personalised month-by-month guidance for career, money, relationships &amp; health.</p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 bg-blue-500/20 text-blue-300 text-xs font-semibold uppercase tracking-wider px-3 py-1.5 rounded-full">
+                      Active
+                    </span>
+                  </div>
+
+                  {/* Month progress strip */}
+                  <div className="grid grid-cols-12 gap-1 mb-4">
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const moIdx = (startMonthIdx + i) % 12;
+                      const isPast = i + 1 < currentMonth;
+                      const isCurrent = i + 1 === currentMonth;
+                      return (
+                        <div
+                          key={i}
+                          className={`rounded-lg py-2 text-center text-[10px] font-medium transition-colors ${
+                            isCurrent
+                              ? "bg-blue-500 text-white ring-2 ring-blue-400/50"
+                              : isPast
+                                ? "bg-blue-500/30 text-blue-200"
+                                : "bg-white/5 text-gray-500"
+                          }`}
+                        >
+                          {monthNames[moIdx]}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Info row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div className="bg-surface/50 border border-border rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">Current Month</p>
+                      <p className="text-lg font-bold text-blue-300">{currentMonth} <span className="text-sm text-muted font-normal">of 12</span></p>
+                    </div>
+                    <div className="bg-surface/50 border border-border rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">Started</p>
+                      <p className="text-sm font-medium text-foreground">{startDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    </div>
+                    <div className="bg-surface/50 border border-border rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">Ends</p>
+                      <p className="text-sm font-medium text-foreground">{endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    </div>
+                    <div className="bg-surface/50 border border-border rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">Delivery</p>
+                      <p className="text-sm font-medium text-foreground">Included in report</p>
+                    </div>
+                  </div>
+
+                  {/* What they received + when first guidance */}
+                  <div className="bg-surface/40 border border-border rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-2">What you received</h3>
+                    <ul className="space-y-1.5 text-sm text-muted">
+                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Month-by-month forecast (career, money, love, health) for 12 months</li>
+                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Best months for action &amp; caution months to stay careful</li>
+                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Key timing windows — when to move, when to wait</li>
+                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> Practical monthly action plan &amp; personal remedies</li>
+                      <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">✓</span> 12-month yearly summary &amp; overall theme</li>
+                    </ul>
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <p className="text-xs text-muted">
+                        <span className="text-blue-300 font-medium">Your guidance pack is included as a dedicated section in your full report.</span>{" "}
+                        Open your report below to view the full month-by-month breakdown.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* View button */}
+                  <div className="mt-4">
+                    <Link
+                      href={`/dashboard/report/${guidanceReport.report_id}`}
+                      className="inline-flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-5 py-2.5 rounded-full text-sm font-medium transition-all border border-blue-400/30 hover:border-blue-400/50"
+                    >
+                      📅 View My 12-Month Guidance
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Reports Grid */}
           {!reports || reports.length === 0 ? (
             <div className="bg-surface border border-border rounded-2xl p-12 text-center">
@@ -109,9 +216,16 @@ export default async function Dashboard() {
                       <h3 className="text-lg font-bold">{report.name}</h3>
                       <p className="text-muted text-sm">{report.report_id}</p>
                     </div>
-                    <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-full">
-                      Paid
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {report.has_12_month_guidance && (
+                        <span className="bg-blue-500/20 text-blue-300 text-[10px] font-bold px-2 py-1 rounded-full">
+                          📅 12-Mo
+                        </span>
+                      )}
+                      <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-full">
+                        Paid
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-1 text-sm text-muted mb-4">
