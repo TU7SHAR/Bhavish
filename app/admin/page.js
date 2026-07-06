@@ -1911,6 +1911,11 @@ function DetailCard({ person, expanded, onToggle, password }) {
             </div>
           )}
 
+          {/* 12-Month Guidance — monthly report generation (only for guidance customers) */}
+          {person.has_12_month_guidance && (
+            <MonthlyGuidanceAdmin person={person} password={password} />
+          )}
+
           {/* Attribution / Source */}
           {person.attribution && (
             <div>
@@ -2127,7 +2132,7 @@ function GuidanceTab({ guidance, password }) {
   return (
     <div className="space-y-4">
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5">
-        <p className="text-[11px] text-blue-300">📅 Everyone who bought the ₹149 12-Month Guidance Pack. Each buyer should get a confirmation email automatically on purchase — use the <span className="font-semibold">📅 Send / Resend Guidance Confirmation</span> button inside a card if it failed.</p>
+        <p className="text-[11px] text-blue-300">📅 Everyone who bought the ₹149 12-Month Guidance Pack. Expand a customer to see all their details, email opens, and manage monthly guidance reports.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -2137,24 +2142,21 @@ function GuidanceTab({ guidance, password }) {
         <StatCard label="Confirmations Opened" value={confirmationsOpened} sub={confirmationsSent ? `${Math.round((confirmationsOpened / confirmationsSent) * 100)}% open rate` : "—"} accent="pink" icon="👁" />
       </div>
 
-      {/* Per-customer guidance cards with monthly report management */}
-      <div className="space-y-3">
-        {(guidance || []).map((person) => (
-          <GuidanceCustomerCard key={person.report_id} person={person} password={password} />
-        ))}
-        {(!guidance || guidance.length === 0) && (
-          <div className="text-center text-gray-500 py-12">No one has bought the 12-Month Guidance add-on yet.</div>
-        )}
-      </div>
+      <DetailCardList
+        rows={guidance}
+        password={password}
+        placeholder="Search guidance customers..."
+        noun="guidance customers"
+        emptyText="No one has bought the 12-Month Guidance add-on yet."
+      />
     </div>
   );
 }
 
-// Per-customer card inside the Guidance tab — shows their info + monthly report generation
-function GuidanceCustomerCard({ person, password }) {
-  const [expanded, setExpanded] = useState(false);
-  const [monthlyReports, setMonthlyReports] = useState(null); // null = not loaded
-  const [generating, setGenerating] = useState(null); // month number being generated
+// Monthly guidance generation controls — rendered inside DetailCard for guidance customers
+function MonthlyGuidanceAdmin({ person, password }) {
+  const [monthlyReports, setMonthlyReports] = useState(null);
+  const [generating, setGenerating] = useState(null);
   const [genResult, setGenResult] = useState(null);
 
   const startDate = person.guidance_start_date ? new Date(person.guidance_start_date) : new Date(person.created_at);
@@ -2166,6 +2168,8 @@ function GuidanceCustomerCard({ person, password }) {
   const FULL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const startMonthIdx = startDate.getMonth();
 
+  useEffect(() => { loadMonthlyReports(); }, []);
+
   const loadMonthlyReports = async () => {
     try {
       const res = await fetch(`/api/admin/data?tab=guidance-monthly&reportId=${person.report_id}`, {
@@ -2175,51 +2179,23 @@ function GuidanceCustomerCard({ person, password }) {
         const json = await res.json();
         setMonthlyReports(json.monthlyReports || []);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  const handleExpand = () => {
-    if (!expanded && monthlyReports === null) loadMonthlyReports();
-    setExpanded(!expanded);
-  };
-
-  const generateMonth = async (monthNum) => {
-    if (!confirm(`Generate Month ${monthNum} guidance for ${person.name}? This will call Gemini and email the customer.`)) return;
+  const generateMonth = async (monthNum, force = false) => {
+    const action = force ? "Regenerate" : "Generate";
+    if (!confirm(`${action} Month ${monthNum} guidance for ${person.name}? This will call Gemini and email the customer.`)) return;
     setGenerating(monthNum);
     setGenResult(null);
     try {
       const res = await fetch("/api/admin/generate-guidance", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
-        body: JSON.stringify({ reportId: person.report_id, monthNumber: monthNum }),
+        body: JSON.stringify({ reportId: person.report_id, monthNumber: monthNum, force }),
       });
       const json = await res.json();
       if (res.ok) {
-        setGenResult({ status: "success", message: `✅ Month ${monthNum} (${json.calendarMonth}) generated${json.emailSent ? " + emailed" : " (email failed)"}.` });
-        loadMonthlyReports(); // refresh
-      } else {
-        setGenResult({ status: "error", message: `❌ ${json.error}` });
-      }
-    } catch (e) {
-      setGenResult({ status: "error", message: `❌ ${e.message}` });
-    }
-    setGenerating(null);
-  };
-
-  const regenerateMonth = async (monthNum) => {
-    setGenerating(monthNum);
-    setGenResult(null);
-    try {
-      const res = await fetch("/api/admin/generate-guidance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
-        body: JSON.stringify({ reportId: person.report_id, monthNumber: monthNum, force: true }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setGenResult({ status: "success", message: `🔄 Month ${monthNum} (${json.calendarMonth}) regenerated${json.emailSent ? " + emailed" : " (email failed)"}.` });
+        setGenResult({ status: "success", message: `✅ Month ${monthNum} (${json.calendarMonth}) ${force ? "regenerated" : "generated"}${json.emailSent ? " + emailed" : " (email failed)"}.` });
         loadMonthlyReports();
       } else {
         setGenResult({ status: "error", message: `❌ ${json.error}` });
@@ -2231,129 +2207,70 @@ function GuidanceCustomerCard({ person, password }) {
   };
 
   return (
-    <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
-      {/* Header */}
-      <button onClick={handleExpand} className="w-full p-4 flex items-center justify-between gap-4 text-left hover:bg-white/5 transition-colors">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-sm font-bold shrink-0">
-            {(person.name || "?")[0].toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold truncate">{person.name}</p>
-            <p className="text-gray-400 text-xs truncate">{person.email || "No email"}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-blue-300 text-[11px] font-medium">Month {currentMonth}/12</span>
-          <span className="text-gray-500 text-lg">{expanded ? "▾" : "▸"}</span>
-        </div>
-      </button>
+    <div>
+      <SectionTitle>12-Month Guidance Reports (Month {currentMonth}/12)</SectionTitle>
 
-      {/* Expanded: monthly reports */}
-      {expanded && (
-        <div className="border-t border-white/10 p-4 space-y-4">
-          {/* Monthly report grid */}
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1.5">
-            {Array.from({ length: 12 }, (_, i) => {
-              const monthNum = i + 1;
-              const moIdx = (startMonthIdx + i) % 12;
-              const report = (monthlyReports || []).find((r) => r.month_number === monthNum);
-              const isGenerated = !!report;
-              const isAvailable = monthNum <= currentMonth;
-              return (
-                <div
-                  key={monthNum}
-                  className={`rounded-lg p-2 text-center text-[10px] border transition-colors ${
-                    isGenerated
-                      ? "bg-green-500/20 border-green-500/30 text-green-300"
-                      : isAvailable
-                        ? "bg-amber-500/10 border-amber-500/20 text-amber-300"
-                        : "bg-white/5 border-white/5 text-gray-600"
-                  }`}
-                >
-                  <p className="font-bold">{monthNum}</p>
-                  <p>{MONTH_NAMES[moIdx]}</p>
-                  {isGenerated && <p className="text-[8px] mt-0.5">✓</p>}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Generate buttons for available months that haven't been generated */}
-          <div>
-            <p className="text-xs text-gray-400 mb-2">Generate monthly reports:</p>
-            <div className="flex flex-wrap gap-2">
-              {Array.from({ length: 12 }, (_, i) => {
-                const monthNum = i + 1;
-                const moIdx = (startMonthIdx + i) % 12;
-                const report = (monthlyReports || []).find((r) => r.month_number === monthNum);
-                const isGenerated = !!report;
-                const isAvailable = monthNum <= currentMonth;
-                if (isGenerated) return null;
-                return (
-                  <button
-                    key={monthNum}
-                    onClick={() => generateMonth(monthNum)}
-                    disabled={generating !== null}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all border ${
-                      isAvailable
-                        ? "bg-blue-600 hover:bg-blue-500 border-blue-500 text-white disabled:opacity-50"
-                        : "bg-white/5 border-white/10 text-gray-500 hover:text-gray-300"
-                    }`}
-                  >
-                    {generating === monthNum ? "Generating..." : `M${monthNum} (${FULL_MONTHS[moIdx]})`}
-                  </button>
-                );
-              })}
-              {monthlyReports && monthlyReports.length === 12 && (
-                <p className="text-xs text-green-400">All 12 months generated ✓</p>
-              )}
+      {/* Monthly report grid */}
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1.5 mb-3">
+        {Array.from({ length: 12 }, (_, i) => {
+          const monthNum = i + 1;
+          const moIdx = (startMonthIdx + i) % 12;
+          const report = (monthlyReports || []).find((r) => r.month_number === monthNum);
+          const isGenerated = !!report;
+          const isAvailable = monthNum <= currentMonth;
+          return (
+            <div key={monthNum} className={`rounded-lg p-2 text-center text-[10px] border transition-colors ${isGenerated ? "bg-green-500/20 border-green-500/30 text-green-300" : isAvailable ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : "bg-white/5 border-white/5 text-gray-600"}`}>
+              <p className="font-bold">{monthNum}</p>
+              <p>{MONTH_NAMES[moIdx]}</p>
+              {isGenerated && <p className="text-[8px] mt-0.5">✓</p>}
             </div>
-          </div>
+          );
+        })}
+      </div>
 
-          {/* Generated reports list */}
-          {monthlyReports && monthlyReports.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-400 mb-2">Generated reports:</p>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {monthlyReports.map((r) => (
-                  <div key={r.id} className="bg-black/30 rounded-xl p-3 flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium mr-2">Month {r.month_number}</span>
-                      <span className="text-sm text-gray-200">{r.calendar_month} {r.calendar_year}</span>
-                      <span className="text-[10px] text-gray-500 ml-2">
-                        {new Date(r.generated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {r.email_sent_at && <span className="text-[10px] text-green-400">✉️ Sent</span>}
-                      {!r.email_sent_at && <span className="text-[10px] text-gray-500">Not emailed</span>}
-                      <button
-                        onClick={() => { if (confirm(`Regenerate Month ${r.month_number} for ${person.name}? This replaces the existing report and re-emails.`)) regenerateMonth(r.month_number); }}
-                        disabled={generating !== null}
-                        className="text-[10px] px-2 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/20 disabled:opacity-50 transition-colors"
-                      >
-                        🔄 Regenerate
-                      </button>
-                    </div>
-                  </div>
-                ))}
+      {/* Generate buttons */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {Array.from({ length: 12 }, (_, i) => {
+          const monthNum = i + 1;
+          const moIdx = (startMonthIdx + i) % 12;
+          const report = (monthlyReports || []).find((r) => r.month_number === monthNum);
+          if (report) return null;
+          const isAvailable = monthNum <= currentMonth;
+          return (
+            <button key={monthNum} onClick={() => generateMonth(monthNum)} disabled={generating !== null}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all border ${isAvailable ? "bg-blue-600 hover:bg-blue-500 border-blue-500 text-white disabled:opacity-50" : "bg-white/5 border-white/10 text-gray-500 hover:text-gray-300"}`}>
+              {generating === monthNum ? "..." : `M${monthNum} (${FULL_MONTHS[moIdx]})`}
+            </button>
+          );
+        })}
+        {monthlyReports && monthlyReports.length === 12 && <p className="text-xs text-green-400 self-center">All 12 months generated ✓</p>}
+      </div>
+
+      {/* Generated reports list */}
+      {monthlyReports && monthlyReports.length > 0 && (
+        <div className="space-y-2">
+          {monthlyReports.map((r) => (
+            <div key={r.id} className="bg-black/30 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium mr-2">Month {r.month_number}</span>
+                <span className="text-sm text-gray-200">{r.calendar_month} {r.calendar_year}</span>
+                <span className="text-[10px] text-gray-500 ml-2">{new Date(r.generated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {r.email_sent_at && <span className="text-[10px] text-green-400">✉️ Sent</span>}
+                {!r.email_sent_at && <span className="text-[10px] text-gray-500">Not emailed</span>}
+                <button onClick={() => generateMonth(r.month_number, true)} disabled={generating !== null}
+                  className="text-[10px] px-2 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/20 disabled:opacity-50 transition-colors">
+                  🔄 Regenerate
+                </button>
               </div>
             </div>
-          )}
-
-          {monthlyReports === null && (
-            <p className="text-xs text-gray-500 animate-pulse">Loading monthly reports...</p>
-          )}
-
-          {/* Gen result */}
-          {genResult && (
-            <p className={`text-xs px-3 py-2 rounded-lg ${genResult.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-              {genResult.message}
-            </p>
-          )}
+          ))}
         </div>
       )}
+
+      {monthlyReports === null && <p className="text-xs text-gray-500 animate-pulse">Loading...</p>}
+      {genResult && <p className={`text-xs px-3 py-2 rounded-lg mt-2 ${genResult.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>{genResult.message}</p>}
     </div>
   );
 }
