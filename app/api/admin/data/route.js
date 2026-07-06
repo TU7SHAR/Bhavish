@@ -231,6 +231,19 @@ export async function GET(request) {
       return NextResponse.json({ founders: excludeTest(founders, getTestEmails()) });
     }
 
+    if (tab === "guidance-customers") {
+      // Everyone who bought the ₹149 12-Month Guidance add-on. Test accounts
+      // excluded; genuine customers only (founder-free gens are irrelevant here
+      // but we keep any real row that has the flag set).
+      const { data: guidance } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("has_12_month_guidance", true)
+        .order("created_at", { ascending: false });
+
+      return NextResponse.json({ guidanceCustomers: excludeTest(guidance, getTestEmails()) });
+    }
+
     if (tab === "test") {
       // Everything tied to the test/QA account(s) — isolated here, out of all metrics.
       const testEmails = getTestEmails();

@@ -285,6 +285,7 @@ export default function ReportPreview() {
                   dateOfBirth: userData.dateOfBirth,
                   timeOfBirth: userData.timeOfBirth,
                   placeOfBirth: userData.placeOfBirth,
+                  includeBump,
                 }),
               }).catch(console.error);
             }
