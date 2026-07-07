@@ -211,7 +211,7 @@ export default function AdminDashboard() {
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
             {tab === "blog" && <BlogTab blogPosts={data.blogPosts} password={password} onRefresh={() => fetchData("blog")} />}
-            {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} />}
+            {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} password={password} />}
           </>
         )}
       </main>
@@ -1562,11 +1562,85 @@ function ActionCard({ title, desc, btnLabel, color, onClick, loading }) {
   );
 }
 
-function ActionsTab({ runAction, actionResult, actionLoading }) {
+function ActionsTab({ runAction, actionResult, actionLoading, password }) {
+  const [replyTo, setReplyTo] = useState("");
+  const [replySubject, setReplySubject] = useState("");
+  const [replyBody, setReplyBody] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [replyResult, setReplyResult] = useState(null);
+
+  const sendReply = async () => {
+    if (!replyTo || !replySubject || !replyBody) return;
+    setReplySending(true);
+    setReplyResult(null);
+    try {
+      const res = await fetch("/api/admin/reply-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ to: replyTo, subject: replySubject, body: replyBody }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setReplyResult({ status: "success", message: `✅ Sent to ${json.to} (${json.messageId})` });
+        setReplyBody("");
+      } else {
+        setReplyResult({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setReplyResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setReplySending(false);
+  };
+
   return (
     <div className="space-y-5">
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-amber-300 text-sm">
         ⚠️ These actions send real emails to real leads. Use Force Send carefully.
+      </div>
+
+      {/* Quick Reply / Compose Email */}
+      <SectionTitle>Reply / Compose Email</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5 space-y-3">
+        <p className="text-gray-400 text-sm">Send an email from <span className="text-purple-400 font-medium">support@bhavishai.in</span> to any address. Use this to reply to customer emails.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <input
+            value={replyTo}
+            onChange={(e) => setReplyTo(e.target.value)}
+            placeholder="To: customer@email.com"
+            type="email"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          <input
+            value={replySubject}
+            onChange={(e) => setReplySubject(e.target.value)}
+            placeholder="Subject: Re: Regarding my report"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+        <textarea
+          value={replyBody}
+          onChange={(e) => setReplyBody(e.target.value)}
+          placeholder="Type your reply here... (plain text, line breaks preserved)"
+          rows={5}
+          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+        />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={sendReply}
+            disabled={replySending || !replyTo || !replySubject || !replyBody}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-600/30"
+          >
+            {replySending ? "Sending..." : "Send from support@bhavishai.in →"}
+          </button>
+          {replyTo && replySubject && replyBody && (
+            <span className="text-[11px] text-gray-500">Will send as &quot;BhavishAI Support &lt;support@bhavishai.in&gt;&quot;</span>
+          )}
+        </div>
+        {replyResult && (
+          <p className={`text-sm px-3 py-2 rounded-lg ${replyResult.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+            {replyResult.message}
+          </p>
+        )}
       </div>
 
       <SectionTitle>Scheduled Sends</SectionTitle>
