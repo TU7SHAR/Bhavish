@@ -455,6 +455,7 @@ function OverviewTab({ data }) {
         </div>
       </div>
 
+      {dateFilter === "all" && (
       <div>
         <SectionTitle>Today</SectionTitle>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -464,6 +465,7 @@ function OverviewTab({ data }) {
           <StatCard label="7-Day Leads" value={data.recentLeads} sub={`${data.recentPaid} paid`} accent="amber" icon="📈" />
         </div>
       </div>
+      )}
 
       <div>
         <SectionTitle>Sales Breakdown</SectionTitle>
