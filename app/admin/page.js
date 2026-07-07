@@ -314,7 +314,8 @@ function OverviewTab({ data }) {
 
     const filtered = reports.filter((r) => {
       if (!r.created_at) return false;
-      const d = new Date(r.created_at);
+      // For paid customers, use paid_at as the relevant date; for leads use created_at
+      const d = new Date(r.payment_status === "paid" && r.paid_at ? r.paid_at : r.created_at);
       if (fromDate && d < fromDate) return false;
       if (toDate && d > toDate) return false;
       return true;
