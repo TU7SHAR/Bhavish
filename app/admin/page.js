@@ -630,36 +630,56 @@ function AnalyticsTab({ password }) {
           {/* Per-date breakdown */}
           <div className="mt-6">
             <SectionTitle>Daily Breakdown (Each Date)</SectionTitle>
-            <p className="text-[10px] text-gray-500 mb-3 -mt-2">Every individual date, newest first. Leads, paid customers, and revenue that day.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {(data.peakHours.dailyBreakdown || []).map((d) => {
-                const dateObj = new Date(d.date + "T00:00:00+05:30");
-                const dayName = dateObj.toLocaleDateString("en-IN", { weekday: "short" });
-                const dateLabel = dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-                return (
-                  <div key={d.date} className="bg-[#11111f] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition-colors">
-                    <div className="flex items-baseline justify-between mb-2">
-                      <p className="text-sm font-semibold text-gray-200">{dateLabel}</p>
-                      <p className="text-[10px] text-gray-500">{dayName}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-gray-400">Leads</span>
-                        <span className="text-sm font-bold text-blue-400">{d.leads}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-gray-400">Paid</span>
-                        <span className="text-sm font-bold text-green-400">{d.paid}</span>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-white/5 pt-1 mt-1">
-                        <span className="text-[11px] text-gray-400">Revenue</span>
-                        <span className="text-xs font-bold text-purple-300">₹{d.revenue.toLocaleString("en-IN")}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <p className="text-[10px] text-gray-500 mb-3 -mt-2">Every individual date, newest first. 7 per row = 1 week. Compare same weekday vertically.</p>
+            {/* Day-of-week header row */}
+            <div className="grid grid-cols-7 gap-2 mb-2 hidden lg:grid">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                <div key={d} className="text-center text-[10px] text-gray-500 font-medium uppercase tracking-wider">{d}</div>
+              ))}
             </div>
+            {(() => {
+              const breakdown = data.peakHours.dailyBreakdown || [];
+              if (breakdown.length === 0) return null;
+              // Pad the first row so the newest date lands in the correct weekday column
+              // JS getDay: 0=Sun,1=Mon...6=Sat → we want Mon=0...Sun=6
+              const newestDate = new Date(breakdown[0].date + "T00:00:00+05:30");
+              const jsDay = newestDate.getDay(); // 0=Sun
+              const colIndex = jsDay === 0 ? 6 : jsDay - 1; // Mon=0, Tue=1, ..., Sun=6
+              const leadingBlanks = colIndex; // how many blank cells before the first real date
+              const paddedItems = [...Array(leadingBlanks).fill(null), ...breakdown];
+              return (
+                <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                  {paddedItems.map((d, i) => {
+                    if (!d) return <div key={`blank-${i}`} className="hidden md:block" />;
+                    const dateObj = new Date(d.date + "T00:00:00+05:30");
+                    const dayName = dateObj.toLocaleDateString("en-IN", { weekday: "short" });
+                    const dateLabel = dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                    return (
+                      <div key={d.date} className="bg-[#11111f] border border-white/10 rounded-xl p-3 hover:border-purple-500/30 transition-colors">
+                        <div className="flex items-baseline justify-between mb-1.5">
+                          <p className="text-xs font-semibold text-gray-200">{dateLabel}</p>
+                          <p className="text-[9px] text-gray-500">{dayName}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-gray-400">Leads</span>
+                            <span className="text-xs font-bold text-blue-400">{d.leads}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-gray-400">Paid</span>
+                            <span className="text-xs font-bold text-green-400">{d.paid}</span>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-white/5 pt-0.5 mt-0.5">
+                            <span className="text-[10px] text-gray-400">Rev</span>
+                            <span className="text-[11px] font-bold text-purple-300">₹{d.revenue.toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {(!data.peakHours.dailyBreakdown || data.peakHours.dailyBreakdown.length === 0) && (
               <p className="text-gray-500 text-center py-8">No data yet.</p>
             )}
