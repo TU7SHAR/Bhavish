@@ -1803,6 +1803,63 @@ function DetailCard({ person, expanded, onToggle, password }) {
   const [customSubject, setCustomSubject] = useState("");
   const [customBody, setCustomBody] = useState("");
   const [showFullReport, setShowFullReport] = useState(false);
+  // AI Reply state
+  const [showAiReply, setShowAiReply] = useState(false);
+  const [aiMsg, setAiMsg] = useState("");
+  const [aiType, setAiType] = useState(person.payment_status === "paid" ? "customer_response" : "lead_nurture");
+  const [aiSubject, setAiSubject] = useState("");
+  const [aiBody, setAiBody] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiSending, setAiSending] = useState(false);
+
+  const generateAiReply = async () => {
+    if (!aiMsg.trim()) return;
+    setAiGenerating(true);
+    setEmailAction(null);
+    try {
+      const res = await fetch("/api/admin/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ customerMessage: aiMsg, type: aiType, customerName: person.name }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setAiSubject(json.subject);
+        setAiBody(json.body);
+        setEmailAction({ status: "success", message: "AI draft ready. Review below, then Send." });
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setAiGenerating(false);
+  };
+
+  const sendAiReply = async () => {
+    if (!person.email || !aiSubject || !aiBody) return;
+    setAiSending(true);
+    setEmailAction(null);
+    try {
+      const res = await fetch("/api/admin/reply-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ to: person.email, subject: aiSubject, body: aiBody }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setEmailAction({ status: "success", message: `✅ Sent AI reply to ${json.to}` });
+        setAiBody("");
+        setAiSubject("");
+        setShowAiReply(false);
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setAiSending(false);
+  };
 
   const sendLeadEmail = async (mode) => {
     setEmailLoading(mode);
@@ -2011,6 +2068,12 @@ function DetailCard({ person, expanded, onToggle, password }) {
                 >
                   ✏️ Custom Email
                 </button>
+                <button
+                  onClick={() => { setShowAiReply(!showAiReply); if (!aiMsg && person.personal_question) setAiMsg(person.personal_question); }}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${showAiReply ? "bg-amber-600 text-white" : "bg-gradient-to-r from-amber-600/80 to-orange-600/80 hover:from-amber-500 hover:to-orange-500 text-white"}`}
+                >
+                  🤖 AI Reply
+                </button>
                 {/* Gift buttons — only show when they DON'T already have the thing */}
                 {!person.has_12_month_guidance && (
                   <button
@@ -2053,6 +2116,74 @@ function DetailCard({ person, expanded, onToggle, password }) {
                   >
                     {emailLoading === "custom" ? "Sending..." : "Send Custom Email →"}
                   </button>
+                </div>
+              )}
+
+              {/* AI Reply Panel */}
+              {showAiReply && (
+                <div className="bg-black/30 rounded-xl p-4 space-y-3 mb-2 border border-amber-500/20">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-amber-400 uppercase tracking-wider font-semibold">AI Reply for {person.name}</p>
+                    <select
+                      value={aiType}
+                      onChange={(e) => setAiType(e.target.value)}
+                      className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    >
+                      <option value="customer_response">Paid Customer Response</option>
+                      <option value="lead_nurture">Lead Nurture (curiosity)</option>
+                      <option value="other">Other / General</option>
+                    </select>
+                  </div>
+                  <textarea
+                    value={aiMsg}
+                    onChange={(e) => setAiMsg(e.target.value)}
+                    placeholder="Paste or type the customer's message / question here..."
+                    rows={3}
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                  />
+                  <button
+                    onClick={generateAiReply}
+                    disabled={aiGenerating || !aiMsg.trim()}
+                    className="bg-gradient-to-r from-amber-600 to-orange-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-medium transition-all"
+                  >
+                    {aiGenerating ? "Generating with Gemini..." : "🤖 Generate Response"}
+                  </button>
+
+                  {/* Generated draft */}
+                  {(aiSubject || aiBody) && (
+                    <div className="border-t border-white/10 pt-3 space-y-2">
+                      <p className="text-[10px] text-green-400 uppercase tracking-wider font-semibold">Draft (edit before sending)</p>
+                      <input
+                        value={aiSubject}
+                        onChange={(e) => setAiSubject(e.target.value)}
+                        placeholder="Subject..."
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <textarea
+                        value={aiBody}
+                        onChange={(e) => setAiBody(e.target.value)}
+                        placeholder="Email body..."
+                        rows={6}
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={sendAiReply}
+                          disabled={aiSending || !aiSubject || !aiBody}
+                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-medium transition-all"
+                        >
+                          {aiSending ? "Sending..." : `📤 Send to ${person.email}`}
+                        </button>
+                        <button
+                          onClick={generateAiReply}
+                          disabled={aiGenerating || !aiMsg.trim()}
+                          className="px-3 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition-colors"
+                        >
+                          🔄 Regenerate
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
