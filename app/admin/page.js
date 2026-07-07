@@ -632,7 +632,7 @@ function AnalyticsTab({ password }) {
             <SectionTitle>Daily Breakdown (Each Date)</SectionTitle>
             <p className="text-[10px] text-gray-500 mb-3 -mt-2">Every individual date, newest first. 7 per row = 1 week. Compare same weekday vertically.</p>
             {/* Day-of-week header row */}
-            <div className="grid grid-cols-7 gap-2 mb-2 hidden lg:grid">
+            <div className="grid grid-cols-7 gap-2 mb-2 hidden md:grid">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                 <div key={d} className="text-center text-[10px] text-gray-500 font-medium uppercase tracking-wider">{d}</div>
               ))}
@@ -640,43 +640,80 @@ function AnalyticsTab({ password }) {
             {(() => {
               const breakdown = data.peakHours.dailyBreakdown || [];
               if (breakdown.length === 0) return null;
-              // Pad the first row so the newest date lands in the correct weekday column
-              // JS getDay: 0=Sun,1=Mon...6=Sat → we want Mon=0...Sun=6
-              const newestDate = new Date(breakdown[0].date + "T00:00:00+05:30");
-              const jsDay = newestDate.getDay(); // 0=Sun
-              const colIndex = jsDay === 0 ? 6 : jsDay - 1; // Mon=0, Tue=1, ..., Sun=6
-              const leadingBlanks = colIndex; // how many blank cells before the first real date
-              const paddedItems = [...Array(leadingBlanks).fill(null), ...breakdown];
+
+              // Helper: get weekday index (Mon=0..Sun=6) from a "YYYY-MM-DD" string
+              // We parse the date parts directly to avoid timezone issues
+              function getWeekdayCol(dateStr) {
+                const [y, m, d] = dateStr.split("-").map(Number);
+                // Construct date at noon UTC to avoid any DST/TZ edge issues
+                const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+                const jsDay = dt.getUTCDay(); // 0=Sun, 1=Mon...6=Sat
+                return jsDay === 0 ? 6 : jsDay - 1; // Mon=0, Tue=1, ..., Sun=6
+              }
+
+              // Build a lookup map: date string → data
+              const dateDataMap = {};
+              breakdown.forEach((d) => { dateDataMap[d.date] = d; });
+
+              // Find the Monday of the week containing the newest date
+              const newestCol = getWeekdayCol(breakdown[0].date);
+              const [ny, nm, nd] = breakdown[0].date.split("-").map(Number);
+              const newestMondayDate = new Date(Date.UTC(ny, nm - 1, nd - newestCol, 12, 0, 0));
+
+              // Find the Monday of the week containing the oldest date
+              const oldestCol = getWeekdayCol(breakdown[breakdown.length - 1].date);
+              const [oy, om, od] = breakdown[breakdown.length - 1].date.split("-").map(Number);
+              const oldestMondayDate = new Date(Date.UTC(oy, om - 1, od - oldestCol, 12, 0, 0));
+
+              // Build rows: each row is Mon-Sun, starting from newest week going back
+              const rows = [];
+              const currentMonday = new Date(newestMondayDate);
+              while (currentMonday >= oldestMondayDate) {
+                const row = [];
+                for (let col = 0; col < 7; col++) {
+                  const cellDate = new Date(currentMonday);
+                  cellDate.setUTCDate(cellDate.getUTCDate() + col);
+                  const key = `${cellDate.getUTCFullYear()}-${String(cellDate.getUTCMonth() + 1).padStart(2, "0")}-${String(cellDate.getUTCDate()).padStart(2, "0")}`;
+                  row.push(dateDataMap[key] || null);
+                }
+                rows.push(row);
+                currentMonday.setUTCDate(currentMonday.getUTCDate() - 7);
+              }
+
               return (
-                <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-7 gap-2">
-                  {paddedItems.map((d, i) => {
-                    if (!d) return <div key={`blank-${i}`} className="hidden md:block" />;
-                    const dateObj = new Date(d.date + "T00:00:00+05:30");
-                    const dayName = dateObj.toLocaleDateString("en-IN", { weekday: "short" });
-                    const dateLabel = dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-                    return (
-                      <div key={d.date} className="bg-[#11111f] border border-white/10 rounded-xl p-3 hover:border-purple-500/30 transition-colors">
-                        <div className="flex items-baseline justify-between mb-1.5">
-                          <p className="text-xs font-semibold text-gray-200">{dateLabel}</p>
-                          <p className="text-[9px] text-gray-500">{dayName}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-gray-400">Leads</span>
-                            <span className="text-xs font-bold text-blue-400">{d.leads}</span>
+                <div className="space-y-2">
+                  {rows.map((row, rowIdx) => (
+                    <div key={rowIdx} className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                      {row.map((d, colIdx) => {
+                        if (!d) return <div key={`blank-${rowIdx}-${colIdx}`} className="hidden md:block" />;
+                        const dateObj = new Date(d.date + "T00:00:00+05:30");
+                        const dayName = dateObj.toLocaleDateString("en-IN", { weekday: "short", timeZone: "Asia/Kolkata" });
+                        const dateLabel = dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+                        return (
+                          <div key={d.date} className="bg-[#11111f] border border-white/10 rounded-xl p-3 hover:border-purple-500/30 transition-colors">
+                            <div className="flex items-baseline justify-between mb-1.5">
+                              <p className="text-xs font-semibold text-gray-200">{dateLabel}</p>
+                              <p className="text-[9px] text-gray-500">{dayName}</p>
+                            </div>
+                            <div className="space-y-0.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-gray-400">Leads</span>
+                                <span className="text-xs font-bold text-blue-400">{d.leads}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-gray-400">Paid</span>
+                                <span className="text-xs font-bold text-green-400">{d.paid}</span>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-white/5 pt-0.5 mt-0.5">
+                                <span className="text-[10px] text-gray-400">Rev</span>
+                                <span className="text-[11px] font-bold text-purple-300">₹{d.revenue.toLocaleString("en-IN")}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-gray-400">Paid</span>
-                            <span className="text-xs font-bold text-green-400">{d.paid}</span>
-                          </div>
-                          <div className="flex items-center justify-between border-t border-white/5 pt-0.5 mt-0.5">
-                            <span className="text-[10px] text-gray-400">Rev</span>
-                            <span className="text-[11px] font-bold text-purple-300">₹{d.revenue.toLocaleString("en-IN")}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               );
             })()}
