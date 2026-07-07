@@ -2258,21 +2258,23 @@ function GuidanceTab({ guidance, password }) {
   if (!guidance) return null;
 
   const total = guidance.length;
+  const paidCount = guidance.filter((p) => p.is_guidance_gifted !== true && p.payment_status === "paid").length;
+  const giftedCount = guidance.filter((p) => p.is_guidance_gifted === true).length;
   const confirmationsSent = guidance.filter((p) => p.guidance_email_sent_at).length;
   const confirmationsOpened = guidance.filter(
     (p) => Array.isArray(p.email_opens) && p.email_opens.some((o) => o.type === "guidance")
   ).length;
-  const revenue = total * 149;
+  const revenue = paidCount * 149; // gifted ones excluded from revenue
 
   return (
     <div className="space-y-4">
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5">
-        <p className="text-[11px] text-blue-300">📅 Everyone who bought the ₹149 12-Month Guidance Pack. Expand a customer to see all their details, email opens, and manage monthly guidance reports.</p>
+        <p className="text-[11px] text-blue-300">📅 Everyone with the ₹149 12-Month Guidance Pack. Expand a customer to see all details, email opens, and manage monthly guidance reports. Use the &quot;Mark as Gifted/Paid&quot; toggle inside a card to correct revenue attribution.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Guidance Buyers" value={total} sub="₹149 add-on" accent="blue" icon="📅" />
-        <StatCard label="Guidance Revenue" value={`₹${revenue.toLocaleString("en-IN")}`} accent="green" />
+        <StatCard label="Guidance Holders" value={total} sub={`${paidCount} paid · ${giftedCount} gifted`} accent="blue" icon="📅" />
+        <StatCard label="Guidance Revenue" value={`₹${revenue.toLocaleString("en-IN")}`} sub={`${paidCount} paid × ₹149`} accent="green" />
         <StatCard label="Confirmations Sent" value={`${confirmationsSent} / ${total}`} accent="purple" icon="✉️" />
         <StatCard label="Confirmations Opened" value={confirmationsOpened} sub={confirmationsSent ? `${Math.round((confirmationsOpened / confirmationsSent) * 100)}% open rate` : "—"} accent="pink" icon="👁" />
       </div>
