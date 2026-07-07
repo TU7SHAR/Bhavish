@@ -1844,14 +1844,15 @@ function DetailCard({ person, expanded, onToggle, password }) {
       const res = await fetch("/api/admin/reply-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
-        body: JSON.stringify({ to: person.email, subject: aiSubject, body: aiBody }),
+        body: JSON.stringify({ to: person.email, subject: aiSubject, body: aiBody, reportId: person.report_id }),
       });
       const json = await res.json();
       if (res.ok) {
-        setEmailAction({ status: "success", message: `✅ Sent AI reply to ${json.to}` });
+        setEmailAction({ status: "success", message: `✅ Sent AI reply to ${json.to} (open tracking enabled)` });
         setAiBody("");
         setAiSubject("");
         setShowAiReply(false);
+        person.admin_reply_sent_at = new Date().toISOString();
       } else {
         setEmailAction({ status: "error", message: `❌ ${json.error}` });
       }
@@ -2073,6 +2074,11 @@ function DetailCard({ person, expanded, onToggle, password }) {
                   className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${showAiReply ? "bg-amber-600 text-white" : "bg-gradient-to-r from-amber-600/80 to-orange-600/80 hover:from-amber-500 hover:to-orange-500 text-white"}`}
                 >
                   🤖 AI Reply
+                  {person.admin_reply_sent_at && (
+                    Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "admin_reply")
+                      ? <span className="ml-1 text-green-300">(opened)</span>
+                      : <span className="ml-1 text-gray-300">(sent)</span>
+                  )}
                 </button>
                 {/* Gift buttons — only show when they DON'T already have the thing */}
                 {!person.has_12_month_guidance && (
@@ -2284,6 +2290,37 @@ function DetailCard({ person, expanded, onToggle, password }) {
                     const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
                     const reportOpen = opens.find((o) => o.type === "report");
                     return reportOpen ? new Date(reportOpen.opened_at).toLocaleString("en-IN") : "—";
+                  })()}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Admin Reply Status */}
+          {(person.admin_reply_sent_at || (Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "admin_reply"))) && (
+            <div>
+              <SectionTitle>Admin Reply</SectionTitle>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <InfoItem
+                  label="Reply Sent"
+                  value={person.admin_reply_sent_at ? new Date(person.admin_reply_sent_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }) : "—"}
+                  badge="blue"
+                />
+                <InfoItem
+                  label="Reply Opened"
+                  value={(() => {
+                    const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
+                    const replyOpen = opens.find((o) => o.type === "admin_reply");
+                    return replyOpen ? "Opened ✅" : "Not opened yet";
+                  })()}
+                  badge={Array.isArray(person.email_opens) && person.email_opens.some((o) => o.type === "admin_reply") ? "green" : null}
+                />
+                <InfoItem
+                  label="Opened At"
+                  value={(() => {
+                    const opens = Array.isArray(person.email_opens) ? person.email_opens : [];
+                    const replyOpen = opens.find((o) => o.type === "admin_reply");
+                    return replyOpen ? new Date(replyOpen.opened_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
                   })()}
                 />
               </div>
