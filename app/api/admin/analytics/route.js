@@ -158,7 +158,7 @@ export async function GET(request) {
       const key = istDateKey(r.paid_at || r.created_at);
       if (!dateMap[key]) dateMap[key] = { date: key, leads: 0, paid: 0, revenue: 0 };
       dateMap[key].paid++;
-      dateMap[key].revenue += 299 + (r.is_founder_member ? 999 : 0) + (r.has_12_month_guidance ? 149 : 0);
+      dateMap[key].revenue += 299 + (r.founder_upgrade_payment_id ? 999 : 0) + (r.has_12_month_guidance && r.is_guidance_gifted !== true ? 149 : 0);
     });
     const dailyBreakdown = Object.values(dateMap).sort((a, b) => new Date(b.date) - new Date(a.date));
 
