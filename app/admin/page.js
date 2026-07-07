@@ -1568,6 +1568,35 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
   const [replyBody, setReplyBody] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replyResult, setReplyResult] = useState(null);
+  // AI draft state
+  const [customerMsg, setCustomerMsg] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [draftType, setDraftType] = useState("customer_response");
+  const [generating, setGenerating] = useState(false);
+
+  const generateDraft = async () => {
+    if (!customerMsg.trim()) return;
+    setGenerating(true);
+    setReplyResult(null);
+    try {
+      const res = await fetch("/api/admin/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ customerMessage: customerMsg, type: draftType, customerName: customerName || undefined }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setReplySubject(json.subject);
+        setReplyBody(json.body);
+        setReplyResult({ status: "success", message: "AI draft generated. Review and edit below, then hit Send." });
+      } else {
+        setReplyResult({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setReplyResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setGenerating(false);
+  };
 
   const sendReply = async () => {
     if (!replyTo || !replySubject || !replyBody) return;
@@ -1583,6 +1612,8 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
       if (res.ok) {
         setReplyResult({ status: "success", message: `✅ Sent to ${json.to} (${json.messageId})` });
         setReplyBody("");
+        setReplySubject("");
+        setCustomerMsg("");
       } else {
         setReplyResult({ status: "error", message: `❌ ${json.error}` });
       }
@@ -1598,44 +1629,91 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
         ⚠️ These actions send real emails to real leads. Use Force Send carefully.
       </div>
 
-      {/* Quick Reply / Compose Email */}
-      <SectionTitle>Reply / Compose Email</SectionTitle>
-      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5 space-y-3">
-        <p className="text-gray-400 text-sm">Send an email from <span className="text-purple-400 font-medium">support@bhavishai.in</span> to any address. Use this to reply to customer emails.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <input
-            value={replyTo}
-            onChange={(e) => setReplyTo(e.target.value)}
-            placeholder="To: customer@email.com"
-            type="email"
-            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      {/* AI-Powered Reply / Compose Email */}
+      <SectionTitle>Reply / Compose Email (AI-Powered)</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5 space-y-4">
+        <p className="text-gray-400 text-sm">Paste the customer&apos;s message, pick a response type, and let Gemini draft a reply. Review it, then send from <span className="text-purple-400 font-medium">support@bhavishai.in</span>.</p>
+
+        {/* Step 1: Input */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              value={replyTo}
+              onChange={(e) => setReplyTo(e.target.value)}
+              placeholder="To: customer@email.com"
+              type="email"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <input
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Customer name (optional)"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <select
+              value={draftType}
+              onChange={(e) => setDraftType(e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-200"
+            >
+              <option value="customer_response">Paid Customer Response</option>
+              <option value="lead_nurture">Lead Nurture (create curiosity)</option>
+              <option value="other">Other / General</option>
+            </select>
+          </div>
+          <textarea
+            value={customerMsg}
+            onChange={(e) => setCustomerMsg(e.target.value)}
+            placeholder="Paste the customer's message here..."
+            rows={3}
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
           />
-          <input
-            value={replySubject}
-            onChange={(e) => setReplySubject(e.target.value)}
-            placeholder="Subject: Re: Regarding my report"
-            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-        </div>
-        <textarea
-          value={replyBody}
-          onChange={(e) => setReplyBody(e.target.value)}
-          placeholder="Type your reply here... (plain text, line breaks preserved)"
-          rows={5}
-          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-        />
-        <div className="flex items-center gap-3">
           <button
-            onClick={sendReply}
-            disabled={replySending || !replyTo || !replySubject || !replyBody}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-600/30"
+            onClick={generateDraft}
+            disabled={generating || !customerMsg.trim()}
+            className="bg-gradient-to-r from-amber-600 to-orange-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-amber-600/30"
           >
-            {replySending ? "Sending..." : "Send from support@bhavishai.in →"}
+            {generating ? "Generating with Gemini..." : "🤖 Generate Response"}
           </button>
-          {replyTo && replySubject && replyBody && (
-            <span className="text-[11px] text-gray-500">Will send as &quot;BhavishAI Support &lt;support@bhavishai.in&gt;&quot;</span>
-          )}
         </div>
+
+        {/* Step 2: Review & Edit Generated Draft */}
+        {(replySubject || replyBody) && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <p className="text-[11px] text-purple-400 uppercase tracking-wider font-semibold">Generated Draft (edit before sending)</p>
+            <input
+              value={replySubject}
+              onChange={(e) => setReplySubject(e.target.value)}
+              placeholder="Subject line..."
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <textarea
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
+              placeholder="Email body..."
+              rows={8}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={sendReply}
+                disabled={replySending || !replyTo || !replySubject || !replyBody}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-green-600/30"
+              >
+                {replySending ? "Sending..." : "📤 Send Email →"}
+              </button>
+              <button
+                onClick={generateDraft}
+                disabled={generating || !customerMsg.trim()}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition-colors"
+              >
+                {generating ? "..." : "🔄 Regenerate"}
+              </button>
+              {replyTo && <span className="text-[11px] text-gray-500">Sends as &quot;BhavishAI Support &lt;support@bhavishai.in&gt;&quot; to {replyTo}</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Result */}
         {replyResult && (
           <p className={`text-sm px-3 py-2 rounded-lg ${replyResult.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
             {replyResult.message}
