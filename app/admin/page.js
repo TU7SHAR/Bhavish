@@ -1882,6 +1882,35 @@ function DetailCard({ person, expanded, onToggle, password }) {
               <InfoItem label="Guidance End" value={person.guidance_end_date ? new Date(person.guidance_end_date).toLocaleDateString("en-IN") : "—"} />
               <InfoItem label="Created At" value={person.created_at ? new Date(person.created_at).toLocaleString("en-IN") : "—"} />
             </div>
+            {/* Gifted toggles — mark revenue attribution */}
+            {(person.is_founder_member || person.has_12_month_guidance) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {person.is_founder_member && (
+                  <button
+                    onClick={async () => {
+                      const newVal = !person.is_founder_gifted;
+                      const res = await fetch("/api/admin/mark-gifted", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` }, body: JSON.stringify({ reportId: person.report_id, field: "founder", value: newVal }) });
+                      if (res.ok) { person.is_founder_gifted = newVal; setEmailAction({ status: "success", message: `✅ Founder marked as ${newVal ? "gifted (excluded from revenue)" : "paid (counts in revenue)"}` }); }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${person.is_founder_gifted ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-300" : "bg-white/5 border-white/10 text-gray-400 hover:text-white"}`}
+                  >
+                    {person.is_founder_gifted ? "🎁 Founder = Gifted (click to mark as Paid)" : "Founder = Paid (click to mark as Gifted)"}
+                  </button>
+                )}
+                {person.has_12_month_guidance && (
+                  <button
+                    onClick={async () => {
+                      const newVal = !person.is_guidance_gifted;
+                      const res = await fetch("/api/admin/mark-gifted", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` }, body: JSON.stringify({ reportId: person.report_id, field: "guidance", value: newVal }) });
+                      if (res.ok) { person.is_guidance_gifted = newVal; setEmailAction({ status: "success", message: `✅ 12-Mo Guidance marked as ${newVal ? "gifted (excluded from revenue)" : "paid (counts in revenue)"}` }); }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${person.is_guidance_gifted ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-300" : "bg-white/5 border-white/10 text-gray-400 hover:text-white"}`}
+                  >
+                    {person.is_guidance_gifted ? "🎁 12-Mo Guidance = Gifted (click to mark as Paid)" : "12-Mo Guidance = Paid (click to mark as Gifted)"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Paid Email Status */}
