@@ -192,6 +192,7 @@ export async function GET(request) {
             created_at: r.created_at,
             payment_status: r.payment_status,
             is_founder_member: !!r.is_founder_member,
+            is_founder_free: !!r.is_founder_free,
             is_founder_gifted: !!r.is_founder_gifted,
             founder_upgrade_payment_id: r.founder_upgrade_payment_id || null,
             has_12_month_guidance: !!r.has_12_month_guidance,

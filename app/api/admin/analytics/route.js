@@ -103,7 +103,7 @@ export async function GET(request) {
 
     const { data: reports } = await supabase
       .from("reports")
-      .select("email, created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, sections")
+      .select("email, created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, is_guidance_gifted, is_founder_gifted, founder_upgrade_payment_id, sections")
       .order("created_at", { ascending: false });
 
     // Exclude test/QA accounts (TEST_ACCOUNT_EMAILS) from all analytics
@@ -158,7 +158,11 @@ export async function GET(request) {
       const key = istDateKey(r.paid_at || r.created_at);
       if (!dateMap[key]) dateMap[key] = { date: key, leads: 0, paid: 0, revenue: 0 };
       dateMap[key].paid++;
-      dateMap[key].revenue += 299 + (r.founder_upgrade_payment_id ? 999 : 0) + (r.has_12_month_guidance && r.is_guidance_gifted !== true ? 149 : 0);
+      // Revenue: ₹299 base + ₹999 founder (only if they have a real payment ID, not gifted)
+      // + ₹149 guidance (only if not gifted)
+      const founderRev = r.founder_upgrade_payment_id ? 999 : 0;
+      const guidanceRev = (r.has_12_month_guidance && r.is_guidance_gifted !== true) ? 149 : 0;
+      dateMap[key].revenue += 299 + founderRev + guidanceRev;
     });
     const dailyBreakdown = Object.values(dateMap).sort((a, b) => new Date(b.date) - new Date(a.date));
 
