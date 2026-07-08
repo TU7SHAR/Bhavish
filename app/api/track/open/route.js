@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { trackingLimiter } from "../../../../lib/rate-limit.js";
 
 // 1x1 transparent GIF pixel
 const PIXEL = Buffer.from(
@@ -13,12 +14,38 @@ const PIXEL = Buffer.from(
 // GET /api/track/open?rid=REPORT_ID&type=thankyou  (thank you email open)
 export async function GET(request) {
   try {
+    // Rate limiting — prevent fake open injection
+    const rateCheck = trackingLimiter(request);
+    if (!rateCheck.allowed) {
+      // Still return pixel even when rate limited (don't break email display)
+      return new NextResponse(PIXEL, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/gif",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const reportId = searchParams.get("rid");
     const emailNum = parseInt(searchParams.get("en") || "0", 10);
     const type = searchParams.get("type"); // "report" or "thankyou"
 
-    if (reportId && (emailNum > 0 || type)) {
+    // Basic validation — report IDs follow a known format
+    if (reportId && reportId.startsWith("RPT-") && (emailNum > 0 || type)) {
+      // Validate type is one of the expected values
+      const validTypes = ["report", "thankyou", "guidance", "howto", "admin_reply"];
+      if (type && !validTypes.includes(type)) {
+        // Invalid type — return pixel without tracking
+        return new NextResponse(PIXEL, {
+          status: 200,
+          headers: { "Content-Type": "image/gif", "Cache-Control": "no-store" },
+        });
+      }
+
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

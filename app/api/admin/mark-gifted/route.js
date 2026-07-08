@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin route: toggle is_guidance_gifted or is_founder_gifted on a report.
 // POST /api/admin/mark-gifted
@@ -7,11 +8,9 @@ import { NextResponse } from "next/server";
 // Auth: Bearer ADMIN_SECRET
 
 export async function POST(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { reportId, field, value } = await request.json();

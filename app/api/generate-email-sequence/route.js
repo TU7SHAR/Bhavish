@@ -1,6 +1,8 @@
 import { generateEmailDrafts } from "../../../lib/email-sequence.js";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyInternal } from "../../../lib/auth.js";
+import { emailGenLimiter } from "../../../lib/rate-limit.js";
 
 // Runs in the background after a preview is generated. Makes ONE Gemini call
 // to draft all 10 nurture emails, then stores them as JSONB in
@@ -10,6 +12,17 @@ export const maxDuration = 30;
 
 export async function POST(request) {
   try {
+    // SECURITY FIX: Require internal authentication.
+    // This endpoint triggers expensive Gemini AI calls — must not be publicly accessible.
+    const auth = verifyInternal(request);
+    if (!auth.authorized) return auth.error;
+
+    // Additional rate limiting as defense-in-depth
+    const rateCheck = emailGenLimiter(request);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+    }
+
     const { reportId, name, summary, sections, dateOfBirth, placeOfBirth, personalQuestion } =
       await request.json();
 

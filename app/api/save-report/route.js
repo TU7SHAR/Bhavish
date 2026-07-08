@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { saveLimiter } from "../../../lib/rate-limit.js";
+import { sanitizeName, sanitizePlace, sanitizeForPrompt } from "../../../lib/sanitize.js";
 
 // Detect device type from User-Agent header
 function detectDevice(userAgent) {
@@ -13,6 +15,12 @@ function detectDevice(userAgent) {
 
 export async function POST(request) {
   try {
+    // Rate limiting — prevent fake lead injection
+    const rateCheck = saveLimiter(request);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+    }
+
     const {
       reportId,
       name,
@@ -112,6 +120,32 @@ export async function POST(request) {
         { error: "Failed to save report. Report is still available on-screen." },
         { status: 500 }
       );
+    }
+
+    // SECURITY FIX: Trigger email sequence generation server-side.
+    // Previously this was called from the frontend (unauthenticated).
+    // Now it runs here with internal auth after a successful unpaid lead save.
+    if (paymentStatus !== "paid" && email && email.trim()) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+      const internalSecret = process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET;
+      if (internalSecret) {
+        fetch(`${baseUrl}/api/generate-email-sequence`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${internalSecret}`,
+          },
+          body: JSON.stringify({
+            reportId,
+            name,
+            summary,
+            sections,
+            dateOfBirth,
+            placeOfBirth,
+            personalQuestion: personalQuestion || "",
+          }),
+        }).catch((err) => console.error("Email sequence generation failed (non-critical):", err.message));
+      }
     }
 
     return NextResponse.json({ success: true });

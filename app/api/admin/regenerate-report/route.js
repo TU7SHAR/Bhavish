@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { generateWithRetry } from "../../../../lib/gemini-retry.js";
 import { calculateBirthChart } from "../../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../../lib/geocode.js";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin endpoint: regenerate a customer's FULL report from scratch.
 // Recalculates the chart from birth details, then generates all 20 sections.
@@ -13,11 +14,9 @@ import { geocodePlace } from "../../../../lib/geocode.js";
 export const maxDuration = 60;
 
 export async function POST(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { reportId } = await request.json();

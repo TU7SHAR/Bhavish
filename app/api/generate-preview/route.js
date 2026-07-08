@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { calculateBirthChart, generateKundliSVG } from "../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../lib/geocode.js";
+import { previewLimiter } from "../../../lib/rate-limit.js";
+import { sanitizeForPrompt, sanitizeName, sanitizePlace } from "../../../lib/sanitize.js";
 
 // Allow up to 30 seconds for preview generation on Vercel
 export const maxDuration = 30;
@@ -22,6 +24,12 @@ const inputSchema = z.object({
 
 export async function POST(request) {
   try {
+    // Rate limiting — prevent Gemini token abuse (3 req/min per IP)
+    const rateCheck = previewLimiter(request);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+    }
+
     const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender, personalQuestion } =
       await request.json();
 
@@ -51,6 +59,9 @@ export async function POST(request) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
+    // Sanitize user input before injecting into AI prompt
+    const safeQuestion = sanitizeForPrompt(personalQuestion, 300);
+
     const planetaryTable = Object.entries(chartData.planets)
       .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | ${data.dignity}`)
       .join("\n");
@@ -68,13 +79,13 @@ Rashi (Moon Sign): ${chartData.rashi}
 PLANETS:
 ${planetaryTable}
 
-${personalQuestion ? `The user asked: "${personalQuestion}"` : ""}
+${safeQuestion ? `The user asked: "${safeQuestion}"` : ""}
 
 Generate JSON:
 {
   "summary": "2 sentence chart overview mentioning specific positions",
   "pastValidation": "2-3 sentences about a challenging period the user likely faced in 2024-2025 based on Saturn/Rahu transits. Be specific about the life area affected. Make it resonate emotionally.",
-  ${personalQuestion ? `"personalInsight": "Start answering their question '${personalQuestion}' with a specific planetary reference, then STOP mid-sentence to create an information gap. 1-2 sentences max, ending abruptly.",` : `"personalInsight": null,`}
+  ${safeQuestion ? `"personalInsight": "Start answering their question '${safeQuestion}' with a specific planetary reference, then STOP mid-sentence to create an information gap. 1-2 sentences max, ending abruptly.",` : `"personalInsight": null,`}
   "sections": [
     { "title": "Rashi & Personality Overview", "content": "200-250 words interpreting Moon in ${chartData.rashi} in house ${chartData.planets.Moon?.house}" },
     { "title": "Lagna & Core Identity", "content": "200-250 words interpreting ${chartData.ascendant.sign} rising" }

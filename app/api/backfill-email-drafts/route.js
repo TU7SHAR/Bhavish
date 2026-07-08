@@ -1,6 +1,7 @@
 import { generateEmailDrafts } from "../../../lib/email-sequence.js";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyCron } from "../../../lib/auth.js";
 
 // One-time / occasional helper: generate email drafts for EXISTING unpaid
 // leads that predate Option B (email_drafts IS NULL). Processes a SMALL batch
@@ -14,10 +15,9 @@ import { NextResponse } from "next/server";
 export const maxDuration = 60;
 
 export async function GET(request) {
-  const authHeader = request.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison for cron secret
+  const auth = verifyCron(request);
+  if (!auth.authorized) return auth.error;
 
   const { searchParams } = new URL(request.url);
   const batchSize = Math.min(Math.max(parseInt(searchParams.get("batch") || "3", 10) || 3, 1), 8);

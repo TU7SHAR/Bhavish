@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
+import { verifyInternal } from "../../../lib/auth.js";
 
 export const maxDuration = 30;
 
@@ -163,10 +164,43 @@ function buildReportHtml({ name, reportId, summary, sections, chartData }) {
 
 export async function POST(request) {
   try {
+    // SECURITY FIX: Verify authorization.
+    // Accept either:
+    // 1. Internal auth header (server-to-server calls), OR
+    // 2. Verify the report is actually paid in DB (for client post-payment calls)
+    const auth = verifyInternal(request);
+    const isInternalCall = auth.authorized;
+
     const { email, name, reportId, sections, summary, chartData, dateOfBirth, timeOfBirth, placeOfBirth, includeBump } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // If not an internal call, verify the report exists and is paid
+    if (!isInternalCall) {
+      if (!reportId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      // Dynamically import to avoid circular deps
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      );
+      const { data: report } = await supabase
+        .from("reports")
+        .select("payment_status, email")
+        .eq("report_id", reportId)
+        .single();
+
+      if (!report || report.payment_status !== "paid") {
+        return NextResponse.json({ error: "Unauthorized: payment not verified" }, { status: 403 });
+      }
+      // Ensure the email matches what's in the DB (can't send to arbitrary addresses)
+      if (report.email && report.email.toLowerCase() !== email.toLowerCase()) {
+        return NextResponse.json({ error: "Email mismatch" }, { status: 403 });
+      }
     }
 
     const html = buildReportHtml({ name, reportId, summary, sections, chartData });
