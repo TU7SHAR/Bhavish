@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin: generate a new SEO blog article with Gemini and store it in Supabase.
 // POST /api/admin/generate-article
@@ -20,11 +21,9 @@ function slugify(str) {
 }
 
 export async function POST(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { topic, keyword } = await request.json();

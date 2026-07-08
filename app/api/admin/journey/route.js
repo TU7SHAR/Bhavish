@@ -1,15 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // GET /api/admin/journey
 // Returns visitor journey analytics: consideration time, visit counts,
 // returning vs impulse buyers, session breakdowns.
 export async function GET(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,

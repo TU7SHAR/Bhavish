@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
+import { verifyCron } from "../../../../lib/auth.js";
 
 export const maxDuration = 60;
 
@@ -72,11 +73,9 @@ function buildHtml(lead, draft, emailNum) {
 export async function GET(request) {
   const startTime = Date.now();
 
-  // Optional cron secret protection
-  const authHeader = request.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison for cron secret
+  const auth = verifyCron(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const supabase = createClient(

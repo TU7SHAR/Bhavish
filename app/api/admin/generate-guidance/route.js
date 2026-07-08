@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin route: Generate a single month's guidance report for a customer.
 // POST /api/admin/generate-guidance
@@ -22,12 +23,9 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 
 export async function POST(request) {
-  // Auth
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { reportId, monthNumber, force } = await request.json();

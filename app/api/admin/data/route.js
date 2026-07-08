@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Test/QA accounts to exclude from ALL admin metrics and lists.
 // Set TEST_ACCOUNT_EMAILS in env as a comma-separated list, e.g.
@@ -38,11 +39,9 @@ function excludeFounderGen(rows) {
 export const maxDuration = 30;
 
 export async function GET(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison for admin auth
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   const { searchParams } = new URL(request.url);
   const tab = searchParams.get("tab") || "overview";

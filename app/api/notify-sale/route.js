@@ -1,11 +1,40 @@
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
+import { verifyInternal } from "../../../lib/auth.js";
 
 // Sends YOU (the owner) a notification whenever someone buys a report
 export async function POST(request) {
   try {
+    // SECURITY FIX: Verify authorization.
+    // Accept either:
+    // 1. Internal auth header (server-to-server calls), OR
+    // 2. Verify the report has a valid payment in DB (for client post-payment calls)
+    const auth = verifyInternal(request);
+    const isInternalCall = auth.authorized;
+
     const { reportId, customerName, customerEmail, paymentId, amount, placeOfBirth, dateOfBirth, includeBump, isUpgrade, reportComplete } =
       await request.json();
+
+    // If not an internal call, verify the payment actually exists
+    if (!isInternalCall) {
+      if (!reportId || !paymentId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      );
+      const { data: report } = await supabase
+        .from("reports")
+        .select("payment_status, payment_id")
+        .eq("report_id", reportId)
+        .single();
+
+      if (!report || report.payment_status !== "paid") {
+        return NextResponse.json({ error: "Unauthorized: payment not verified" }, { status: 403 });
+      }
+    }
 
     // A paid sale whose report did NOT pass the quality check — needs YOUR action.
     const reportFailed = reportComplete === false && !isUpgrade;

@@ -1,5 +1,6 @@
 import Razorpay from "razorpay";
 import { NextResponse } from "next/server";
+import { paymentLimiter } from "../../../lib/rate-limit.js";
 
 // Server-side prices — NEVER trust frontend amount
 const PRICE_BASE = parseInt(process.env.NEXT_PUBLIC_PRICE_BASE || "299");
@@ -7,6 +8,12 @@ const PRICE_BUMP = parseInt(process.env.NEXT_PUBLIC_PRICE_BUMP || "149");
 
 export async function POST(request) {
   try {
+    // Rate limiting — prevent order creation spam
+    const rateCheck = paymentLimiter(request);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+    }
+
     const { reportId, email, name, includeBump } = await request.json();
 
     if (!reportId) {

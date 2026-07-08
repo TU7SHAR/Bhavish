@@ -1,6 +1,9 @@
 import { generateWithRetry } from "../../../lib/gemini-retry.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { previewLimiter } from "../../../lib/rate-limit.js";
+import { sanitizeForPrompt } from "../../../lib/sanitize.js";
 
 // Fix #1: Allow up to 60 seconds for full report generation on Vercel
 export const maxDuration = 60;
@@ -30,6 +33,12 @@ const inputSchema = z.object({
 // PHASE 2 — Full 20-section report, only called AFTER payment is verified
 export async function POST(request) {
   try {
+    // Rate limiting — prevent abuse of expensive AI generation
+    const rateCheck = previewLimiter(request);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+    }
+
     const { reportId, name, gender, dateOfBirth, timeOfBirth, placeOfBirth, chartData, personalQuestion, includeBump } =
       await request.json();
 
@@ -37,6 +46,33 @@ export async function POST(request) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
+      );
+    }
+
+    // SECURITY FIX: Verify payment was actually made before generating full report.
+    // This prevents paywall bypass by directly calling this endpoint with chartData.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+    const { data: report, error: dbError } = await supabase
+      .from("reports")
+      .select("payment_status, payment_id")
+      .eq("report_id", reportId)
+      .single();
+
+    if (dbError || !report) {
+      return NextResponse.json(
+        { error: "Report not found. Please try again." },
+        { status: 404 }
+      );
+    }
+
+    if (report.payment_status !== "paid") {
+      return NextResponse.json(
+        { error: "Payment required to generate full report." },
+        { status: 403 }
       );
     }
 
@@ -65,6 +101,9 @@ export async function POST(request) {
     const dashaTable = (chartData.dasha || [])
       .map((d, i) => `${i + 1}. ${d.planet} Mahadasha: ${d.years} years`)
       .join("\n");
+
+    // Sanitize personalQuestion to prevent prompt injection
+    const safeQuestion = sanitizeForPrompt(personalQuestion, 300);
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
@@ -124,7 +163,7 @@ Sections:
 17. Remedies & Spiritual Guidance
 18. Lucky Factors (Numbers, Colors, Gems, Days) — IMPORTANT: You MUST use these exact primary lucky factors (computed from Ascendant Lord): Primary Gem = ${luckyFactors.gem}, Primary Color = ${luckyFactors.color}, Primary Numbers = ${luckyFactors.lucky}, Primary Day = ${luckyFactors.day}. You may add secondary factors from Moon sign or strongest planet, but the PRIMARY factors listed here must appear first and must not be contradicted.
 19. Monthly Predictions for 2026-2027
-20. Life Purpose & Spiritual Path${personalQuestion ? `\n21. Personal Concern: Answer "${personalQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}${includeBump ? `\n${personalQuestion ? "22" : "21"}. 12-Month Personal Guidance Pack — THIS IS A PAID ADD-ON THE CUSTOMER PURCHASED. Make it substantial (500-700 words). Include ALL of: (a) a brief month-by-month forecast for the next 12 months covering career, money, love, and health each month; (b) which months are BEST for action/decisions and which are CAUTION months; (c) key timing windows (e.g. "good for career movement", "avoid impulsive spending", "focus on health", "relationship clarity period"); (d) a simple practical monthly action plan; (e) safe personal remedies/suggestions (journaling, meditation, discipline, charity, mantra); (f) a final 12-month yearly-theme summary. Anchor timing to the computed dasha/antardasha above.` : ""}
+20. Life Purpose & Spiritual Path${safeQuestion ? `\n21. Personal Concern: Answer "${safeQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}${includeBump ? `\n${safeQuestion ? "22" : "21"}. 12-Month Personal Guidance Pack — THIS IS A PAID ADD-ON THE CUSTOMER PURCHASED. Make it substantial (500-700 words). Include ALL of: (a) a brief month-by-month forecast for the next 12 months covering career, money, love, and health each month; (b) which months are BEST for action/decisions and which are CAUTION months; (c) key timing windows (e.g. "good for career movement", "avoid impulsive spending", "focus on health", "relationship clarity period"); (d) a simple practical monthly action plan; (e) safe personal remedies/suggestions (journaling, meditation, discipline, charity, mantra); (f) a final 12-month yearly-theme summary. Anchor timing to the computed dasha/antardasha above.` : ""}
 
 Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
 

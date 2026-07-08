@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin endpoint: send email to a SINGLE lead.
 // POST /api/admin/send-email
@@ -65,11 +66,9 @@ function buildCustomHtml(lead, subject, body) {
 }
 
 export async function POST(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison for admin auth
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { reportId, mode, customSubject, customBody } = await request.json();

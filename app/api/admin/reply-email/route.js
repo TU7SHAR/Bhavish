@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin endpoint: send/reply to any email address from support@bhavishai.in
 // POST /api/admin/reply-email
@@ -36,11 +37,9 @@ function buildReplyHtml(body, reportId) {
 }
 
 export async function POST(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { to, subject, body, reportId, inReplyTo } = await request.json();

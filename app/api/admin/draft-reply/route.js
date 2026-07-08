@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Admin endpoint: use Gemini AI to draft an email reply.
 // POST /api/admin/draft-reply
@@ -64,11 +65,9 @@ Rules:
 };
 
 export async function POST(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const { customerMessage, type, customerName } = await request.json();

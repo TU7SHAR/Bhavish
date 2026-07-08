@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getDbPost, getDbPosts } from "../../../../lib/blog-db";
+import { verifyAdmin } from "../../../../lib/auth.js";
 
 // Temporary diagnostic: shows exactly what the public blog read sees.
 // GET /api/admin/blog-debug?slug=optional-slug
@@ -8,11 +9,9 @@ import { getDbPost, getDbPosts } from "../../../../lib/blog-db";
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // SECURITY FIX: Use timing-safe comparison
+  const auth = verifyAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get("slug");
