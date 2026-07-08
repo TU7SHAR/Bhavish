@@ -391,19 +391,20 @@ export default function GetReport() {
               {/* Email */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                  Email Address (for report delivery)
+                  Email Address *
                 </label>
                 <input
                   type="email"
                   id="email"
                   name="email"
-                  placeholder="your@email.com (optional)"
+                  required
+                  placeholder="your@email.com"
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 />
                 <p className="text-muted text-xs mt-1">
-                  Optional. We&apos;ll email a backup copy of your report after purchase.
+                  Your report will be delivered to this email. Also used to save your report to your account.
                 </p>
               </div>
 
