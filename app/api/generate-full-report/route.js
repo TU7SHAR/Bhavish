@@ -44,6 +44,24 @@ export async function POST(request) {
       .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | Navamsa D9: ${data.navamsa} | ${data.dignity}`)
       .join("\n");
 
+    // Lucky factors (pre-computed from ascendant lord) — must be used in Section 18
+    const signGems = {
+      1: { gem: "Red Coral", color: "Red", lucky: "9, 1, 3", day: "Tuesday" },
+      2: { gem: "Diamond", color: "White", lucky: "6, 2, 7", day: "Friday" },
+      3: { gem: "Emerald", color: "Green", lucky: "5, 3, 8", day: "Wednesday" },
+      4: { gem: "Pearl", color: "White/Silver", lucky: "2, 7, 9", day: "Monday" },
+      5: { gem: "Ruby", color: "Gold/Orange", lucky: "1, 4, 9", day: "Sunday" },
+      6: { gem: "Emerald", color: "Green", lucky: "5, 3, 6", day: "Wednesday" },
+      7: { gem: "Diamond", color: "White/Pink", lucky: "6, 7, 2", day: "Friday" },
+      8: { gem: "Red Coral", color: "Dark Red", lucky: "9, 1, 8", day: "Tuesday" },
+      9: { gem: "Yellow Sapphire", color: "Yellow", lucky: "3, 9, 5", day: "Thursday" },
+      10: { gem: "Blue Sapphire", color: "Blue/Black", lucky: "8, 4, 6", day: "Saturday" },
+      11: { gem: "Blue Sapphire", color: "Blue", lucky: "8, 4, 7", day: "Saturday" },
+      12: { gem: "Yellow Sapphire", color: "Yellow", lucky: "3, 9, 7", day: "Thursday" },
+    };
+    const signIdx = chartData.ascendant.signIndex || 1;
+    const luckyFactors = signGems[signIdx] || signGems[1];
+
     const dashaTable = (chartData.dasha || [])
       .map((d, i) => `${i + 1}. ${d.planet} Mahadasha: ${d.years} years`)
       .join("\n");
@@ -104,7 +122,7 @@ Sections:
 15. Kaal Sarp & Other Yoga Analysis
 16. Favorable & Unfavorable Periods
 17. Remedies & Spiritual Guidance
-18. Lucky Factors (Numbers, Colors, Gems, Days)
+18. Lucky Factors (Numbers, Colors, Gems, Days) — IMPORTANT: You MUST use these exact primary lucky factors (computed from Ascendant Lord): Primary Gem = ${luckyFactors.gem}, Primary Color = ${luckyFactors.color}, Primary Numbers = ${luckyFactors.lucky}, Primary Day = ${luckyFactors.day}. You may add secondary factors from Moon sign or strongest planet, but the PRIMARY factors listed here must appear first and must not be contradicted.
 19. Monthly Predictions for 2026-2027
 20. Life Purpose & Spiritual Path${personalQuestion ? `\n21. Personal Concern: Answer "${personalQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}${includeBump ? `\n${personalQuestion ? "22" : "21"}. 12-Month Personal Guidance Pack — THIS IS A PAID ADD-ON THE CUSTOMER PURCHASED. Make it substantial (500-700 words). Include ALL of: (a) a brief month-by-month forecast for the next 12 months covering career, money, love, and health each month; (b) which months are BEST for action/decisions and which are CAUTION months; (c) key timing windows (e.g. "good for career movement", "avoid impulsive spending", "focus on health", "relationship clarity period"); (d) a simple practical monthly action plan; (e) safe personal remedies/suggestions (journaling, meditation, discipline, charity, mantra); (f) a final 12-month yearly-theme summary. Anchor timing to the computed dasha/antardasha above.` : ""}
 

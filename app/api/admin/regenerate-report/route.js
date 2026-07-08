@@ -64,6 +64,24 @@ export async function POST(request) {
       .map((d, i) => `${i + 1}. ${d.planet} Mahadasha: ${d.years} years`)
       .join("\n");
 
+    // Lucky factors (pre-computed from ascendant lord) — must be used in Section 18
+    const signGemsLookup = {
+      1: { gem: "Red Coral", color: "Red", lucky: "9, 1, 3", day: "Tuesday" },
+      2: { gem: "Diamond", color: "White", lucky: "6, 2, 7", day: "Friday" },
+      3: { gem: "Emerald", color: "Green", lucky: "5, 3, 8", day: "Wednesday" },
+      4: { gem: "Pearl", color: "White/Silver", lucky: "2, 7, 9", day: "Monday" },
+      5: { gem: "Ruby", color: "Gold/Orange", lucky: "1, 4, 9", day: "Sunday" },
+      6: { gem: "Emerald", color: "Green", lucky: "5, 3, 6", day: "Wednesday" },
+      7: { gem: "Diamond", color: "White/Pink", lucky: "6, 7, 2", day: "Friday" },
+      8: { gem: "Red Coral", color: "Dark Red", lucky: "9, 1, 8", day: "Tuesday" },
+      9: { gem: "Yellow Sapphire", color: "Yellow", lucky: "3, 9, 5", day: "Thursday" },
+      10: { gem: "Blue Sapphire", color: "Blue/Black", lucky: "8, 4, 6", day: "Saturday" },
+      11: { gem: "Blue Sapphire", color: "Blue", lucky: "8, 4, 7", day: "Saturday" },
+      12: { gem: "Yellow Sapphire", color: "Yellow", lucky: "3, 9, 7", day: "Thursday" },
+    };
+    const signIdx = chartData.ascendant.signIndex || 1;
+    const luckyFactors = signGemsLookup[signIdx] || signGemsLookup[1];
+
     const personalQuestion = report.personal_question || "";
     const name = report.name;
 
@@ -123,7 +141,7 @@ Sections:
 15. Kaal Sarp & Other Yoga Analysis
 16. Favorable & Unfavorable Periods
 17. Remedies & Spiritual Guidance
-18. Lucky Factors (Numbers, Colors, Gems, Days)
+18. Lucky Factors (Numbers, Colors, Gems, Days) — IMPORTANT: You MUST use these exact primary lucky factors (computed from Ascendant Lord): Primary Gem = ${luckyFactors.gem}, Primary Color = ${luckyFactors.color}, Primary Numbers = ${luckyFactors.lucky}, Primary Day = ${luckyFactors.day}. You may add secondary factors from Moon sign or strongest planet, but the PRIMARY factors listed here must appear first and must not be contradicted.
 19. Monthly Predictions for 2026-2027
 20. Life Purpose & Spiritual Path${personalQuestion ? `\n21. Personal Concern: Answer "${personalQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}
 
