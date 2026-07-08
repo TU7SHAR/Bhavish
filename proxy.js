@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 /**
- * Next.js Middleware for BhavishAI
+ * Next.js 16 Proxy for BhavishAI
+ * (Replaces deprecated middleware.js convention)
  * 
  * Provides:
  * 1. Security headers on all responses
@@ -41,7 +42,7 @@ function getAllowedOrigins() {
   return origins;
 }
 
-export function middleware(request) {
+export function proxy(request) {
   const { pathname } = request.nextUrl;
   const method = request.method;
 
@@ -125,7 +126,7 @@ export function middleware(request) {
   return response;
 }
 
-// Only run middleware on relevant paths (skip static assets, _next, etc.)
+// Only run proxy on relevant paths (skip static assets, _next, etc.)
 export const config = {
   matcher: [
     // Match all API routes
