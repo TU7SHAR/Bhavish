@@ -70,6 +70,9 @@ export default function Header() {
             <Link href="/blog" className="text-muted hover:text-foreground transition-colors text-sm">
               Blog
             </Link>
+            <Link href="/plans" className="text-muted hover:text-foreground transition-colors text-sm">
+              Plans
+            </Link>
 
             {!loading && user ? (
               <>
@@ -78,6 +81,12 @@ export default function Header() {
                   className="text-muted hover:text-foreground transition-colors text-sm"
                 >
                   My Reports
+                </Link>
+                <Link
+                  href="/my-plans"
+                  className="text-muted hover:text-foreground transition-colors text-sm"
+                >
+                  My Plan
                 </Link>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
@@ -160,11 +169,17 @@ export default function Header() {
               <Link href="/blog" className="text-muted hover:text-foreground transition-colors" onClick={() => setMobileOpen(false)}>
                 Blog
               </Link>
+              <Link href="/plans" className="text-muted hover:text-foreground transition-colors" onClick={() => setMobileOpen(false)}>
+                Plans
+              </Link>
 
               {user ? (
                 <>
                   <Link href="/dashboard" className="text-muted hover:text-foreground transition-colors" onClick={() => setMobileOpen(false)}>
                     My Reports
+                  </Link>
+                  <Link href="/my-plans" className="text-muted hover:text-foreground transition-colors" onClick={() => setMobileOpen(false)}>
+                    My Plan
                   </Link>
                   <button onClick={handleLogout} className="text-left text-muted hover:text-foreground transition-colors">
                     Logout ({user.user_metadata?.full_name || user.email})
