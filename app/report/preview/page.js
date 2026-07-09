@@ -63,6 +63,7 @@ export default function ReportPreview() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [retryMessage, setRetryMessage] = useState(null);
   const [includeBump, setIncludeBump] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
 
   useEffect(() => {
     // Try sessionStorage first, then localStorage backup
@@ -97,6 +98,7 @@ export default function ReportPreview() {
     // Double-click protection
     if (paymentLoading) return;
     setPaymentLoading(true);
+    setPaymentError(null); // clear any previous failure before a fresh attempt
 
     // 🔥 TRACKING: InitiateCheckout — user clicked Pay
     if (typeof window !== "undefined" && window.fbq) {
@@ -360,6 +362,51 @@ export default function ReportPreview() {
       };
 
       const rzp = new window.Razorpay(options);
+
+      // Handle payment failures (bank declines, wrong OTP, gateway timeouts).
+      // Razorpay does NOT call the success handler here — the modal closes and
+      // this fires instead. We show a friendly, non-alarming retry nudge and
+      // push the user toward UPI (far higher success rate than netbanking/cards).
+      rzp.on("payment.failed", function (resp) {
+        const err = (resp && resp.error) || {};
+        const source = err.source || "";
+        const step = err.step || "";
+        const reason = err.reason || "";
+
+        let title = "Payment didn't go through";
+        let detail =
+          "No money was deducted. If any amount was debited, it is automatically refunded within 4-5 business days.";
+
+        if (source === "bank" || step === "payment_authorization") {
+          title = "Your bank declined the payment";
+          detail =
+            "This is a temporary bank-side issue, not a problem with your account. Paying via UPI usually works instantly. No money was deducted.";
+        } else if (source === "customer") {
+          title = "Payment was cancelled";
+          detail =
+            "No problem — you can try again whenever you're ready. UPI is the fastest way to pay.";
+        }
+
+        setPaymentError({ title, detail });
+        setPaymentLoading(false);
+
+        // 🔥 TRACKING: a failed attempt is your HOTTEST lead — they opened their wallet.
+        if (typeof window !== "undefined" && window.fbq) {
+          window.fbq("trackCustom", "PaymentFailed", {
+            value: includeBump ? 448 : 299,
+            currency: "INR",
+            reason: reason || source || "unknown",
+          });
+        }
+        if (typeof window !== "undefined" && window.gtag) {
+          window.gtag("event", "payment_failed", {
+            event_category: "funnel",
+            event_label: reason || source || "unknown",
+          });
+        }
+        track("payment_failed", { source: source || "unknown" });
+      });
+
       rzp.open();
       // Vercel Analytics funnel event — Razorpay checkout actually opened
       track("payment_opened", { value: includeBump ? 448 : 299 });
@@ -723,6 +770,21 @@ export default function ReportPreview() {
                   <div className="mt-3 bg-primary/10 border border-primary/30 rounded-xl p-3 text-center">
                     <p className="text-sm font-medium text-primary-light">{retryMessage.title}</p>
                     <p className="text-xs text-muted mt-1">{retryMessage.sub}</p>
+                  </div>
+                )}
+
+                {/* Payment failed — friendly, non-alarming retry nudge (pushes UPI) */}
+                {paymentError && !paymentLoading && (
+                  <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+                    <p className="text-sm font-semibold text-red-300">⚠️ {paymentError.title}</p>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">{paymentError.detail}</p>
+                    <button
+                      onClick={handlePayment}
+                      disabled={paymentLoading}
+                      className="mt-3 w-full bg-primary hover:bg-primary-dark disabled:opacity-50 text-white py-2.5 rounded-full font-semibold text-sm transition-all"
+                    >
+                      Try Again — Pay via UPI →
+                    </button>
                   </div>
                 )}
 
