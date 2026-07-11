@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (authed && tab !== "actions" && tab !== "analytics") fetchData(tab);
+    if (authed && tab !== "actions" && tab !== "analytics" && tab !== "economics") fetchData(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -134,6 +134,7 @@ export default function AdminDashboard() {
     { id: "blog", label: "Blog", icon: "📝" },
     { id: "test", label: "Test", icon: "🧪" },
     { id: "actions", label: "Actions", icon: "⚡" },
+    { id: "economics", label: "Economics", icon: "📉" },
   ];
 
   // ---------- MAIN SHELL ----------
@@ -212,6 +213,7 @@ export default function AdminDashboard() {
             {tab === "emails" && <EmailsTab emails={data.emails} />}
             {tab === "blog" && <BlogTab blogPosts={data.blogPosts} password={password} onRefresh={() => fetchData("blog")} />}
             {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} password={password} />}
+            {tab === "economics" && <EconomicsTab password={password} />}
           </>
         )}
       </main>
@@ -2896,10 +2898,36 @@ function AllDetailsTab({ all, password }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [expanded, setExpanded] = useState(null);
+  const [dateFilter, setDateFilter] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   const filtered = useMemo(() => {
     if (!all) return [];
     const q = search.toLowerCase();
+
+    // Date filter logic (IST)
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const nowIST = new Date(Date.now() + IST_OFFSET);
+    let fromDate = null;
+    let toDate = null;
+
+    if (dateFilter === "today") {
+      fromDate = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET);
+    } else if (dateFilter === "yesterday") {
+      const yesterday = new Date(nowIST);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      fromDate = new Date(Date.UTC(yesterday.getUTCFullYear(), yesterday.getUTCMonth(), yesterday.getUTCDate()) - IST_OFFSET);
+      toDate = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET);
+    } else if (dateFilter === "7days") {
+      fromDate = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    } else if (dateFilter === "30days") {
+      fromDate = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    } else if (dateFilter === "custom" && customFrom) {
+      fromDate = new Date(customFrom + "T00:00:00+05:30");
+      if (customTo) toDate = new Date(customTo + "T23:59:59+05:30");
+    }
+
     return all.filter((p) => {
       const matchesSearch = !q || (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.report_id || "").includes(q);
       const matchesStatus =
@@ -2908,13 +2936,52 @@ function AllDetailsTab({ all, password }) {
         status === "unpaid" ? p.payment_status === "unpaid" :
         status === "founder" ? p.is_founder_member :
         status === "noemail" ? (!p.email || !p.email.trim()) : true;
-      return matchesSearch && matchesStatus;
+      // Date filter
+      let matchesDate = true;
+      if (fromDate || toDate) {
+        const d = new Date(p.created_at);
+        if (fromDate && d < fromDate) matchesDate = false;
+        if (toDate && d > toDate) matchesDate = false;
+      }
+      return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [all, search, status]);
+  }, [all, search, status, dateFilter, customFrom, customTo]);
 
   if (!all) return null;
   return (
     <div>
+      {/* Date filter bar */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {[
+          { id: "today", label: "Today" },
+          { id: "yesterday", label: "Yesterday" },
+          { id: "7days", label: "Last 7 Days" },
+          { id: "30days", label: "Last 30 Days" },
+          { id: "all", label: "All Time" },
+          { id: "custom", label: "Custom" },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setDateFilter(f.id)}
+            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${
+              dateFilter === f.id
+                ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-600/20"
+                : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2 ml-2">
+            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="bg-[#11111f] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]" />
+            <span className="text-gray-500 text-xs">to</span>
+            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="bg-[#11111f] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]" />
+          </div>
+        )}
+        {dateFilter !== "all" && <span className="text-[11px] text-purple-400 ml-2">Showing filtered</span>}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
@@ -3074,6 +3141,311 @@ function BlogTab({ blogPosts, password, onRefresh }) {
                 </a>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+// ---------- ECONOMICS (profit/loss + expense tracking) ----------
+function EconomicsTab({ password }) {
+  const [expenses, setExpenses] = useState([]);
+  const [revenueData, setRevenueData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [tableNotCreated, setTableNotCreated] = useState(false);
+
+  // Add expense form state
+  const [formCategory, setFormCategory] = useState("ads");
+  const [formLabel, setFormLabel] = useState("");
+  const [formAmount, setFormAmount] = useState("");
+  const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
+  const [formNotes, setFormNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formResult, setFormResult] = useState(null);
+
+  // Compute date range for API
+  const getDateRange = () => {
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const nowIST = new Date(Date.now() + IST_OFFSET);
+    let from = null;
+    let to = null;
+
+    if (dateFilter === "today") {
+      from = `${nowIST.getUTCFullYear()}-${String(nowIST.getUTCMonth() + 1).padStart(2, "0")}-${String(nowIST.getUTCDate()).padStart(2, "0")}`;
+      to = from;
+    } else if (dateFilter === "yesterday") {
+      const y = new Date(nowIST);
+      y.setUTCDate(y.getUTCDate() - 1);
+      from = `${y.getUTCFullYear()}-${String(y.getUTCMonth() + 1).padStart(2, "0")}-${String(y.getUTCDate()).padStart(2, "0")}`;
+      to = from;
+    } else if (dateFilter === "7days") {
+      const d = new Date(nowIST);
+      d.setUTCDate(d.getUTCDate() - 7);
+      from = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    } else if (dateFilter === "30days") {
+      const d = new Date(nowIST);
+      d.setUTCDate(d.getUTCDate() - 30);
+      from = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    } else if (dateFilter === "custom") {
+      from = customFrom || null;
+      to = customTo || null;
+    }
+    return { from, to };
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { from, to } = getDateRange();
+      let url = "/api/admin/expenses";
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      if (params.toString()) url += `?${params.toString()}`;
+
+      const [expRes, revRes] = await Promise.all([
+        fetch(url, { headers: { Authorization: `Bearer ${password}` } }),
+        fetch(`/api/admin/data?tab=overview`, { headers: { Authorization: `Bearer ${password}` } }),
+      ]);
+      const expJson = await expRes.json();
+      const revJson = await revRes.json();
+      setExpenses(expJson.expenses || []);
+      setTableNotCreated(!!expJson.tableNotCreated);
+      setRevenueData(revJson.overview || null);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, [dateFilter, customFrom, customTo]);
+
+  const addExpense = async () => {
+    if (!formLabel.trim() || !formAmount) return;
+    setSubmitting(true);
+    setFormResult(null);
+    try {
+      const res = await fetch("/api/admin/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ category: formCategory, label: formLabel, amount: formAmount, date: formDate, notes: formNotes }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setFormResult({ status: "success", message: `✅ Added ₹${parseFloat(formAmount).toLocaleString("en-IN")} — ${formLabel}` });
+        setFormLabel("");
+        setFormAmount("");
+        setFormNotes("");
+        loadData();
+      } else {
+        setFormResult({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setFormResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setSubmitting(false);
+  };
+
+  const deleteExpense = async (id) => {
+    if (!confirm("Delete this expense?")) return;
+    try {
+      await fetch("/api/admin/expenses", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ id }),
+      });
+      loadData();
+    } catch (e) { console.error(e); }
+  };
+
+  // P&L calculations
+  const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+  const categoryBreakdown = expenses.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] || 0) + parseFloat(e.amount || 0);
+    return acc;
+  }, {});
+
+  // Revenue: use date-filtered stats from overview if a filter is active
+  const getRevenue = () => {
+    if (!revenueData) return { gross: 0, net: 0, fees: 0 };
+    if (dateFilter === "all") return { gross: revenueData.totalRevenue || 0, net: revenueData.netRevenue || 0, fees: revenueData.totalFees || 0 };
+    // For filtered views, approximate from the reportDates array
+    const reports = revenueData.reportDates || [];
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const nowIST = new Date(Date.now() + IST_OFFSET);
+    let fromDate = null;
+    let toDate = null;
+    if (dateFilter === "today") {
+      fromDate = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET);
+    } else if (dateFilter === "yesterday") {
+      const y = new Date(nowIST); y.setUTCDate(y.getUTCDate() - 1);
+      fromDate = new Date(Date.UTC(y.getUTCFullYear(), y.getUTCMonth(), y.getUTCDate()) - IST_OFFSET);
+      toDate = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET);
+    } else if (dateFilter === "7days") { fromDate = new Date(Date.now() - 7 * 24 * 3600 * 1000); }
+    else if (dateFilter === "30days") { fromDate = new Date(Date.now() - 30 * 24 * 3600 * 1000); }
+    else if (dateFilter === "custom" && customFrom) {
+      fromDate = new Date(customFrom + "T00:00:00+05:30");
+      if (customTo) toDate = new Date(customTo + "T23:59:59+05:30");
+    }
+    const filtered = reports.filter((r) => {
+      if (!r.created_at) return false;
+      const d = new Date(r.payment_status === "paid" && r.paid_at ? r.paid_at : r.created_at);
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+      return true;
+    });
+    const paid = filtered.filter((r) => r.payment_status === "paid" && !r.is_founder_free).length;
+    const founders = filtered.filter((r) => r.founder_upgrade_payment_id).length;
+    const guidance = filtered.filter((r) => r.has_12_month_guidance && r.is_guidance_gifted !== true && r.payment_status === "paid").length;
+    const gross = (paid * 299) + (founders * 999) + (guidance * 149);
+    const fees = Math.round(gross * 2.36 / 100);
+    return { gross, net: gross - fees, fees };
+  };
+
+  const revenue = getRevenue();
+  const profit = revenue.net - totalExpenses;
+  const roas = totalExpenses > 0 ? ((revenue.gross / totalExpenses) * 100).toFixed(0) : "∞";
+
+  if (loading) return <LoadingState />;
+
+  const CATEGORY_LABELS = { ads: "🎯 Ads", tools: "🔧 Tools", services: "🛠 Services", infra: "☁️ Infra", other: "📦 Other" };
+
+  return (
+    <div className="space-y-6">
+      {tableNotCreated && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-amber-300 text-sm">
+          ⚠️ The <code className="text-amber-200">expenses</code> table hasn&apos;t been created yet. Run the SQL migration in Supabase → SQL Editor. See <code>supabase/migrations/001_create_expenses_table.sql</code>.
+        </div>
+      )}
+
+      {/* Date Filter Bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { id: "today", label: "Today" },
+          { id: "yesterday", label: "Yesterday" },
+          { id: "7days", label: "Last 7 Days" },
+          { id: "30days", label: "Last 30 Days" },
+          { id: "all", label: "All Time" },
+          { id: "custom", label: "Custom" },
+        ].map((f) => (
+          <button key={f.id} onClick={() => setDateFilter(f.id)} className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border ${dateFilter === f.id ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-600/20" : "bg-[#11111f] border-white/10 text-gray-400 hover:text-white hover:border-white/20"}`}>{f.label}</button>
+        ))}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2 ml-2">
+            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="bg-[#11111f] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]" />
+            <span className="text-gray-500 text-xs">to</span>
+            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="bg-[#11111f] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]" />
+          </div>
+        )}
+      </div>
+
+      {/* P&L Summary */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-green-600/10 via-transparent to-red-600/10 p-6">
+        <div className="relative grid grid-cols-2 md:grid-cols-5 gap-6">
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">Gross Revenue</p>
+            <p className="text-2xl md:text-3xl font-bold mt-1 text-green-400">₹{revenue.gross.toLocaleString("en-IN")}</p>
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">Net (after Razorpay)</p>
+            <p className="text-2xl md:text-3xl font-bold mt-1 text-green-300">₹{revenue.net.toLocaleString("en-IN")}</p>
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">Total Expenses</p>
+            <p className="text-2xl md:text-3xl font-bold mt-1 text-red-400">₹{totalExpenses.toLocaleString("en-IN")}</p>
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">Net Profit / Loss</p>
+            <p className={`text-2xl md:text-3xl font-bold mt-1 ${profit >= 0 ? "text-green-400" : "text-red-400"}`}>
+              {profit >= 0 ? "+" : ""}₹{profit.toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">ROAS</p>
+            <p className={`text-2xl md:text-3xl font-bold mt-1 ${parseFloat(roas) >= 100 ? "text-green-400" : "text-red-400"}`}>{roas}%</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">{parseFloat(roas) >= 100 ? "Profitable" : "Losing money"}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Expense breakdown by category */}
+      {Object.keys(categoryBreakdown).length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {Object.entries(categoryBreakdown).map(([cat, amt]) => (
+            <div key={cat} className="bg-[#11111f] border border-white/10 rounded-2xl p-4">
+              <p className="text-[11px] text-gray-400 uppercase tracking-wider">{CATEGORY_LABELS[cat] || cat}</p>
+              <p className="text-xl font-bold mt-1 text-red-300">₹{amt.toLocaleString("en-IN")}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{((amt / totalExpenses) * 100).toFixed(0)}% of spend</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Expense Form */}
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <SectionTitle>Add Expense</SectionTitle>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3">
+          <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-200">
+            <option value="ads">🎯 Ads</option>
+            <option value="tools">🔧 Tools</option>
+            <option value="services">🛠 Services</option>
+            <option value="infra">☁️ Infra</option>
+            <option value="other">📦 Other</option>
+          </select>
+          <input value={formLabel} onChange={(e) => setFormLabel(e.target.value)} placeholder="Label (e.g. Meta Ads Campaign 1)" className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          <input value={formAmount} onChange={(e) => setFormAmount(e.target.value)} placeholder="Amount (₹)" type="number" min="0" step="0.01" className="bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          <input value={formDate} onChange={(e) => setFormDate(e.target.value)} type="date" className="bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 [color-scheme:dark]" />
+          <button onClick={addExpense} disabled={submitting || !formLabel.trim() || !formAmount} className="bg-gradient-to-r from-red-600 to-rose-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+            {submitting ? "Adding..." : "+ Add"}
+          </button>
+        </div>
+        <input value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Notes (optional)" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2" />
+        {formResult && <p className={`text-sm ${formResult.status === "success" ? "text-green-400" : "text-red-400"}`}>{formResult.message}</p>}
+      </div>
+
+      {/* Expense History */}
+      <div>
+        <SectionTitle>Expense History ({expenses.length})</SectionTitle>
+        {expenses.length === 0 ? (
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl p-8 text-center text-gray-500 text-sm">
+            No expenses recorded{dateFilter !== "all" ? " for this period" : ""}. Add your first one above.
+          </div>
+        ) : (
+          <div className="bg-[#11111f] border border-white/10 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-white/5 text-gray-400 text-left text-xs uppercase tracking-wider">
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Category</th>
+                    <th className="p-3">Label</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3">Notes</th>
+                    <th className="p-3 text-center">×</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((e) => (
+                    <tr key={e.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="p-3 text-gray-300 whitespace-nowrap">{new Date(e.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded-full text-[11px] bg-white/10 text-gray-300">{CATEGORY_LABELS[e.category] || e.category}</span></td>
+                      <td className="p-3 font-medium text-gray-200">{e.label}</td>
+                      <td className="p-3 text-right text-red-400 font-medium">₹{parseFloat(e.amount).toLocaleString("en-IN")}</td>
+                      <td className="p-3 text-gray-500 text-xs max-w-[200px] truncate">{e.notes || "—"}</td>
+                      <td className="p-3 text-center">
+                        <button onClick={() => deleteExpense(e.id)} className="text-red-400 hover:text-red-300 text-sm transition-colors" title="Delete">🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
