@@ -1982,6 +1982,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
           {person.report_status === "failed" && <span className="px-2 py-0.5 rounded-full text-[11px] bg-red-500/20 text-red-400 font-semibold">⚠️ Report Failed</span>}
           {person.is_founder_member && <span className={`px-2 py-0.5 rounded-full text-[11px] ${person.is_founder_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-pink-500/20 text-pink-400"}`}>{person.is_founder_gifted ? "🎁 Founder (Gifted)" : "Founder"}</span>}
           {person.has_12_month_guidance && <span className={`px-2 py-0.5 rounded-full text-[11px] ${person.is_guidance_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-blue-500/20 text-blue-400"}`}>{person.is_guidance_gifted ? "🎁 12-Mo (Gifted)" : "📅 12-Mo"}</span>}
+          {person.attribution?.utm_campaign && <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300 font-medium" title={`Campaign: ${person.attribution.utm_campaign}`}>📣 {person.attribution.utm_campaign.length > 20 ? person.attribution.utm_campaign.substring(0, 20) + "…" : person.attribution.utm_campaign}</span>}
           <span className="text-gray-500 text-lg">{expanded ? "▾" : "▸"}</span>
         </div>
       </button>
@@ -2901,6 +2902,17 @@ function AllDetailsTab({ all, password }) {
   const [dateFilter, setDateFilter] = useState("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [campaignFilter, setCampaignFilter] = useState("all");
+
+  // Extract unique campaign names for the filter dropdown
+  const campaigns = useMemo(() => {
+    if (!all) return [];
+    const set = new Set();
+    all.forEach((p) => {
+      if (p.attribution?.utm_campaign) set.add(p.attribution.utm_campaign);
+    });
+    return Array.from(set).sort();
+  }, [all]);
 
   const filtered = useMemo(() => {
     if (!all) return [];
@@ -2943,9 +2955,13 @@ function AllDetailsTab({ all, password }) {
         if (fromDate && d < fromDate) matchesDate = false;
         if (toDate && d > toDate) matchesDate = false;
       }
-      return matchesSearch && matchesStatus && matchesDate;
+      // Campaign filter
+      const matchesCampaign = campaignFilter === "all" ? true :
+        campaignFilter === "organic" ? (!p.attribution?.utm_campaign) :
+        (p.attribution?.utm_campaign === campaignFilter);
+      return matchesSearch && matchesStatus && matchesDate && matchesCampaign;
     });
-  }, [all, search, status, dateFilter, customFrom, customTo]);
+  }, [all, search, status, dateFilter, customFrom, customTo, campaignFilter]);
 
   if (!all) return null;
   return (
@@ -2997,6 +3013,17 @@ function AllDetailsTab({ all, password }) {
         <Pill active={status === "unpaid"} onClick={() => setStatus("unpaid")}>Unpaid</Pill>
         <Pill active={status === "founder"} onClick={() => setStatus("founder")}>Founder</Pill>
         <Pill active={status === "noemail"} onClick={() => setStatus("noemail")}>No email</Pill>
+        <select
+          value={campaignFilter}
+          onChange={(e) => setCampaignFilter(e.target.value)}
+          className="bg-[#11111f] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+        >
+          <option value="all">All Campaigns</option>
+          <option value="organic">Organic (no campaign)</option>
+          {campaigns.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
         <span className="text-xs text-gray-500 ml-auto">{filtered.length} of {all.length}</span>
       </div>
 
