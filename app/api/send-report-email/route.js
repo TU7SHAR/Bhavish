@@ -133,7 +133,19 @@ function buildReportHtml({ name, reportId, summary, sections, chartData }) {
   </div>
   
   <p>Dear <strong>${name}</strong>,</p>
-  <p>Thank you for choosing BhavishAI. Here is your complete personalized Vedic astrology report. A <strong>PDF version</strong> is attached to this email for offline access.</p>
+  <p>Thank you for choosing BhavishAI. Here is your complete personalized Vedic astrology report.</p>
+  
+  <div style="background: linear-gradient(135deg, #7c3aed, #4f46e5); border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
+    <p style="color: #e9d5ff; font-size: 14px; margin: 0 0 8px;">Your PDF report is attached to this email</p>
+    <p style="color: white; font-size: 18px; font-weight: bold; margin: 0 0 12px;">📥 Look for the attachment below ↓</p>
+    <p style="color: #c4b5fd; font-size: 12px; margin: 0;">On mobile: tap the paperclip icon or scroll to the bottom of this email.<br>On Gmail: look for "${name.replace(/\s+/g, "_")}_BhavishAI_Report.pdf" at the bottom.</p>
+  </div>
+
+  <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+    <p style="margin: 0; font-size: 14px; color: #166534;"><strong>💡 Want to access your report anytime?</strong></p>
+    <p style="margin: 8px 0 0; font-size: 13px; color: #374151;">Sign in with Google at <a href="https://www.bhavishai.in/login" style="color: #7c3aed;">bhavishai.in</a> using <strong>${email}</strong> → open "My Reports" to read it on our website.</p>
+  </div>
+
   <p><strong>Report ID:</strong> ${reportId}</p>
   <p><em>${summary || ""}</em></p>
 
