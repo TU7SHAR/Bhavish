@@ -593,6 +593,12 @@ GRANT EXECUTE ON FUNCTION check_rate_limit TO service_role;
 GRANT EXECUTE ON FUNCTION cleanup_rate_limits TO service_role;
 ```
 
+**Verify it works:**
+```sql
+SELECT check_rate_limit('test:127.0.0.1', 5, 60000);
+-- Should return: {"allowed": true, "current_count": 1}
+```
+
 The full migration file is also available at: `supabase/migrations/001_rate_limits_table.sql`
 
 ---
