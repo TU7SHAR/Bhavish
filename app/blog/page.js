@@ -55,7 +55,7 @@ export default async function BlogIndex() {
           {/* CTA */}
           <div className="mt-10 bg-surface border border-primary/30 rounded-2xl p-6 text-center">
             <h3 className="text-lg font-bold mb-2">Ready to see your own chart?</h3>
-            <p className="text-muted text-sm mb-4">Get a personalized 20-page Vedic astrology report based on your exact birth details.</p>
+            <p className="text-muted text-sm mb-4">Get a personalized Vedic astrology report based on your exact birth details, from ₹299.</p>
             <Link href="/get-report" className="inline-block bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-full font-medium transition-all">
               Get Your Free Preview →
             </Link>

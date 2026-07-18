@@ -34,7 +34,7 @@ export async function POST(request) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
-    const prompt = `You are an SEO content writer for BhavishAI, an AI-powered Vedic astrology platform (bhavishai.in) that sells personalized 20-page Janam Kundli reports for Rs 299.
+    const prompt = `You are an SEO content writer for BhavishAI, an AI-powered Vedic astrology platform (bhavishai.in) that sells personalized Janam Kundli reports from Rs 299.
 
 Write a high-quality, accurate, beginner-friendly blog article about this topic:
 "${topic}"

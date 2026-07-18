@@ -21,7 +21,7 @@ function buildHowToHtml(name, email, reportId) {
 
       <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">🔮 Generating a report</h3>
       <p style="font-size: 14px; line-height: 1.7; margin: 0 0 4px; color: #374151;">
-        Go to <a href="https://www.bhavishai.in/get-report" style="color:#7c3aed;">bhavishai.in</a>, enter your exact birth date, time, and place, and ask your one most important question. You'll see a free preview, then unlock the full 20-page personalized report.
+        Go to <a href="https://www.bhavishai.in/get-report" style="color:#7c3aed;">bhavishai.in</a>, enter your exact birth date, time, and place, and ask your one most important question. You'll see a free preview, then unlock your full personalized report.
       </p>
 
       <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">📅 Your 12-Month Guidance Pack</h3>

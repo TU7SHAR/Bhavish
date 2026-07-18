@@ -347,9 +347,9 @@ export default function ReportPreview() {
               }),
             }).catch(console.error);
 
-            // Redirect to founder upgrade page (post-purchase upsell)
-            sessionStorage.setItem("upgradeReportId", reportData.reportId);
-            router.push("/founder-upgrade");
+            // Go straight to the full report. The Founder upsell has been retired
+            // for new buyers (existing Founder members are grandfathered).
+            router.push("/report/full");
           } else {
             alert("Payment verification failed. Please contact support.");
           }

@@ -25,8 +25,8 @@ export default function TermsOfService() {
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">2. Description of Service</h2>
               <p>BhavishAI provides AI-generated Vedic astrology reports based on user-provided birth details. Our reports are generated using artificial intelligence and astronomical calculations. The service includes:</p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Free preview of the first page of your astrology report</li>
-                <li>Paid access to the complete 20-page personalized report</li>
+                <li>Free preview of the first section of your astrology report</li>
+                <li>Paid access to the complete personalized report (Essential, Premium or Master tier)</li>
                 <li>Email delivery of purchased reports (optional)</li>
               </ul>
             </section>

@@ -10,7 +10,7 @@ const loadingMessages = [
   "Calculating Rashi and Lagna...",
   "Analyzing Nakshatra and Dasha periods...",
   "Interpreting house lords and aspects...",
-  "Generating your 20-page report...",
+  "Generating your report...",
   "Almost done — finalizing predictions...",
 ];
 

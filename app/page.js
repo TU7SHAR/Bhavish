@@ -6,13 +6,13 @@ import ConstellationBackground from "./components/ConstellationBackground";
 export const metadata = {
   title: "BhavishAI - AI-Powered Vedic Astrology Reports | Janam Kundli Online",
   description:
-    "Get your personalized 20-page Vedic astrology report in 60 seconds. AI-powered Janam Kundli, career predictions, marriage compatibility, and life guidance based on your birth chart.",
+    "Get your personalized Vedic astrology report in 60 seconds, from ₹299. AI-powered Janam Kundli, career predictions, marriage compatibility, and life guidance based on your birth chart.",
   keywords:
     "kundli, janam kundli, vedic astrology, birth chart, astrology report, AI astrology, kundli online, rashifal, horoscope, marriage compatibility",
   openGraph: {
     title: "BhavishAI - Your Future, Revealed by AI",
     description:
-      "Get a detailed 20-page Vedic astrology report personalized to your exact birth details. Powered by AI + ancient wisdom.",
+      "Get a detailed Vedic astrology report personalized to your exact birth details, from ₹299. Powered by AI + ancient wisdom.",
     url: "https://www.bhavishai.in",
     siteName: "BhavishAI",
     type: "website",
@@ -22,7 +22,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "BhavishAI - AI-Powered Vedic Astrology Reports",
     description:
-      "Your personalized 20-page birth chart report in 60 seconds. Career, love, health & spiritual guidance.",
+      "Your personalized birth chart report in 60 seconds, from ₹299. Career, love, health & spiritual guidance.",
   },
   alternates: {
     canonical: "https://www.bhavishai.in",
@@ -39,7 +39,7 @@ const faqSchema = {
       name: "What is BhavishAI?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "BhavishAI is an AI-powered Vedic astrology platform that generates personalized 20-page birth chart reports based on your exact date, time, and place of birth. It combines ancient Jyotish wisdom with modern AI technology.",
+        text: "BhavishAI is an AI-powered Vedic astrology platform that generates detailed, personalized birth chart reports based on your exact date, time, and place of birth. It combines ancient Jyotish wisdom with modern AI technology.",
       },
     },
     {
@@ -55,7 +55,7 @@ const faqSchema = {
       name: "How much does a full astrology report cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "A complete 20-page personalized Vedic astrology report costs just Rs 299. You get a free preview of the first page before purchasing the full report.",
+        text: "Reports start at Rs 299 (Essential). Premium is Rs 499 (full 20-section analysis plus a year of month-by-month guidance) and Master is Rs 999 (adds a specialized deep-dive on your biggest concern plus a 24-month roadmap). You get a free preview before purchasing.",
       },
     },
     {
@@ -71,7 +71,7 @@ const faqSchema = {
       name: "How long does it take to generate the report?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Your personalized 20-page report is generated in approximately 60 seconds using our AI engine. You can view the free preview instantly and access the full report immediately after payment.",
+        text: "Your personalized report is generated in approximately 60 seconds using our AI engine. You can view the free preview instantly and access the full report immediately after payment.",
       },
     },
   ],
@@ -81,12 +81,14 @@ const productSchema = {
   "@context": "https://schema.org",
   "@type": "Product",
   name: "BhavishAI Vedic Astrology Report",
-  description: "AI-powered personalized 20-page Vedic astrology birth chart report",
+  description: "AI-powered, personalized Vedic astrology birth chart report (Essential, Premium & Master tiers)",
   brand: { "@type": "Brand", name: "BhavishAI" },
   offers: {
-    "@type": "Offer",
-    price: "299",
+    "@type": "AggregateOffer",
+    lowPrice: "299",
+    highPrice: "999",
     priceCurrency: "INR",
+    offerCount: "3",
     availability: "https://schema.org/InStock",
     url: "https://www.bhavishai.in/get-report",
   },
@@ -106,7 +108,7 @@ const serviceSchema = {
   provider: { "@type": "Organization", name: "BhavishAI" },
   areaServed: "IN",
   description:
-    "Personalized 20-page Vedic astrology (Janam Kundli) report generated from your exact birth details using Swiss Ephemeris calculations and classical Jyotish principles.",
+    "Personalized Vedic astrology (Janam Kundli) reports generated from your exact birth details using Swiss Ephemeris calculations and classical Jyotish principles. Available in Essential, Premium and Master tiers.",
   offers: {
     "@type": "Offer",
     price: "299",
@@ -156,7 +158,7 @@ export default function Home() {
             </h1>
 
             <p className="text-lg md:text-xl text-muted max-w-2xl mx-auto mb-10">
-              Get a personalized <strong className="text-foreground">20-page Vedic astrology report</strong> in 60 seconds. 
+              Get a personalized <strong className="text-foreground">Vedic astrology report</strong> in 60 seconds, from ₹299.
               Career, love, health, and spiritual guidance based on your exact birth chart.
             </p>
 
@@ -218,13 +220,13 @@ export default function Home() {
                   step: "2",
                   icon: "🤖",
                   title: "AI Generates Report",
-                  desc: "Our AI analyzes planetary positions and generates your personalized 20-page report in 60 seconds.",
+                  desc: "Our AI analyzes planetary positions and generates your personalized report in 60 seconds.",
                 },
                 {
                   step: "3",
                   icon: "📖",
                   title: "Read & Unlock",
-                  desc: "Preview the first page free. Pay just Rs 299 to unlock your complete life report instantly.",
+                  desc: "Preview the first section free. Unlock your complete life report from Rs 299, instantly.",
                 },
               ].map((item) => (
                 <div
@@ -261,7 +263,7 @@ export default function Home() {
                 { icon: "📍", title: "Exact Birth Coordinates", desc: "We geocode your birthplace to exact latitude/longitude for accurate house calculations." },
                 { icon: "🕉️", title: "Vedic Astrology System", desc: "Lahiri Ayanamsa, Whole Sign houses, Vimshottari Dasha — classical Jyotish methodology." },
                 { icon: "🎯", title: "Personalized to YOUR Chart", desc: "Every prediction references your specific planets, houses, and degrees. Not sun-sign-level." },
-                { icon: "📊", title: "Structured 20-Page Analysis", desc: "Career, marriage, health, doshas, remedies, timing — organized into actionable sections." },
+                { icon: "📊", title: "Structured, In-Depth Analysis", desc: "Career, marriage, health, doshas, remedies, timing — organized into actionable sections." },
                 { icon: "🚫", title: "Not a Generic AI Response", desc: "We calculate first, then interpret. The AI reads real data — it doesn't guess your chart." },
               ].map((item) => (
                 <div key={item.title} className="bg-surface border border-border rounded-xl p-5 card-hover">
@@ -279,7 +281,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                What&apos;s In Your 20-Page Report
+                What&apos;s In Your Report
               </h2>
               <p className="text-muted text-lg max-w-xl mx-auto">
                 A complete life guide based on Vedic Jyotish principles
@@ -380,53 +382,70 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="max-w-md mx-auto">
-              <div className="relative bg-surface border-2 border-primary rounded-2xl p-8 text-center glow">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold">
-                  MOST POPULAR
-                </div>
-                <h3 className="text-2xl font-bold mb-2 mt-2">Complete Life Report</h3>
-                <p className="text-muted mb-6">20-page personalized Vedic astrology report</p>
-                
-                <div className="mb-6">
-                  <span className="text-5xl font-bold text-foreground">&#x20B9;299</span>
-                  <span className="text-muted ml-2">one-time</span>
-                </div>
-
-                <ul className="text-left space-y-3 mb-8">
-                  {[
-                    "Complete Rashi & Lagna analysis",
-                    "Career & finance predictions",
-                    "Marriage & compatibility insights",
-                    "Health & wellness guidance",
-                    "10-year Mahadasha forecast",
-                    "Lucky numbers, colors & gems",
-                    "Dosha analysis & remedies",
-                    "2026-2027 monthly predictions",
-                    "Instant digital delivery",
-                    "Email backup copy",
-                  ].map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-sm">
-                      <svg className="w-5 h-5 text-green-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                      </svg>
-                      <span className="text-muted">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href="/get-report"
-                  className="block w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-semibold text-lg transition-all glow-hover"
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch max-w-4xl mx-auto">
+              {[
+                {
+                  name: "Essential",
+                  price: "299",
+                  tagline: "Your key answer, clearly explained",
+                  points: ["10 core personalized sections", "Direct answer to your question", "Remedies & lucky factors", "Add 12-month guidance for ₹149"],
+                },
+                {
+                  name: "Premium",
+                  price: "499",
+                  highlight: true,
+                  badge: "MOST POPULAR",
+                  tagline: "The complete experience",
+                  points: ["20 in-depth sections", "Direct answer to your question", "12-month month-by-month guidance", "Full dashas, yogas & remedies"],
+                },
+                {
+                  name: "Master",
+                  price: "999",
+                  badge: "MOST COMPLETE",
+                  tagline: "For your biggest concern",
+                  points: ["Everything in Premium", "7-part deep-dive on your concern", "24-month personalized roadmap", "Best-action & caution timing"],
+                },
+              ].map((plan) => (
+                <div
+                  key={plan.name}
+                  className={`relative bg-surface border rounded-2xl p-6 flex flex-col text-left ${
+                    plan.highlight ? "border-primary glow md:-mt-2 md:mb-2" : "border-border"
+                  }`}
                 >
-                  Get Free Preview First &rarr;
-                </Link>
-
-                <p className="text-muted text-xs mt-4">
-                  No payment needed for preview. Pay only for full report.
-                </p>
-              </div>
+                  {plan.badge && (
+                    <span className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] font-semibold px-3 py-1 rounded-full whitespace-nowrap ${plan.highlight ? "bg-primary text-white" : "bg-accent text-black"}`}>
+                      {plan.badge}
+                    </span>
+                  )}
+                  <h3 className="text-xl font-bold mt-2">{plan.name}</h3>
+                  <div className="mt-1 mb-1">
+                    <span className="text-3xl font-bold text-foreground">&#x20B9;{plan.price}</span>
+                    <span className="text-muted text-sm ml-1">one-time</span>
+                  </div>
+                  <p className="text-muted text-sm mb-4">{plan.tagline}</p>
+                  <ul className="space-y-2.5 mb-6 flex-1">
+                    {plan.points.map((item) => (
+                      <li key={item} className="flex items-start gap-2 text-sm">
+                        <svg className="w-5 h-5 text-green-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                        </svg>
+                        <span className="text-muted">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/get-report"
+                    className={`block w-full text-center py-3 rounded-full font-semibold text-sm transition-all ${plan.highlight ? "bg-primary hover:bg-primary-dark text-white pulse-glow" : "bg-primary/15 hover:bg-primary/25 text-primary-light"}`}
+                  >
+                    Get Free Preview &rarr;
+                  </Link>
+                </div>
+              ))}
             </div>
+
+            <p className="text-center text-muted text-sm mt-6">
+              Start with a free preview — no payment needed. You choose your plan after seeing your chart.
+            </p>
 
             {/* Comparison with alternatives */}
             <div className="mt-12 max-w-2xl mx-auto">
@@ -439,7 +458,7 @@ export default function Home() {
                 </div>
                 <div className="bg-surface border-2 border-primary rounded-xl p-4">
                   <p className="text-primary-light mb-1 font-medium">BhavishAI</p>
-                  <p className="text-foreground font-bold">&#x20B9;299</p>
+                  <p className="text-foreground font-bold">from &#x20B9;299</p>
                   <p className="text-muted text-xs mt-1">Ready in 60 sec</p>
                 </div>
                 <div className="bg-surface border border-border rounded-xl p-4">
@@ -465,7 +484,7 @@ export default function Home() {
               {[
                 {
                   q: "What is BhavishAI?",
-                  a: "BhavishAI is an AI-powered Vedic astrology platform that generates personalized 20-page birth chart reports based on your exact date, time, and place of birth. It combines ancient Jyotish wisdom with modern AI technology to give you accurate, detailed life insights.",
+                  a: "BhavishAI is an AI-powered Vedic astrology platform that generates detailed, personalized birth chart reports based on your exact date, time, and place of birth. It combines ancient Jyotish wisdom with modern AI technology to give you accurate, detailed life insights.",
                 },
                 {
                   q: "How accurate is the AI astrology report?",
@@ -476,8 +495,8 @@ export default function Home() {
                   a: "You need your full name, date of birth, exact time of birth (check your birth certificate), and place of birth. The more accurate your birth time, the more precise your report will be.",
                 },
                 {
-                  q: "Is the first page really free?",
-                  a: "Yes! You can generate your report and view the complete first page (Rashi & personality overview) absolutely free. No payment details required. You only pay Rs 299 if you want to unlock the remaining 19 pages.",
+                  q: "Is the preview really free?",
+                  a: "Yes! You can generate your report and view the first section (Rashi & personality overview) absolutely free. No payment details required. You only pay — from Rs 299 — if you want to unlock your complete report.",
                 },
                 {
                   q: "What payment methods are accepted?",
