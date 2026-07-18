@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { getVisitorId } from "../../components/VisitorTracker";
+import RichText from "../../components/RichText";
 import { track } from "@vercel/analytics";
 import { resolvePlan } from "../../../lib/plans.js";
 
@@ -615,9 +616,7 @@ export default function ReportPreview() {
             <h2 className="text-2xl font-bold mb-4">
               {firstSection.title.replace(/^\d+\.\s*/, "")}
             </h2>
-            <div className="text-muted leading-relaxed whitespace-pre-line">
-              {firstSection.content}
-            </div>
+            <RichText text={firstSection.content} className="text-muted leading-relaxed" />
           </div>
 
           {/* Locked sections as blurred background behind paywall CTA */}
@@ -835,6 +834,7 @@ export default function ReportPreview() {
                   Secure Razorpay payment · Instant access · Sent to your email
                 </p>
               </div>
+            </div>
           </div>
 
           {/* Why BhavishAI — Trust Section */}

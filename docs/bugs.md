@@ -2,7 +2,35 @@
 
 ## BhavishAI — Structured Issue Tracker
 
-**Last Updated:** July 2026 (post-hardening pass)
+**Last Updated:** July 2026 (regenerate-tiers + markdown pass)
+
+---
+
+## Fixed Bugs (This Session — regenerate tiers + markdown rendering)
+
+### BUG-016: Vercel deploy failing — unclosed `<div>` in preview paywall
+**Status:** Fixed
+**Severity:** Critical (blocked all deploys)
+
+**Symptom:** `next build` failed with `./app/report/preview/page.js:894 Expected '</', got 'jsx text'`. Every Vercel deployment failed.
+**Root Cause:** The blurred-background paywall refactor left the `<div className="relative">` wrapper (the locked-sections background + CTA overlay container) unclosed — 56 opening `<div>` vs 55 `</div>`.
+**Fix:** Added the missing `</div>` after the CTA wrapper closes (below the "Secure Razorpay payment" trust line). Build is green again.
+
+### BUG-017: Raw `**markdown**` asterisks shown to customers
+**Status:** Fixed
+**Severity:** Medium (visible quality issue)
+
+**Symptom:** Reports, guidance packs, PDF and emails showed literal `**bold**`, `##` and `*` characters because Gemini emits light Markdown and the frontend rendered it raw via `whitespace-pre-line`.
+**Root Cause:** No Markdown rendering layer; content was dropped straight into the DOM / email HTML / PDF text.
+**Fix:** New `lib/markdown.js` (`mdToHtml` for HTML contexts, `mdToPlain` for PDF) plus a shared `app/components/RichText.js`. Converts `**bold**`/`__bold__` → `<strong>`, `#` headings → bold, `- `/`* ` → bullets, preserves line breaks, escapes HTML, and strips any stray asterisks. Wired into every report/guidance render surface: report full/preview/view-token, dashboard report, admin report view, GuidancePack, MonthlyGuidanceSection, and the report/resend/guidance email HTML + the PDF.
+
+### BUG-018: "Regenerate" always produced a 30+ section report regardless of tier
+**Status:** Fixed
+**Severity:** Medium (admin ops / wrong deliverable)
+
+**Symptom:** The single admin "Regenerate Full Report" button always generated the full 20-section report even for ₹299 Essential customers, so admins couldn't rebuild the exact package a customer paid for.
+**Root Cause:** `regenerate-report` hard-coded a 20-section prompt and ignored the plan.
+**Fix:** `regenerate-report` is now tier-aware — it reuses the shared `generateFullReport` + `generateDeepDive` + `resolvePlan`, accepts `{ reportId, tier, includeGuidance }`, and Master does a two-phase save (main report persisted first, then the deep-dive appended; partial failures are recoverable). Admin UI now has explicit **Regen Essential ₹299 / Essential+Guidance ₹448 / Premium ₹499 / Master ₹999** buttons.
 
 ---
 

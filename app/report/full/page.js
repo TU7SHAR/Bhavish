@@ -6,6 +6,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import KundliChartsSection from "../../components/KundliCharts";
 import GuidancePack from "../../components/GuidancePack";
+import RichText from "../../components/RichText";
 import { createClient } from "../../../lib/supabase-browser";
 
 // Master-tier deep-dive / roadmap sections get distinct styling.
@@ -317,9 +318,7 @@ export default function FullReport() {
                         </span>
                         <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
                       </div>
-                      <div className="text-muted leading-relaxed whitespace-pre-line">
-                        {section.content}
-                      </div>
+                      <RichText text={section.content} className="text-muted leading-relaxed" />
                     </div>
                   );
                 })()

@@ -7,6 +7,8 @@
 // formatted card with a decorative 12-month strip — so it always looks premium.
 
 import { useState } from "react";
+import RichText from "./RichText";
+import { mdToPlain } from "../../lib/markdown";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -22,15 +24,15 @@ function boldSubtopics(text) {
   return (text || "").split("\n").map((line, idx) => {
     const m = line.match(SUBTOPIC_RE);
     if (m) {
-      const rest = line.slice(m[0].length);
+      const rest = mdToPlain(line.slice(m[0].length));
       return (
         <span key={idx} className="block">
-          <span className="text-foreground font-semibold">{m[2]}</span>
-          {m[3].trim()} {rest}
+          <span className="text-foreground font-semibold">{mdToPlain(m[2])}</span>
+          {mdToPlain(m[3].trim())} {rest}
         </span>
       );
     }
-    return <span key={idx} className="block">{line}</span>;
+    return <span key={idx} className="block">{mdToPlain(line)}</span>;
   });
 }
 
@@ -102,7 +104,7 @@ export default function GuidancePack({ title, content }) {
             <span key={mo} className="text-[11px] px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-200">{mo}</span>
           ))}
         </div>
-        <div className="text-muted leading-relaxed whitespace-pre-line">{parsed.content}</div>
+        <RichText text={parsed.content} className="text-muted leading-relaxed" />
       </div>
     );
   }
@@ -114,7 +116,7 @@ export default function GuidancePack({ title, content }) {
       <PackHeader />
 
       {intro && (
-        <p className="text-muted leading-relaxed whitespace-pre-line mb-5 bg-black/10 border border-blue-400/10 rounded-xl p-4">{intro}</p>
+        <RichText text={intro} className="text-muted leading-relaxed mb-5 bg-black/10 border border-blue-400/10 rounded-xl p-4" />
       )}
 
       {/* Month timeline chips — quick visual overview + jump */}
@@ -164,7 +166,7 @@ export default function GuidancePack({ title, content }) {
             <span className="text-sm">🗝️</span>
             <h3 className="text-sm font-semibold text-blue-200">Key Windows, Remedies &amp; Yearly Summary</h3>
           </div>
-          <div className="text-xs text-muted leading-relaxed whitespace-pre-line">{outro}</div>
+          <RichText text={outro} className="text-xs text-muted leading-relaxed" />
         </div>
       )}
     </div>
