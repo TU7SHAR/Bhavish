@@ -53,20 +53,32 @@ export async function POST(request) {
     const existing = Array.isArray(report.sections) ? report.sections : [];
     const alreadyHasDeepDive =
       report.deep_dive_status === "completed" ||
-      existing.some((s) => /deep dive|deep-dive|roadmap/i.test(s.title || ""));
+      existing.some((s) => /deep dive|deep-dive/i.test(s.title || "") || /\b24[- ]month.*roadmap/i.test(s.title || ""));
     if (alreadyHasDeepDive) {
       return NextResponse.json({ status: "already_done", reportId, sections: existing });
     }
 
     const focus = report.deep_dive_focus || classifyFocus(report.personal_question);
 
-    // ATOMIC CLAIM — only one process generates the deep-dive.
+    // Require main report completed before starting deep-dive.
+    if (report.report_status !== "completed" || existing.length < 10) {
+      return NextResponse.json({
+        status: "waiting",
+        message: "Main report not yet complete. Deep-dive will start after.",
+      }, { status: 202 });
+    }
+
+    // ATOMIC CLAIM — inspect `error` field (Supabase doesn't throw on RPC failure).
     let claimed = false;
-    try {
-      const { data: claimResult } = await supabase.rpc("claim_deep_dive_generation", { p_report_id: reportId });
-      claimed = !!claimResult;
-    } catch {
+    const { data: claimData, error: claimErr } = await supabase.rpc("claim_deep_dive_generation", { p_report_id: reportId });
+    if (claimErr) {
       // RPC not available — fallback
+      if (["generating", "completed"].includes(report.deep_dive_status)) {
+        if (report.deep_dive_status === "completed") {
+          return NextResponse.json({ status: "already_done", reportId, sections: existing });
+        }
+        return NextResponse.json({ status: "generating", reportId }, { status: 202 });
+      }
       const { data: rows } = await supabase
         .from("reports")
         .update({ deep_dive_status: "generating", deep_dive_focus: focus })
@@ -74,10 +86,11 @@ export async function POST(request) {
         .in("deep_dive_status", ["pending", "failed"])
         .select("report_id");
       claimed = Array.isArray(rows) && rows.length > 0;
+    } else {
+      claimed = !!claimData;
     }
 
     if (!claimed) {
-      // Already being generated or completed — return existing sections.
       const { data: current } = await supabase.from("reports").select("sections, deep_dive_status").eq("report_id", reportId).single();
       if (current?.deep_dive_status === "completed") {
         return NextResponse.json({ status: "already_done", reportId, sections: current.sections || [] });
@@ -85,10 +98,8 @@ export async function POST(request) {
       return NextResponse.json({ status: "generating", reportId }, { status: 202 });
     }
 
-    // Mark generating with focus
-    await supabase
-      .from("reports")
-      .update({ deep_dive_status: "generating", deep_dive_focus: focus })
+    // Set focus after claiming
+    await supabase.from("reports").update({ deep_dive_focus: focus }).eq("report_id", reportId);
       .eq("report_id", reportId);
 
     let deepDive;
