@@ -19,7 +19,10 @@ import GuidancePack from "../../../components/GuidancePack";
 export const dynamic = "force-dynamic";
 
 const isGuidanceSection = (title) => /guidance pack|12-month|12 month/i.test(title || "");
-const isDeepDiveSection = (title) => /deep dive|deep-dive|roadmap|specialized/i.test(title || "");
+const isDeepDiveSection = (title) => {
+  if (!title) return false;
+  return title.toLowerCase().includes("deep dive") || title.toLowerCase().includes("deep-dive") || /\b24[- ]month.*roadmap/i.test(title);
+};
 
 export async function generateMetadata() {
   // Never index these private report links.
