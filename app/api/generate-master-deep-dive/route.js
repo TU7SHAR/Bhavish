@@ -100,6 +100,7 @@ export async function POST(request) {
 
     // Set focus after claiming
     await supabase.from("reports").update({ deep_dive_focus: focus }).eq("report_id", reportId);
+
     let deepDive;
     try {
       deepDive = await generateDeepDive({
