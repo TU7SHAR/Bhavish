@@ -85,6 +85,58 @@ export async function POST(request) {
       summary: reportData.summary, sections: reportData.sections, report_status: "completed",
     }).eq("report_id", reportId);
 
+    // ENSURE DELIVERY: Browser generated the report, so webhook may have already
+    // arrived and returned "already_generating". The browser must guarantee
+    // email + notification happen. For Master, deep-dive endpoint handles email.
+    if (tier !== "master" && report.email && report.email.trim() && !report.email_sent_at) {
+      try {
+        const { getInternalAuthHeaders } = await import("../../../lib/auth.js");
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+        const emailRes = await fetch(`${baseUrl}/api/send-report-email`, {
+          method: "POST",
+          headers: getInternalAuthHeaders(),
+          body: JSON.stringify({
+            email: report.email, name: report.name, reportId,
+            sections: reportData.sections, summary: reportData.summary,
+            chartData: report.chart_data, dateOfBirth: report.date_of_birth,
+            timeOfBirth: report.time_of_birth, placeOfBirth: report.place_of_birth,
+            includeBump: guidanceMonths > 0,
+          }),
+        });
+        if (emailRes.ok) {
+          await supabase.from("reports").update({ email_sent_at: new Date().toISOString() }).eq("report_id", reportId);
+        }
+      } catch (emailErr) {
+        console.error("Browser-path email delivery failed:", emailErr.message);
+      }
+      // Notify owner
+      try {
+        const { getInternalAuthHeaders } = await import("../../../lib/auth.js");
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+        await fetch(`${baseUrl}/api/notify-sale`, {
+          method: "POST",
+          headers: getInternalAuthHeaders(),
+          body: JSON.stringify({
+            reportId, customerName: report.name, customerEmail: report.email,
+            paymentId: report.payment_id, amount: String(report.plan_price || 299),
+            planTier: tier, placeOfBirth: report.place_of_birth,
+            dateOfBirth: report.date_of_birth, includeBump: guidanceMonths > 0,
+            reportComplete: true,
+          }),
+        });
+      } catch {}
+    }
+
+    // Master: trigger deep-dive (server-side, idempotent).
+    if (tier === "master") {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+      fetch(`${baseUrl}/api/generate-master-deep-dive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId }),
+      }).catch(() => {});
+    }
+
     return NextResponse.json({
       reportId, summary: reportData.summary, sections: reportData.sections,
       tier, guidanceMonths, deepDive: tier === "master", generatedAt: new Date().toISOString(),
