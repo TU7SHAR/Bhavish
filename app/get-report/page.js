@@ -18,7 +18,7 @@ const loadingMessages = [
   "Generating career and finance predictions...",
   "Analyzing marriage and compatibility yogas...",
   "Computing lucky numbers, colors, and gems...",
-  "Preparing your personalized 20-page report...",
+  "Preparing your personalized report...",
   "Almost done — finalizing predictions...",
 ];
 

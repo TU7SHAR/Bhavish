@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { createServiceClient } from "../../../lib/supabase-service.js";
 
 // Public route (auth-checked): fetch all monthly guidance reports for the
 // logged-in user. Used by the user dashboard to display their monthly guidance.
@@ -18,7 +19,7 @@ export async function GET(request) {
     }
 
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
@@ -32,10 +33,15 @@ export async function GET(request) {
     );
 
     // Verify user is logged in
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await authClient.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
+
+    // Service-role client for the DB reads. We enforce ownership below by
+    // matching the parent report's user_id to the authenticated user, so RLS
+    // isn't relied upon here (guidance_reports has no public policy).
+    const supabase = createServiceClient();
 
     // Verify the parent report belongs to this user
     const { data: parentReport } = await supabase

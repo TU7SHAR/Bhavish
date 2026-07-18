@@ -92,7 +92,7 @@ export default async function BlogPost({ params }) {
           {/* CTA */}
           <div className="mt-10 bg-surface border border-primary/30 rounded-2xl p-6 text-center">
             <h3 className="text-lg font-bold mb-2">See what your own chart reveals</h3>
-            <p className="text-muted text-sm mb-4">Get a personalized 20-page Vedic astrology report in 60 seconds. Free preview, no payment required to start.</p>
+            <p className="text-muted text-sm mb-4">Get a personalized Vedic astrology report in 60 seconds, from ₹299. Free preview, no payment required to start.</p>
             <Link href="/get-report" className="inline-block bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-full font-medium transition-all">
               Get Your Free Preview →
             </Link>

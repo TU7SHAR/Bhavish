@@ -1,7 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createServiceClient } from "../../../lib/supabase-service.js";
 
 // Verifies the ₹999 founder upgrade payment and marks user as founder member
 export async function POST(request) {
@@ -30,21 +29,9 @@ export async function POST(request) {
       );
     }
 
-    // Mark as founder member in DB
+    // Mark as founder member in DB (service role — bypasses RLS)
     try {
-      const cookieStore = await cookies();
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        {
-          cookies: {
-            getAll() { return cookieStore.getAll(); },
-            setAll(cookiesToSet) {
-              try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {}
-            },
-          },
-        }
-      );
+      const supabase = createServiceClient();
 
       await supabase
         .from("reports")

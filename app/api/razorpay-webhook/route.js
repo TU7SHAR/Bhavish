@@ -66,6 +66,8 @@ export async function POST(request) {
     const result = await fulfillPayment({
       reportId: details.reportId,
       paymentId: details.paymentId,
+      planId: details.planId,
+      includeGuidance: details.includeGuidance,
       includeBump: details.includeBump,
       source: "webhook",
     });
@@ -88,6 +90,14 @@ export async function POST(request) {
 async function resolveOrderDetails(event, type) {
   const payload = event?.payload || {};
 
+  // Extract plan info from Razorpay order/payment notes.
+  const fromNotes = (notes = {}) => ({
+    planId: notes.planId || null,
+    includeGuidance:
+      notes.guidanceMonths ? parseInt(notes.guidanceMonths, 10) > 0 : notes.has_12_month_guidance === "true",
+    includeBump: notes.has_12_month_guidance === "true",
+  });
+
   if (type === "order.paid") {
     const order = payload.order?.entity || {};
     const payment = payload.payment?.entity || {};
@@ -95,7 +105,7 @@ async function resolveOrderDetails(event, type) {
     return {
       reportId: notes.reportId || order.receipt || null,
       paymentId: payment.id || null,
-      includeBump: notes.has_12_month_guidance === "true",
+      ...fromNotes(notes),
     };
   }
 
@@ -107,7 +117,7 @@ async function resolveOrderDetails(event, type) {
     return {
       reportId: payment.notes.reportId,
       paymentId: payment.id || null,
-      includeBump: payment.notes.has_12_month_guidance === "true",
+      ...fromNotes(payment.notes),
     };
   }
 
@@ -123,12 +133,12 @@ async function resolveOrderDetails(event, type) {
       return {
         reportId: notes.reportId || order?.receipt || null,
         paymentId: payment.id || null,
-        includeBump: notes.has_12_month_guidance === "true",
+        ...fromNotes(notes),
       };
     } catch (e) {
       console.error("[webhook] failed to fetch order", payment.order_id, e.message);
     }
   }
 
-  return { reportId: null, paymentId: payment.id || null, includeBump: false };
+  return { reportId: null, paymentId: payment.id || null, planId: null, includeGuidance: false, includeBump: false };
 }

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { saveLimiter } from "../../../lib/rate-limit.js";
 import { sanitizeName, sanitizePlace, sanitizeForPrompt } from "../../../lib/sanitize.js";
+import { createServiceClient } from "../../../lib/supabase-service.js";
 
 // Detect device type from User-Agent header
 function detectDevice(userAgent) {
@@ -52,9 +53,12 @@ export async function POST(request) {
     const userAgent = request.headers.get("user-agent") || "";
     const deviceType = detectDevice(userAgent);
 
-    // Create Supabase client
+    // Auth client (cookie-based) — used ONLY to read the logged-in user so we
+    // can link the report to their account. All actual DB writes go through the
+    // service-role client below, which is required now that RLS is enabled
+    // (guest leads have no auth session and could not write otherwise).
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
@@ -67,8 +71,11 @@ export async function POST(request) {
       }
     );
 
+    // Service-role client for the write (bypasses RLS).
+    const supabase = createServiceClient();
+
     // Check if user is logged in
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await authClient.auth.getUser();
 
     // CRITICAL: Only include fields that are ACTUALLY provided in this request.
     // If a field is not passed (e.g. attribution on second save after payment),

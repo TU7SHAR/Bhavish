@@ -8,6 +8,9 @@ import KundliChartsSection from "../../components/KundliCharts";
 import GuidancePack from "../../components/GuidancePack";
 import { createClient } from "../../../lib/supabase-browser";
 
+// Master-tier deep-dive / roadmap sections get distinct styling.
+const isDeepDiveSectionTitle = (title) => /deep dive|deep-dive|roadmap/i.test(title || "");
+
 export default function FullReport() {
   const router = useRouter();
   const [reportData, setReportData] = useState(null);
@@ -15,6 +18,7 @@ export default function FullReport() {
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [user, setUser] = useState(null);
+  const [deepDivePending, setDeepDivePending] = useState(false);
 
   // Check auth state
   useEffect(() => {
@@ -61,6 +65,58 @@ export default function FullReport() {
     setPending(reportPending);
     setLoading(false);
   }, [router]);
+
+  // Master tier: the concern-specific deep-dive is generated as a separate job
+  // and appended server-side. If it's pending, poll the (idempotent) endpoint
+  // until the deep-dive sections appear, then hydrate them into the report.
+  useEffect(() => {
+    if (!reportData?.reportId) return;
+    const flag = sessionStorage.getItem("masterDeepDivePending") === "true";
+    const hasDeep = (reportData.sections || []).some((s) => isDeepDiveSectionTitle(s.title));
+    if (!flag || hasDeep) {
+      if (hasDeep) sessionStorage.removeItem("masterDeepDivePending");
+      return;
+    }
+
+    setDeepDivePending(true);
+    let cancelled = false;
+    let attempts = 0;
+
+    const poll = async () => {
+      attempts++;
+      try {
+        const res = await fetch("/api/generate-master-deep-dive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportId: reportData.reportId }),
+        });
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.sections) && data.sections.some((s) => isDeepDiveSectionTitle(s.title))) {
+          setReportData((prev) => {
+            const updated = { ...prev, sections: data.sections };
+            try { sessionStorage.setItem("reportData", JSON.stringify(updated)); } catch {}
+            return updated;
+          });
+          sessionStorage.removeItem("masterDeepDivePending");
+          setDeepDivePending(false);
+          return;
+        }
+      } catch {
+        /* ignore, will retry */
+      }
+      if (!cancelled && attempts < 8) {
+        setTimeout(poll, 12000);
+      } else {
+        setDeepDivePending(false);
+      }
+    };
+
+    const t = setTimeout(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [reportData?.reportId]);
 
   if (loading) {
     return (
@@ -114,6 +170,10 @@ export default function FullReport() {
   const isGuidanceSection = (title) => /guidance pack|12-month|12 month/i.test(title || "");
   const guidanceIndex = (reportData.sections || []).findIndex((s) => isGuidanceSection(s.title));
   const hasGuidance = guidanceIndex >= 0;
+  // Where to insert the "sign in to save" CTA. Premium/Master have 20+ sections
+  // (insert after #20); Essential has ~11 (insert after its last section).
+  const totalSections = (reportData.sections || []).length;
+  const ctaAfterIndex = totalSections >= 20 ? 19 : Math.max(0, totalSections - 1);
 
   return (
     <>
@@ -129,6 +189,17 @@ export default function FullReport() {
               {userData.email && " A backup copy has been sent to your email."}
             </p>
           </div>
+
+          {/* Master deep-dive being prepared (separate job still running) */}
+          {deepDivePending && (
+            <div className="bg-accent/10 border border-accent/30 rounded-2xl p-5 mb-8 flex items-center gap-3">
+              <div className="animate-spin h-5 w-5 border-2 border-accent border-t-transparent rounded-full shrink-0" />
+              <p className="text-sm text-foreground">
+                Your specialized <strong className="text-accent">deep-dive &amp; 24-month roadmap</strong> is being
+                prepared and will appear here in a moment — no need to refresh.
+              </p>
+            </div>
+          )}
 
           {/* 12-Month Guidance Pack — buyer callout. Only shows when the ₹149 add-on was purchased. */}
           {hasGuidance && (
@@ -212,25 +283,39 @@ export default function FullReport() {
                   <GuidancePack title={section.title} content={section.content} />
                 </div>
               ) : (
-                <div
-                  key={i}
-                  id={`section-${i}`}
-                  className="bg-surface border border-border rounded-2xl p-6 md:p-8 scroll-mt-24"
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="bg-primary/20 text-primary text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">
-                      {i + 1}
-                    </span>
-                    <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
-                  </div>
-                  <div className="text-muted leading-relaxed whitespace-pre-line">
-                    {section.content}
-                  </div>
-                </div>
+                (() => {
+                  const deep = isDeepDiveSectionTitle(section.title);
+                  return (
+                    <div
+                      key={i}
+                      id={`section-${i}`}
+                      className={`rounded-2xl p-6 md:p-8 scroll-mt-24 border ${
+                        deep ? "bg-accent/5 border-accent/40" : "bg-surface border-border"
+                      }`}
+                    >
+                      {deep && (
+                        <span className="inline-block mb-3 text-[10px] uppercase tracking-wider bg-accent/20 text-accent px-2 py-0.5 rounded-full font-semibold">
+                          ★ Master Deep-Dive
+                        </span>
+                      )}
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className={`text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center ${
+                          deep ? "bg-accent/20 text-accent" : "bg-primary/20 text-primary"
+                        }`}>
+                          {i + 1}
+                        </span>
+                        <h2 className="text-xl md:text-2xl font-bold">{section.title.replace(/^\d+\.\s*/, "")}</h2>
+                      </div>
+                      <div className="text-muted leading-relaxed whitespace-pre-line">
+                        {section.content}
+                      </div>
+                    </div>
+                  );
+                })()
               );
 
-              // Insert login CTA between section 20 and 21 — only if not logged in
-              if (i === 19 && !user) {
+              // Insert login CTA after the core report — only if not logged in
+              if (i === ctaAfterIndex && !user) {
                 return (
                   <div key={`section-group-${i}`}>
                     {sectionEl}

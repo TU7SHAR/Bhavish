@@ -25,7 +25,7 @@ export const metadata = {
     template: "%s | BhavishAI",
   },
   description:
-    "Get your personalized 20-page Vedic astrology report in 60 seconds. AI-powered Janam Kundli, career predictions, marriage compatibility, and life guidance based on Swiss Ephemeris calculations.",
+    "Get your personalized Vedic astrology report in 60 seconds, from ₹299. AI-powered Janam Kundli, career predictions, marriage compatibility, and life guidance based on Swiss Ephemeris calculations.",
   keywords: [
     "kundli",
     "janam kundli",
@@ -68,7 +68,7 @@ export const metadata = {
   },
   openGraph: {
     title: "BhavishAI - Your Future, Revealed by AI",
-    description: "Get a personalized 20-page Vedic astrology report in 60 seconds. Career, love, health & spiritual guidance based on Swiss Ephemeris calculations.",
+    description: "Get a personalized Vedic astrology report in 60 seconds, from ₹299. Career, love, health & spiritual guidance based on Swiss Ephemeris calculations.",
     url: "https://www.bhavishai.in",
     siteName: "BhavishAI",
     type: "website",
@@ -77,7 +77,7 @@ export const metadata = {
   twitter: {
     card: "summary_large_image",
     title: "BhavishAI - AI-Powered Vedic Astrology Reports",
-    description: "Your personalized 20-page birth chart report in 60 seconds. Career, love, health & spiritual guidance.",
+    description: "Your personalized birth chart report in 60 seconds, from ₹299. Career, love, health & spiritual guidance.",
   },
 };
 

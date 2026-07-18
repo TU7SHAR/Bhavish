@@ -23,7 +23,7 @@ export async function GET() {
     name: "BhavishAI",
     short_name: "BhavishAI",
     description:
-      "AI-powered Vedic astrology platform. Get a personalized 20-page Janam Kundli report in 60 seconds based on Swiss Ephemeris calculations.",
+      "AI-powered Vedic astrology platform. Get a personalized Janam Kundli report in 60 seconds, from ₹299, based on Swiss Ephemeris calculations.",
     url: baseUrl,
     start_url: "/",
     display: "standalone",
@@ -44,7 +44,7 @@ export async function GET() {
     og: {
       title: "BhavishAI - Your Future, Revealed by AI",
       description:
-        "Get a personalized 20-page Vedic astrology report in 60 seconds. Career, love, health & spiritual guidance based on Swiss Ephemeris calculations.",
+        "Get a personalized Vedic astrology report in 60 seconds, from ₹299. Career, love, health & spiritual guidance based on Swiss Ephemeris calculations.",
       type: "website",
       url: baseUrl,
       site_name: "BhavishAI",
@@ -84,7 +84,7 @@ export async function GET() {
           page: "/report/preview",
           description: "Payment verified successfully via Razorpay",
           value_currency: "INR",
-          value_range: "299-448",
+          value_range: "299-999",
         },
       ],
     },
@@ -92,10 +92,10 @@ export async function GET() {
     // Product / service catalog information (helps Meta Ads with targeting)
     products: [
       {
-        id: "vedic_report_full",
-        name: "Complete Vedic Astrology Report (20 Pages)",
+        id: "vedic_report_essential",
+        name: "Essential Vedic Astrology Report",
         description:
-          "AI-powered personalized Janam Kundli with career, marriage, health, dasha analysis, remedies, and monthly predictions.",
+          "AI-powered personalized Janam Kundli — 10 core sections plus a direct answer to your personal question.",
         price: 299,
         currency: "INR",
         availability: "in_stock",
@@ -103,26 +103,37 @@ export async function GET() {
         url: `${baseUrl}/get-report`,
       },
       {
-        id: "12_month_guidance",
-        name: "12-Month Personal Guidance Pack",
+        id: "vedic_report_premium",
+        name: "Premium Vedic Astrology Report",
         description:
-          "Monthly personalized predictions and remedies delivered every month for 12 months based on your birth chart.",
+          "Full 20-section personalized analysis with career, marriage, health, dashas, remedies plus a 12-month month-by-month guidance pack.",
+        price: 499,
+        currency: "INR",
+        availability: "in_stock",
+        category: "Astrology > Birth Chart > Vedic",
+        url: `${baseUrl}/get-report`,
+      },
+      {
+        id: "vedic_report_master",
+        name: "Master Vedic Astrology Report",
+        description:
+          "Everything in Premium plus a 7-part specialized deep-dive on your biggest concern and a 24-month personalized roadmap.",
+        price: 999,
+        currency: "INR",
+        availability: "in_stock",
+        category: "Astrology > Birth Chart > Vedic",
+        url: `${baseUrl}/get-report`,
+      },
+      {
+        id: "12_month_guidance",
+        name: "12-Month Personal Guidance Pack (Essential add-on)",
+        description:
+          "Optional add-on for the Essential report — month-by-month guidance for the next 12 months based on your birth chart.",
         price: 149,
         currency: "INR",
         availability: "in_stock",
         category: "Astrology > Monthly Predictions > Vedic",
         url: `${baseUrl}/get-report`,
-      },
-      {
-        id: "founder_membership",
-        name: "Lifetime Founder Membership",
-        description:
-          "Unlimited report generations, priority support, and all future premium features for life.",
-        price: 999,
-        currency: "INR",
-        availability: "in_stock",
-        category: "Astrology > Membership > Premium",
-        url: `${baseUrl}/founder-upgrade`,
       },
     ],
 
