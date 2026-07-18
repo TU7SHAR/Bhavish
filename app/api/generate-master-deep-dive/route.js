@@ -55,7 +55,7 @@ export async function POST(request) {
       report.deep_dive_status === "completed" ||
       existing.some((s) => /deep dive|deep-dive|roadmap/i.test(s.title || ""));
     if (alreadyHasDeepDive) {
-      return NextResponse.json({ status: "already_done", reportId });
+      return NextResponse.json({ status: "already_done", reportId, sections: existing });
     }
 
     const focus = report.deep_dive_focus || classifyFocus(report.personal_question);

@@ -8,6 +8,7 @@ import Footer from "../../components/Footer";
 import { getVisitorId } from "../../components/VisitorTracker";
 import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 import { track } from "@vercel/analytics";
+import { resolvePlan } from "../../../lib/plans.js";
 
 const previewLoadingMessages = [
   "Aligning Swiss Ephemeris data...",
@@ -62,7 +63,10 @@ export default function ReportPreview() {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [retryMessage, setRetryMessage] = useState(null);
-  const [includeBump, setIncludeBump] = useState(false);
+  // Three-tier selector. Essential is the DEFAULT (₹299 ad promise); Premium is
+  // highlighted as Most Popular but NOT auto-selected (avoids bait-and-switch).
+  const [selectedPlan, setSelectedPlan] = useState("essential");
+  const [includeGuidance, setIncludeGuidance] = useState(false); // ₹149 add-on (Essential only)
   const [paymentError, setPaymentError] = useState(null);
 
   useEffect(() => {
@@ -100,24 +104,32 @@ export default function ReportPreview() {
     setPaymentLoading(true);
     setPaymentError(null); // clear any previous failure before a fresh attempt
 
+    // Server is authoritative on price; we mirror it here only for tracking.
+    const planId = selectedPlan;
+    const guidanceOn = planId === "essential" ? includeGuidance : true;
+    const plan = resolvePlan(planId, { includeGuidance });
+    const price = plan?.price || 299;
+    const isMaster = planId === "master";
+
     // 🔥 TRACKING: InitiateCheckout — user clicked Pay
     if (typeof window !== "undefined" && window.fbq) {
       window.fbq("track", "InitiateCheckout", {
-        value: includeBump ? 448 : 299,
+        value: price,
         currency: "INR",
         content_ids: [reportData.reportId],
         content_type: "product",
+        content_name: planId,
       });
     }
     if (typeof window !== "undefined" && window.gtag) {
       window.gtag("event", "begin_checkout", {
-        value: includeBump ? 448 : 299,
+        value: price,
         currency: "INR",
-        items: [{ item_name: "vedic_report", price: includeBump ? 448 : 299 }],
+        items: [{ item_name: `vedic_report_${planId}`, price }],
       });
     }
     // Vercel Analytics funnel event
-    track("buy_now_clicked", { value: includeBump ? 448 : 299 });
+    track("buy_now_clicked", { value: price, plan: planId });
 
     try {
       // Create Razorpay order
@@ -128,7 +140,8 @@ export default function ReportPreview() {
           reportId: reportData.reportId,
           email: userData.email,
           name: userData.name,
-          includeBump,
+          planId,
+          includeGuidance,
         }),
       });
 
@@ -144,7 +157,7 @@ export default function ReportPreview() {
         amount: orderData.amount,
         currency: orderData.currency,
         name: "BhavishAI",
-        description: "Complete Vedic Astrology Report (20 Pages)",
+        description: `Vedic Astrology Report — ${planId.charAt(0).toUpperCase() + planId.slice(1)}`,
         order_id: orderData.orderId,
         handler: async function (response) {
           // Verify payment
@@ -160,7 +173,8 @@ export default function ReportPreview() {
               chartData: reportData.chartData,
               previewSections: reportData.sections,
               summary: reportData.summary,
-              includeBump,
+              planId,
+              includeGuidance,
             }),
           });
 
@@ -170,22 +184,23 @@ export default function ReportPreview() {
             // Fire Meta Pixel Purchase event
             if (typeof window !== "undefined" && window.fbq) {
               window.fbq("track", "Purchase", {
-                value: includeBump ? 448 : 299,
+                value: price,
                 currency: "INR",
                 content_type: "product",
                 content_ids: [reportData.reportId],
+                content_name: planId,
               });
             }
             if (typeof window !== "undefined" && window.gtag) {
               window.gtag("event", "purchase", {
-                value: includeBump ? 448 : 299,
+                value: price,
                 currency: "INR",
                 transaction_id: response.razorpay_payment_id,
-                items: [{ item_name: "vedic_report", price: 299 }, ...(includeBump ? [{ item_name: "12_month_guidance", price: 149 }] : [])],
+                items: [{ item_name: `vedic_report_${planId}`, price }],
               });
             }
             // Vercel Analytics funnel event — payment successful
-            track("purchase", { value: includeBump ? 448 : 299 });
+            track("purchase", { value: price, plan: planId });
 
             // PHASE 2: Now generate the FULL 20-section report (only after payment)
             // Includes retry on timeout — Gemini can sometimes take >60s
@@ -204,12 +219,13 @@ export default function ReportPreview() {
                   placeOfBirth: userData.placeOfBirth,
                   chartData: reportData.chartData,
                   personalQuestion: userData.personalQuestion || "",
-                  includeBump,
+                  // Tier is resolved server-side from the paid DB row.
                 }),
               });
               if (!fullRes.ok) throw new Error(`Status ${fullRes.status}`);
               const data = await fullRes.json();
-              if (!data.sections || data.sections.length < 10) throw new Error("Incomplete report");
+              const minOk = planId === "essential" ? 8 : 10;
+              if (!data.sections || data.sections.length < minOk) throw new Error("Incomplete report");
               return data;
             };
 
@@ -233,17 +249,28 @@ export default function ReportPreview() {
             }
 
             // ── QUALITY LOCK ── never treat an incomplete report as delivered.
-            // Complete = generated, enough sections, has a summary, and (if the
-            // ₹149 add-on was bought) includes the 12-Month Guidance Pack section.
-            const REQUIRED_SECTIONS = 18;
+            // Tier-aware: Essential is ~11 sections, Premium/Master ~22. Guidance
+            // section required whenever guidance was purchased.
+            const REQUIRED_SECTIONS = planId === "essential" ? 9 : 18;
             const hasGuidance = fullData?.sections?.some((s) => /guidance pack|12-month/i.test(s.title || ""));
             const isComplete = Boolean(
               fullData &&
               Array.isArray(fullData.sections) &&
               fullData.sections.length >= REQUIRED_SECTIONS &&
               fullData.summary &&
-              (!includeBump || hasGuidance)
+              (!guidanceOn || hasGuidance)
             );
+
+            // Master: kick off the concern-specific deep-dive as its OWN job.
+            // It appends to the report server-side; /report/full will poll for it.
+            if (isMaster && isComplete) {
+              fetch("/api/generate-master-deep-dive", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reportId: reportData.reportId }),
+              }).catch(console.error);
+              sessionStorage.setItem("masterDeepDivePending", "true");
+            }
 
             // Never pass off the 2-section preview as the full report.
             const finalSections = isComplete ? fullData.sections : reportData.sections;
@@ -276,6 +303,8 @@ export default function ReportPreview() {
                 reportStatus: isComplete ? "completed" : "failed",
                 visitorId: getVisitorId(),
                 chartData: reportData.chartData,
+                planId,
+                includeGuidance,
               }),
             }).catch(console.error);
 
@@ -294,7 +323,7 @@ export default function ReportPreview() {
                   dateOfBirth: userData.dateOfBirth,
                   timeOfBirth: userData.timeOfBirth,
                   placeOfBirth: userData.placeOfBirth,
-                  includeBump,
+                  includeBump: guidanceOn,
                 }),
               }).catch(console.error);
             }
@@ -309,10 +338,11 @@ export default function ReportPreview() {
                 customerName: userData.name,
                 customerEmail: userData.email,
                 paymentId: response.razorpay_payment_id,
-                amount: includeBump ? "448" : "299",
+                amount: String(price),
+                planTier: planId,
                 placeOfBirth: userData.placeOfBirth,
                 dateOfBirth: userData.dateOfBirth,
-                includeBump,
+                includeBump: guidanceOn,
                 reportComplete: isComplete,
               }),
             }).catch(console.error);
@@ -393,7 +423,7 @@ export default function ReportPreview() {
         // 🔥 TRACKING: a failed attempt is your HOTTEST lead — they opened their wallet.
         if (typeof window !== "undefined" && window.fbq) {
           window.fbq("trackCustom", "PaymentFailed", {
-            value: includeBump ? 448 : 299,
+            value: price,
             currency: "INR",
             reason: reason || source || "unknown",
           });
@@ -409,7 +439,7 @@ export default function ReportPreview() {
 
       rzp.open();
       // Vercel Analytics funnel event — Razorpay checkout actually opened
-      track("payment_opened", { value: includeBump ? 448 : 299 });
+      track("payment_opened", { value: price, plan: planId });
     } catch (error) {
       alert(error.message || "Something went wrong. Please try again.");
     } finally {
@@ -498,6 +528,40 @@ export default function ReportPreview() {
 
   const catContent = CATEGORY_CONTENT[questionCategory];
   const answerHeadline = catContent.label ? `Your ${catContent.label} Answer Is Ready` : "Your Full Answer Is Ready";
+
+  // Three-tier selector data. Sell outcomes, not raw section counts.
+  const focusLabel = catContent.label || "life";
+  const TIERS = [
+    {
+      id: "essential",
+      name: "Essential",
+      price: 299,
+      tagline: "Your key answer, clearly explained",
+      points: ["10 core life sections", "Direct answer to your question", "Remedies & lucky factors"],
+    },
+    {
+      id: "premium",
+      name: "Premium",
+      price: 499,
+      badge: "MOST POPULAR",
+      tagline: "The complete analysis + a full year of guidance",
+      points: ["20 in-depth sections", "Direct answer to your question", "12-month month-by-month guidance"],
+    },
+    {
+      id: "master",
+      name: "Master",
+      price: 999,
+      badge: "MOST COMPLETE",
+      tagline: `Everything, plus a specialized ${focusLabel.toLowerCase()} deep-dive`,
+      points: [
+        "Everything in Premium",
+        `7-part ${focusLabel.toLowerCase()} deep-dive on your concern`,
+        "24-month personalized roadmap",
+      ],
+    },
+  ];
+  const selectedResolved = resolvePlan(selectedPlan, { includeGuidance });
+  const displayPrice = selectedResolved?.price || 299;
 
   // Guard: if no sections generated, show error state
   if (!firstSection) {
@@ -610,7 +674,7 @@ export default function ReportPreview() {
               <span className="bg-green-500/20 text-green-400 text-xs font-bold px-3 py-1 rounded-full">
                 FREE PREVIEW
               </span>
-              <span className="text-muted text-sm">Page 1 of 20</span>
+              <span className="text-muted text-sm">Sample section</span>
             </div>
             <h2 className="text-2xl font-bold mb-4">
               {firstSection.title.replace(/^\d+\.\s*/, "")}
@@ -644,7 +708,7 @@ export default function ReportPreview() {
                       />
                     </svg>
                     <span className="text-muted text-sm">
-                      Locked - Page {i + 2} of 20
+                      Locked section
                     </span>
                   </div>
                   <h3 className="text-xl font-bold mb-2">
@@ -689,6 +753,7 @@ export default function ReportPreview() {
                     <p>✓ What may delay or block your result</p>
                     <p>✓ Your current planetary period and what it means</p>
                     <p>✓ Personalized remedies and next steps</p>
+                    <p className="text-muted/70">Depth depends on the plan you choose below.</p>
                   </div>
                 </div>
 
@@ -714,7 +779,7 @@ export default function ReportPreview() {
 
                 {/* Priority 5: Report quality bullets */}
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs text-muted mb-4">
-                  <span>✓ 20 personalized pages</span>
+                  <span>✓ Personalized to your chart</span>
                   <span>✓ Exact birth time analysis</span>
                   <span>✓ Remedies included</span>
                   <span>✓ Personal question answered</span>
@@ -722,37 +787,97 @@ export default function ReportPreview() {
                   <span>✓ Lifetime access</span>
                 </div>
 
-                {/* Price */}
-                <div className="mb-3">
-                  <span className="text-4xl font-bold">&#x20B9;{includeBump ? "448" : "299"}</span>
-                  <span className="text-muted text-sm ml-2 line-through">₹999</span>
-                </div>
-
                 {/* Priority 3: Social proof */}
                 <div className="flex items-center justify-center gap-3 text-xs text-muted mb-4">
                   <span>⭐⭐⭐⭐⭐</span>
                   <span>2,000+ reports generated</span>
-                  <span>·</span>
-                  <span>Avg 14 min read</span>
                 </div>
 
-                {/* ₹149 add-on card — visible but optional, above CTA */}
-                <label className="block text-left bg-background/50 border border-border rounded-xl p-3 mb-4 cursor-pointer hover:border-accent/40 transition-colors">
-                  <div className="flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={includeBump}
-                      onChange={(e) => setIncludeBump(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 accent-accent shrink-0"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Add 12-Month Personal Guidance Pack — ₹149</p>
-                      <p className="text-xs text-muted mt-0.5">A dedicated month-by-month guidance section in your report — career, money, relationships, health, key timing windows, caution periods, and practical monthly advice for the next 12 months.</p>
-                    </div>
-                  </div>
-                </label>
+                {/* ── THREE-TIER SELECTOR ── Essential default, Premium highlighted */}
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2 text-left">Choose your report</p>
+                <div className="space-y-2.5 mb-4">
+                  {TIERS.map((t) => {
+                    const active = selectedPlan === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedPlan(t.id)}
+                        className={`relative w-full text-left rounded-xl p-3.5 border-2 transition-all ${
+                          active
+                            ? "border-primary bg-primary/10"
+                            : t.badge === "MOST POPULAR"
+                              ? "border-primary/40 bg-background/50 hover:border-primary/70"
+                              : "border-border bg-background/50 hover:border-primary/40"
+                        }`}
+                      >
+                        {t.badge && (
+                          <span className={`absolute -top-2 right-3 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            t.badge === "MOST POPULAR" ? "bg-primary text-white" : "bg-accent text-black"
+                          }`}>
+                            {t.badge}
+                          </span>
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${active ? "border-primary" : "border-muted"}`}>
+                              {active && <span className="w-2 h-2 rounded-full bg-primary" />}
+                            </span>
+                            <span className="font-bold text-foreground">{t.name}</span>
+                          </div>
+                          <span className="font-bold text-foreground">&#x20B9;{t.price}</span>
+                        </div>
+                        <p className="text-xs text-muted mt-1 ml-6">{t.tagline}</p>
+                        {active && (
+                          <ul className="mt-2 ml-6 space-y-1">
+                            {t.points.map((p) => (
+                              <li key={p} className="text-[11px] text-foreground flex items-start gap-1.5">
+                                <span className="text-green-400">✓</span><span>{p}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {/* Priority 2: Compelling CTA — text changes with bump */}
+                {/* Essential-only: ₹149 guidance add-on + the "₹51 more" Premium nudge */}
+                {selectedPlan === "essential" && (
+                  <div className="mb-4">
+                    <label className="block text-left bg-background/50 border border-border rounded-xl p-3 cursor-pointer hover:border-accent/40 transition-colors">
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={includeGuidance}
+                          onChange={(e) => setIncludeGuidance(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 accent-accent shrink-0"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Add 12-Month Guidance Pack — ₹149</p>
+                          <p className="text-xs text-muted mt-0.5">Month-by-month guidance for career, money, relationships & health for the next 12 months.</p>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* The ₹51 decoy nudge — only when the Essential+Guidance total (₹448) is close to Premium (₹499) */}
+                    {includeGuidance && (
+                      <div className="mt-2 bg-primary/10 border border-primary/30 rounded-xl p-3 text-left">
+                        <p className="text-sm font-semibold text-primary-light">⭐ Premium is only ₹51 more</p>
+                        <p className="text-xs text-muted mt-0.5 mb-2">Get the complete 20-section analysis <em>plus</em> your 12-month guidance for ₹499.</p>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPlan("premium")}
+                          className="w-full bg-primary/20 hover:bg-primary/30 text-primary-light py-2 rounded-full text-xs font-semibold transition-all"
+                        >
+                          Upgrade to Premium — ₹499 →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Compelling CTA — price reflects the selected plan */}
                 <button
                   onClick={handlePayment}
                   disabled={paymentLoading}
@@ -760,9 +885,7 @@ export default function ReportPreview() {
                 >
                   {paymentLoading
                     ? (retryMessage ? "Analyzing deeper..." : "Generating your report...")
-                    : includeBump
-                      ? "Unlock Report + 12-Month Forecast — ₹448 →"
-                      : "Unlock My Full Answer — ₹299 →"}
+                    : `Unlock My Report — ₹${displayPrice} →`}
                 </button>
 
                 {/* Retry message — shows when Gemini needs extra time */}
@@ -805,7 +928,7 @@ export default function ReportPreview() {
                 { icon: "📍", text: "Exact birth coordinates" },
                 { icon: "🕉️", text: "Vedic astrology system" },
                 { icon: "🎯", text: "Personalized to YOUR chart" },
-                { icon: "📊", text: "20-page structured report" },
+                { icon: "📊", text: "Structured, in-depth report" },
                 { icon: "🚫", text: "Not a generic AI response" },
               ].map((item) => (
                 <div key={item.text} className="flex items-center gap-2 text-xs text-muted">
