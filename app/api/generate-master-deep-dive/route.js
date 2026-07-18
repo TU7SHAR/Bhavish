@@ -100,7 +100,6 @@ export async function POST(request) {
 
     // Set focus after claiming
     await supabase.from("reports").update({ deep_dive_focus: focus }).eq("report_id", reportId);
-      .eq("report_id", reportId);
 
     let deepDive;
     try {
@@ -138,7 +137,7 @@ export async function POST(request) {
       try {
         const { getInternalAuthHeaders } = await import("../../../lib/auth.js");
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
-        await fetch(`${baseUrl}/api/send-report-email`, {
+        const emailRes = await fetch(`${baseUrl}/api/send-report-email`, {
           method: "POST",
           headers: getInternalAuthHeaders(),
           body: JSON.stringify({
@@ -151,9 +150,12 @@ export async function POST(request) {
             dateOfBirth: report.date_of_birth,
             timeOfBirth: report.time_of_birth,
             placeOfBirth: report.place_of_birth,
-            includeBump: true, // Master always includes guidance
+            includeBump: true,
           }),
         });
+        if (emailRes.ok) {
+          await supabase.from("reports").update({ email_sent_at: new Date().toISOString() }).eq("report_id", reportId);
+        }
       } catch (emailErr) {
         console.error("[deep-dive] Final email send failed:", emailErr.message);
       }
