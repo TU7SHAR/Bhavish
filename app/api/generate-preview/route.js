@@ -5,7 +5,7 @@ import { z } from "zod";
 import { calculateBirthChart, generateKundliSVG } from "../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../lib/geocode.js";
 import { previewLimiter } from "../../../lib/rate-limit.js";
-import { sanitizeForPrompt, sanitizeName, sanitizePlace } from "../../../lib/sanitize.js";
+import { sanitizeForPrompt } from "../../../lib/sanitize.js";
 
 // Allow up to 30 seconds for preview generation on Vercel
 export const maxDuration = 30;

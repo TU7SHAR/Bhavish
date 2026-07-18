@@ -69,7 +69,6 @@ export default function VisitorTracker() {
       "/report/full",
       "/login",
       "/dashboard",
-      "/founder-upgrade",
       "/blog",
       "/contact",
       "/pricing",
