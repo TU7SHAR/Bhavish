@@ -122,29 +122,29 @@ export default function GetReport() {
 
       // Save report to DB as "unpaid" — MUST succeed before payment is possible.
       // Uses cleanData (sanitized) for all user-supplied fields.
-      try {
-        await fetch("/api/save-report", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reportId: data.reportId,
-            name: cleanData.name,
-            email: cleanData.email,
-            dateOfBirth: cleanData.dateOfBirth,
-            timeOfBirth: cleanData.timeOfBirth,
-            placeOfBirth: cleanData.placeOfBirth,
-            gender: cleanData.gender,
-            summary: data.summary,
-            sections: data.sections || data.previewSections || [],
-            attribution: getAttribution(),
-            personalQuestion: cleanData.personalQuestion || "",
-            city: data.city || "",
-            visitorId: getVisitorId(),
-            chartData: data.chartData || null,
-          }),
-        });
-      } catch (saveErr) {
-        console.error("Preview save failed (non-critical):", saveErr.message);
+      const saveRes = await fetch("/api/save-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportId: data.reportId,
+          name: cleanData.name,
+          email: cleanData.email,
+          dateOfBirth: cleanData.dateOfBirth,
+          timeOfBirth: cleanData.timeOfBirth,
+          placeOfBirth: cleanData.placeOfBirth,
+          gender: cleanData.gender,
+          summary: data.summary,
+          sections: data.sections || data.previewSections || [],
+          attribution: getAttribution(),
+          personalQuestion: cleanData.personalQuestion || "",
+          city: data.city || "",
+          visitorId: getVisitorId(),
+          chartData: data.chartData || null,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        throw new Error("We couldn't save your preview securely. Please try again.");
       }
 
       // Small delay to show 100% before redirect
