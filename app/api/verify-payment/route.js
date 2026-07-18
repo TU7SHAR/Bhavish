@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createServiceClient } from "../../../lib/supabase-service.js";
 
 export async function POST(request) {
   try {
@@ -34,7 +35,7 @@ export async function POST(request) {
     // Save payment status to database
     try {
       const cookieStore = await cookies();
-      const supabase = createServerClient(
+      const authClient = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
         {
@@ -47,7 +48,10 @@ export async function POST(request) {
         }
       );
 
-      const { data: { user } } = await supabase.auth.getUser();
+      // Service-role client for the write (bypasses RLS).
+      const supabase = createServiceClient();
+
+      const { data: { user } } = await authClient.auth.getUser();
 
       const now = new Date();
       const guidanceEnd = new Date(now);

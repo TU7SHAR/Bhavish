@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { generateWithRetry } from "../../../../lib/gemini-retry.js";
 import { calculateBirthChart } from "../../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../../lib/geocode.js";
+import { createServiceClient } from "../../../../lib/supabase-service.js";
 
 // Founder-only: generate a FREE full report (no payment).
 // The logged-in user must be a verified founder member.
@@ -18,7 +19,7 @@ const FOUNDER_MONTHLY_LIMIT = parseInt(process.env.FOUNDER_MONTHLY_LIMIT || "0",
 export async function POST(request) {
   try {
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
@@ -31,8 +32,11 @@ export async function POST(request) {
       }
     );
 
+    // Service-role client for reads/writes (bypasses RLS).
+    const supabase = createServiceClient();
+
     // Must be logged in
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await authClient.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
     }

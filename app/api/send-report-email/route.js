@@ -1,7 +1,9 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { verifyInternal } from "../../../lib/auth.js";
+import { ensureAccessToken, reportViewUrl } from "../../../lib/report-access.js";
 
 export const maxDuration = 30;
 
@@ -21,7 +23,7 @@ const SIGN_GEMS = {
   12: { gem: "Yellow Sapphire", lucky: "3, 9, 7", day: "Thursday", color: "Yellow" },
 };
 
-function buildReportHtml({ name, reportId, summary, sections, chartData }) {
+function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl }) {
   const planetOrder = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"];
 
   // Build planet table rows
@@ -135,6 +137,12 @@ function buildReportHtml({ name, reportId, summary, sections, chartData }) {
   <p>Dear <strong>${name}</strong>,</p>
   <p>Thank you for choosing BhavishAI. Here is your complete personalized Vedic astrology report. A <strong>PDF version</strong> is attached to this email for offline access.</p>
   <p><strong>Report ID:</strong> ${reportId}</p>
+  ${viewUrl ? `
+  <div style="margin: 20px 0; padding: 18px; background: #f5f0ff; border: 1px solid #ddd6fe; border-radius: 10px; text-align: center;">
+    <p style="margin: 0 0 12px; font-size: 14px; color: #4c1d95;">Access your report anytime — no login needed:</p>
+    <a href="${viewUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; padding: 12px 28px; border-radius: 25px; text-decoration: none; font-size: 14px; font-weight: 600;">View My Report Online</a>
+    <p style="margin: 12px 0 0; font-size: 11px; color: #6b7280;">Bookmark this link to return to your report whenever you like.</p>
+  </div>` : ""}
   <p><em>${summary || ""}</em></p>
 
   ${nakshatraHtml}
@@ -177,17 +185,18 @@ export async function POST(request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
+    // Service-role client — used for the paid check (non-internal calls) and
+    // for ensuring the report's secure access token.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
     // If not an internal call, verify the report exists and is paid
     if (!isInternalCall) {
       if (!reportId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      // Dynamically import to avoid circular deps
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      );
       const { data: report } = await supabase
         .from("reports")
         .select("payment_status, email")
@@ -203,7 +212,16 @@ export async function POST(request) {
       }
     }
 
-    const html = buildReportHtml({ name, reportId, summary, sections, chartData });
+    // Ensure a secure, login-free access link for the customer (best-effort —
+    // if the migration hasn't run yet, ensureAccessToken returns null and we
+    // simply omit the link).
+    let viewUrl = null;
+    if (reportId) {
+      const token = await ensureAccessToken(supabase, reportId);
+      if (token) viewUrl = reportViewUrl(token);
+    }
+
+    const html = buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl });
 
     // Generate PDF server-side (non-blocking — if it fails, still send HTML email)
     let pdfBuffer = null;
