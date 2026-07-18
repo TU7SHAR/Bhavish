@@ -620,46 +620,9 @@ export default function ReportPreview() {
             </div>
           </div>
 
-          {/* Locked Sections Preview */}
-          <div className="relative overflow-hidden min-h-[600px]">
-            {/* Blur overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background z-10 pointer-events-none rounded-2xl"></div>
-
-            <div className="space-y-4 opacity-60">
-              {lockedSections.slice(0, 3).map((section, i) => (
-                <div
-                  key={i}
-                  className="bg-surface border border-border rounded-2xl p-6"
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <svg
-                      className="w-5 h-5 text-accent"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-muted text-sm">
-                      Locked section
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">
-                    {section.title.replace(/^\d+\.\s*/, "")}
-                  </h3>
-                  <p className="text-muted line-clamp-2">
-                    {section.content.substring(0, 150)}...
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* CTA Overlay */}
-            <div className="absolute inset-0 z-20 flex items-start justify-center pt-8">
-              <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
+          {/* Paywall CTA — replaces locked sections */}
+          <div className="mt-6">
+              <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-auto glow">
 
                 {/* Priority 9: Personalization banner — references their chart */}
                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-2.5 mb-5 text-left">
@@ -852,7 +815,6 @@ export default function ReportPreview() {
                   Secure Razorpay payment · Instant access · Sent to your email
                 </p>
               </div>
-            </div>
           </div>
 
           {/* Why BhavishAI — Trust Section */}
