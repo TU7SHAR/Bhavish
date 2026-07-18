@@ -620,46 +620,29 @@ export default function ReportPreview() {
             </div>
           </div>
 
-          {/* Locked Sections Preview */}
-          <div className="relative overflow-hidden min-h-[600px]">
-            {/* Blur overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background z-10 pointer-events-none rounded-2xl"></div>
-
-            <div className="space-y-4 opacity-60">
-              {lockedSections.slice(0, 3).map((section, i) => (
-                <div
-                  key={i}
-                  className="bg-surface border border-border rounded-2xl p-6"
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <svg
-                      className="w-5 h-5 text-accent"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                        clipRule="evenodd"
-                      />
+          {/* Locked sections as blurred background behind paywall CTA */}
+          <div className="relative">
+            {/* Background: locked sections (blurred, faded) */}
+            <div className="space-y-3 opacity-40 blur-[2px] pointer-events-none" aria-hidden="true">
+              {lockedSections.slice(0, 4).map((section, i) => (
+                <div key={i} className="bg-surface border border-border rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-muted text-sm">
-                      Locked section
-                    </span>
+                    <span className="text-muted text-sm">Locked</span>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">
-                    {section.title.replace(/^\d+\.\s*/, "")}
-                  </h3>
-                  <p className="text-muted line-clamp-2">
-                    {section.content.substring(0, 150)}...
-                  </p>
+                  <h3 className="text-lg font-bold mb-1">{section.title.replace(/^\d+\.\s*/, "")}</h3>
+                  <p className="text-muted text-sm line-clamp-2">{section.content.substring(0, 150)}...</p>
                 </div>
               ))}
             </div>
+            {/* Gradient fade over background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/70 to-background pointer-events-none"></div>
 
-            {/* CTA Overlay */}
-            <div className="absolute inset-0 z-20 flex items-start justify-center pt-8">
-              <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
+            {/* Paywall CTA — overlaid on the blurred background */}
+            <div className="relative z-10 -mt-[80%] pt-8 pb-4">
+              <div className="bg-surface border-2 border-primary rounded-2xl p-6 md:p-8 text-center glow">
 
                 {/* Priority 9: Personalization banner — references their chart */}
                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-2.5 mb-5 text-left">
@@ -875,44 +858,37 @@ export default function ReportPreview() {
             </div>
           </div>
 
-          {/* All 20 section titles */}
+          {/* Section names by tier */}
           <div className="mt-6 bg-surface border border-border rounded-2xl p-6">
-            <h3 className="text-lg font-bold mb-4">
-              Your Full Report Includes:
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {allSections.map((section, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  {i === 0 ? (
-                    <svg
-                      className="w-4 h-4 text-green-400 shrink-0"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-4 h-4 text-accent shrink-0"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  )}
-                  <span className={i === 0 ? "text-foreground" : "text-muted"}>
-                    {i + 1}. {section.title.replace(/^\d+\.\s*/, "")}
-                  </span>
-                </div>
-              ))}
+            <h3 className="text-lg font-bold mb-4">Your Full Report Includes:</h3>
+
+            <div className="mb-5">
+              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Essential — ₹299</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {["Rashi & Personality","Lagna & Core Identity","Career & Professional Direction","Money & Financial Outlook","Love & Marriage","Health & Wellbeing","Current Mahadasha & Antardasha","Important Yogas & Doshas","Remedies & Practical Guidance","Key Strengths & Lucky Factors","Direct Answer to Your Question"].map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-green-400 text-xs">✓</span><span>{s}</span></div>
+                ))}
+                <div className="flex items-center gap-2 text-sm text-blue-300 italic"><span className="text-xs">+</span><span>12-Month Guidance (optional +₹149)</span></div>
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <p className="text-xs text-purple-400 uppercase tracking-wider font-semibold mb-2">Premium — ₹499 <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-1">Most Popular</span></p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {["Rashi (Moon Sign) & Personality","Lagna (Ascendant) & Physical Traits","Sun Sign & Core Identity","Nakshatra (Birth Star) Analysis","Planetary Positions & Strengths","Career & Professional Life","Wealth & Financial Prospects","Marriage & Love Life","Family & Relationships","Health & Physical Wellbeing","Education & Intellectual Growth","Current Mahadasha Analysis","Upcoming Dasha Predictions (5 Years)","Manglik Dosha Analysis","Kaal Sarp & Other Yogas","Favorable & Unfavorable Periods","Remedies & Spiritual Guidance","Lucky Factors (Numbers, Colors, Gems)","Monthly Predictions 2026-2027","Life Purpose & Spiritual Path","Direct Answer to Your Question","12-Month Personal Guidance Pack"].map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-purple-400 text-xs">✓</span><span>{s}</span></div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-amber-400 uppercase tracking-wider font-semibold mb-2">Master — ₹999 <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded-full ml-1">Most Complete</span></p>
+              <p className="text-xs text-muted mb-2">Everything in Premium, plus:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {["Specialized Deep-Dive (7 sections on your concern)","— Why your situation feels the way it does","— Your strongest traits & natural talents","— Turning-point timing & action windows","— Biggest growth opportunities","— Recurring challenges & how to overcome","— Caution periods & personalized remedies","24-Month Personalized Roadmap"].map((s, i) => (
+                  <div key={i} className={`flex items-center gap-2 text-sm ${s.startsWith("—") ? "text-muted/70 pl-3" : "text-muted"}`}><span className="text-amber-400 text-xs">{s.startsWith("—") ? "·" : "★"}</span><span>{s}</span></div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
