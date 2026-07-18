@@ -273,89 +273,122 @@ export default function FullReport() {
             <div className="flex flex-wrap items-center justify-center gap-4">
               <button
                 onClick={async () => {
-                  const { jsPDF } = await import("jspdf");
-                  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-                  const pageWidth = doc.internal.pageSize.getWidth();
-                  const pageHeight = doc.internal.pageSize.getHeight();
-                  const margin = 20;
-                  const contentWidth = pageWidth - margin * 2;
-                  let y = margin;
-
-                  // Helper: add new page if needed
-                  const checkPage = (needed = 20) => {
-                    if (y + needed > pageHeight - margin) {
-                      doc.addPage();
-                      y = margin;
-                    }
-                  };
-
-                  // Title page
-                  doc.setFillColor(26, 26, 46);
-                  doc.rect(0, 0, pageWidth, pageHeight, "F");
-                  doc.setTextColor(167, 139, 250);
-                  doc.setFontSize(28);
-                  doc.text("BhavishAI", pageWidth / 2, 50, { align: "center" });
-                  doc.setFontSize(12);
-                  doc.setTextColor(200, 200, 200);
-                  doc.text("AI-Powered Vedic Astrology Report", pageWidth / 2, 62, { align: "center" });
-                  doc.setFontSize(22);
-                  doc.setTextColor(255, 255, 255);
-                  doc.text(userData.name, pageWidth / 2, 100, { align: "center" });
-                  doc.setFontSize(11);
-                  doc.setTextColor(180, 180, 180);
-                  doc.text(`Date of Birth: ${new Date(userData.dateOfBirth).toLocaleDateString("en-IN")}`, pageWidth / 2, 115, { align: "center" });
-                  doc.text(`Time: ${userData.timeOfBirth} | Place: ${userData.placeOfBirth}`, pageWidth / 2, 123, { align: "center" });
-                  doc.text(`Report ID: ${reportData.reportId}`, pageWidth / 2, 135, { align: "center" });
-                  doc.setTextColor(167, 139, 250);
-                  doc.setFontSize(10);
-                  doc.text("bhavishai.in", pageWidth / 2, pageHeight - 20, { align: "center" });
-
-                  // Summary page
-                  doc.addPage();
-                  y = margin;
-                  doc.setFillColor(255, 255, 255);
-                  doc.rect(0, 0, pageWidth, pageHeight, "F");
-                  doc.setTextColor(124, 58, 237);
-                  doc.setFontSize(16);
-                  doc.text("Chart Summary", margin, y);
-                  y += 10;
-                  doc.setTextColor(80, 80, 80);
-                  doc.setFontSize(11);
-                  const summaryLines = doc.splitTextToSize(reportData.summary, contentWidth);
-                  doc.text(summaryLines, margin, y);
-                  y += summaryLines.length * 6 + 15;
-
-                  // Sections
-                  reportData.sections.forEach((section, i) => {
-                    checkPage(40);
-                    // Section header
-                    doc.setFillColor(245, 245, 255);
-                    doc.roundedRect(margin - 2, y - 4, contentWidth + 4, 12, 2, 2, "F");
-                    doc.setTextColor(124, 58, 237);
-                    doc.setFontSize(13);
-                    doc.text(`${i + 1}. ${section.title.replace(/^\d+\.\s*/, "")}`, margin, y + 4);
-                    y += 16;
-
-                    // Section content
-                    doc.setTextColor(60, 60, 60);
-                    doc.setFontSize(10);
-                    const lines = doc.splitTextToSize(section.content, contentWidth);
-                    lines.forEach((line) => {
-                      checkPage(7);
-                      doc.text(line, margin, y);
-                      y += 5.5;
+                  // Server-side PDF generation (primary) with client-side fallback.
+                  // Previously this was client-only using jsPDF — if the browser
+                  // crashed mid-generation or the tab was closed, the PDF was lost.
+                  // Now we hit the server endpoint first, which produces an identical
+                  // PDF and is also what gets emailed to the customer.
+                  try {
+                    const res = await fetch("/api/generate-pdf", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: userData.name,
+                        dateOfBirth: userData.dateOfBirth,
+                        timeOfBirth: userData.timeOfBirth,
+                        placeOfBirth: userData.placeOfBirth,
+                        reportId: reportData.reportId,
+                        summary: reportData.summary,
+                        sections: reportData.sections,
+                        chartData: reportData.chartData,
+                      }),
                     });
+
+                    if (res.ok) {
+                      const { pdf } = await res.json();
+                      if (pdf) {
+                        // Convert base64 to blob and trigger download
+                        const byteChars = atob(pdf);
+                        const byteNumbers = new Array(byteChars.length);
+                        for (let i = 0; i < byteChars.length; i++) {
+                          byteNumbers[i] = byteChars.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: "application/pdf" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `${userData.name.replace(/\s+/g, "_")}_BhavishAI_Report.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        return; // Success — skip fallback
+                      }
+                    }
+                    throw new Error("Server PDF failed");
+                  } catch (serverErr) {
+                    // Fallback: client-side jsPDF (same logic the server uses)
+                    console.warn("Server PDF failed, using client-side fallback:", serverErr.message);
+                    const { jsPDF } = await import("jspdf");
+                    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margin = 20;
+                    const contentWidth = pageWidth - margin * 2;
+                    let y = margin;
+                    const checkPage = (needed = 20) => {
+                      if (y + needed > pageHeight - margin) { doc.addPage(); y = margin; }
+                    };
+
+                    // Title page
+                    doc.setFillColor(26, 26, 46);
+                    doc.rect(0, 0, pageWidth, pageHeight, "F");
+                    doc.setTextColor(167, 139, 250);
+                    doc.setFontSize(28);
+                    doc.text("BhavishAI", pageWidth / 2, 50, { align: "center" });
+                    doc.setFontSize(12);
+                    doc.setTextColor(200, 200, 200);
+                    doc.text("AI-Powered Vedic Astrology Report", pageWidth / 2, 62, { align: "center" });
+                    doc.setFontSize(22);
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(userData.name, pageWidth / 2, 100, { align: "center" });
+                    doc.setFontSize(11);
+                    doc.setTextColor(180, 180, 180);
+                    doc.text(`Date of Birth: ${new Date(userData.dateOfBirth).toLocaleDateString("en-IN")}`, pageWidth / 2, 115, { align: "center" });
+                    doc.text(`Time: ${userData.timeOfBirth} | Place: ${userData.placeOfBirth}`, pageWidth / 2, 123, { align: "center" });
+                    doc.text(`Report ID: ${reportData.reportId}`, pageWidth / 2, 135, { align: "center" });
+                    doc.setTextColor(167, 139, 250);
+                    doc.setFontSize(10);
+                    doc.text("bhavishai.in", pageWidth / 2, pageHeight - 20, { align: "center" });
+
+                    // Summary page
+                    doc.addPage();
+                    y = margin;
+                    doc.setFillColor(255, 255, 255);
+                    doc.rect(0, 0, pageWidth, pageHeight, "F");
+                    doc.setTextColor(124, 58, 237);
+                    doc.setFontSize(16);
+                    doc.text("Chart Summary", margin, y);
                     y += 10;
-                  });
+                    doc.setTextColor(80, 80, 80);
+                    doc.setFontSize(11);
+                    const summaryLines = doc.splitTextToSize(reportData.summary, contentWidth);
+                    doc.text(summaryLines, margin, y);
+                    y += summaryLines.length * 6 + 15;
 
-                  // Footer on last page
-                  checkPage(20);
-                  doc.setTextColor(150, 150, 150);
-                  doc.setFontSize(8);
-                  doc.text("Generated by BhavishAI | bhavishai.in | Powered by Swiss Ephemeris calculations.", pageWidth / 2, pageHeight - 10, { align: "center" });
+                    // Sections
+                    reportData.sections.forEach((section, i) => {
+                      checkPage(40);
+                      doc.setFillColor(245, 245, 255);
+                      doc.roundedRect(margin - 2, y - 4, contentWidth + 4, 12, 2, 2, "F");
+                      doc.setTextColor(124, 58, 237);
+                      doc.setFontSize(13);
+                      doc.text(`${i + 1}. ${section.title.replace(/^\d+\.\s*/, "")}`, margin, y + 4);
+                      y += 16;
+                      doc.setTextColor(60, 60, 60);
+                      doc.setFontSize(10);
+                      const lines = doc.splitTextToSize(section.content, contentWidth);
+                      lines.forEach((line) => { checkPage(7); doc.text(line, margin, y); y += 5.5; });
+                      y += 10;
+                    });
 
-                  // Save
-                  doc.save(`${userData.name.replace(/\s+/g, "_")}_BhavishAI_Report.pdf`);
+                    checkPage(20);
+                    doc.setTextColor(150, 150, 150);
+                    doc.setFontSize(8);
+                    doc.text("Generated by BhavishAI | bhavishai.in | Powered by Swiss Ephemeris calculations.", pageWidth / 2, pageHeight - 10, { align: "center" });
+                    doc.save(`${userData.name.replace(/\s+/g, "_")}_BhavishAI_Report.pdf`);
+                  }
                 }}
                 className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-full text-sm font-medium transition-all glow-hover"
               >

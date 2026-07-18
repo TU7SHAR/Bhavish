@@ -12,7 +12,7 @@ export const maxDuration = 60;
 export async function POST(request) {
   try {
     // Rate limiting — prevent abuse of expensive AI generation
-    const rateCheck = previewLimiter(request);
+    const rateCheck = await previewLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }

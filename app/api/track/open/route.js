@@ -15,7 +15,7 @@ const PIXEL = Buffer.from(
 export async function GET(request) {
   try {
     // Rate limiting — prevent fake open injection
-    const rateCheck = trackingLimiter(request);
+    const rateCheck = await trackingLimiter(request);
     if (!rateCheck.allowed) {
       // Still return pixel even when rate limited (don't break email display)
       return new NextResponse(PIXEL, {

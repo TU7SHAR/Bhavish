@@ -77,6 +77,7 @@ export async function POST(request) {
       timeOfBirth,
       latitude: location.latitude,
       longitude: location.longitude,
+      timezoneOffsetMinutes: location.timezoneOffsetMinutes,
     });
 
     const planetaryTable = Object.entries(chartData.planets)
