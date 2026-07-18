@@ -3,10 +3,14 @@ import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { verifyAdmin } from "../../../../lib/auth.js";
 
-// Admin-only: gift a customer either the 12-Month Guidance Pack or Founder Upgrade.
+// Admin-only: gift a customer a product or upgrade their report tier.
 // POST /api/admin/gift
-// Body: { reportId, type: "guidance" | "founder" }
+// Body: { reportId, type: "guidance" | "founder" | "upgrade_premium" | "upgrade_master" }
 // Auth: Bearer ADMIN_SECRET
+//
+// New types (three-tier model):
+//   upgrade_premium  — upgrades report to Premium tier (sets plan_tier, adds guidance)
+//   upgrade_master   — upgrades to Master tier (triggers deep-dive generation + email after)
 
 export const maxDuration = 15;
 
@@ -19,21 +23,48 @@ function getSupabase() {
 
 function buildGiftEmail({ name, email, type }) {
   const isGuidance = type === "guidance";
+  const isPremium = type === "upgrade_premium";
+  const isMaster = type === "upgrade_master";
+
   const title = isGuidance
     ? "You've been gifted the 12-Month Guidance Pack!"
+    : isPremium
+    ? "Your report has been upgraded to Premium!"
+    : isMaster
+    ? "Your report has been upgraded to Master!"
     : "You've been gifted a Founder Membership!";
-  const what = isGuidance
-    ? `<p style="margin-bottom:16px;">We've added the <strong>12-Month Personal Guidance Pack</strong> to your account — completely free, as a gift from us.</p>
+
+  let what;
+  if (isGuidance) {
+    what = `<p style="margin-bottom:16px;">We've added the <strong>12-Month Personal Guidance Pack</strong> to your account — completely free, as a gift from us.</p>
        <p style="margin-bottom:8px;"><strong>What's included:</strong></p>
        <ul style="margin:0 0 16px 20px;padding:0;color:#e2e8f0;">
          <li>Month-by-month forecast (career, money, love, health) for 12 months</li>
          <li>Best months for action & caution months</li>
          <li>Key timing windows — when to move, when to wait</li>
          <li>Practical monthly action plan & personal remedies</li>
-         <li>12-month yearly summary & overall theme</li>
        </ul>
-       <p style="margin-bottom:16px;">Your guidance is included as a <strong>dedicated section in your full report</strong>. Open your report from the My Reports page to see it.</p>`
-    : `<p style="margin-bottom:16px;">We've upgraded your account to <strong>Founding Member</strong> status — completely free, as a gift from us.</p>
+       <p style="margin-bottom:16px;">Your guidance is included as a <strong>dedicated section in your full report</strong>. Open your report to see it.</p>`;
+  } else if (isPremium) {
+    what = `<p style="margin-bottom:16px;">Great news — your report has been upgraded to <strong>Premium</strong>!</p>
+       <p style="margin-bottom:8px;"><strong>What this means for you:</strong></p>
+       <ul style="margin:0 0 16px 20px;padding:0;color:#e2e8f0;">
+         <li>Full 20-section in-depth analysis (career, marriage, health, dashas, yogas, remedies)</li>
+         <li>12-month month-by-month guidance included</li>
+         <li>Best timing windows and caution periods for the year ahead</li>
+       </ul>
+       <p style="margin-bottom:16px;">Open your report to see the complete Premium experience.</p>`;
+  } else if (isMaster) {
+    what = `<p style="margin-bottom:16px;">Your report has been upgraded to <strong>Master</strong> — our most complete offering!</p>
+       <p style="margin-bottom:8px;"><strong>What's being added:</strong></p>
+       <ul style="margin:0 0 16px 20px;padding:0;color:#e2e8f0;">
+         <li>Full 20-section analysis + 12-month guidance</li>
+         <li>7-part specialized deep-dive focused on your biggest concern</li>
+         <li>24-month personalized roadmap with timing</li>
+       </ul>
+       <p style="margin-bottom:16px;">Your deep-dive is being generated now and will appear in your report within a few minutes.</p>`;
+  } else {
+    what = `<p style="margin-bottom:16px;">We've upgraded your account to <strong>Founding Member</strong> status — completely free, as a gift from us.</p>
        <p style="margin-bottom:8px;"><strong>What this means:</strong></p>
        <ul style="margin:0 0 16px 20px;padding:0;color:#e2e8f0;">
          <li>Generate up to 5 free reports every month</li>
@@ -41,8 +72,9 @@ function buildGiftEmail({ name, email, type }) {
          <li>Valid for 24 months (up to 120 total reports)</li>
          <li>Access via bhavishai.in → Google Sign In → My Reports → Generate Free Report</li>
        </ul>`;
+  }
 
-  const trackType = isGuidance ? "gift_guidance" : "gift_founder";
+  const trackType = isGuidance ? "gift_guidance" : isPremium ? "gift_premium" : isMaster ? "gift_master" : "gift_founder";
 
   return `<!DOCTYPE html>
 <html>
@@ -76,8 +108,8 @@ export async function POST(request) {
   try {
     const { reportId, type } = await request.json();
 
-    if (!reportId || !["guidance", "founder"].includes(type)) {
-      return NextResponse.json({ error: "reportId and type (guidance|founder) required." }, { status: 400 });
+    if (!reportId || !["guidance", "founder", "upgrade_premium", "upgrade_master"].includes(type)) {
+      return NextResponse.json({ error: "reportId and type (guidance|founder|upgrade_premium|upgrade_master) required." }, { status: 400 });
     }
 
     const supabase = getSupabase();
@@ -117,10 +149,35 @@ export async function POST(request) {
         guidance_end_date: endDate.toISOString(),
         is_guidance_gifted: true,
       };
-    } else {
+    } else if (type === "founder") {
       updateData = {
         is_founder_member: true,
         is_founder_gifted: true,
+      };
+    } else if (type === "upgrade_premium") {
+      const endDate = new Date(now);
+      endDate.setMonth(endDate.getMonth() + 12);
+      updateData = {
+        plan_tier: "premium",
+        plan_price: 499,
+        guidance_months: 12,
+        has_12_month_guidance: true,
+        guidance_start_date: now.toISOString(),
+        guidance_end_date: endDate.toISOString(),
+        is_guidance_gifted: true,
+      };
+    } else if (type === "upgrade_master") {
+      const endDate = new Date(now);
+      endDate.setMonth(endDate.getMonth() + 12);
+      updateData = {
+        plan_tier: "master",
+        plan_price: 999,
+        guidance_months: 12,
+        has_12_month_guidance: true,
+        guidance_start_date: now.toISOString(),
+        guidance_end_date: endDate.toISOString(),
+        deep_dive_status: "pending",
+        is_guidance_gifted: true,
       };
     }
 
@@ -133,13 +190,17 @@ export async function POST(request) {
       return NextResponse.json({ error: `DB update failed: ${updateErr.message}` }, { status: 500 });
     }
 
-    // Send the gift email
+    // Send the gift/upgrade notification email
     const html = buildGiftEmail({ name: report.name, email: report.email, type });
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
     const subject = type === "guidance"
       ? `🎁 You've been gifted the 12-Month Guidance Pack — ${report.name}`
-      : `🎁 You've been gifted a Founder Membership — ${report.name}`;
+      : type === "founder"
+      ? `🎁 You've been gifted a Founder Membership — ${report.name}`
+      : type === "upgrade_premium"
+      ? `⭐ Your report has been upgraded to Premium — ${report.name}`
+      : `★ Your report has been upgraded to Master — ${report.name}`;
 
     let emailSent = false;
     try {
@@ -157,7 +218,21 @@ export async function POST(request) {
       // Still return success for the DB update — admin can resend manually
     }
 
-    const label = type === "guidance" ? "12-Month Guidance Pack" : "Founder Membership";
+    const label = type === "guidance" ? "12-Month Guidance Pack"
+      : type === "founder" ? "Founder Membership"
+      : type === "upgrade_premium" ? "Premium Upgrade"
+      : "Master Upgrade";
+
+    // Master upgrade: trigger the deep-dive generation as a separate job.
+    if (type === "upgrade_master") {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+      fetch(`${baseUrl}/api/generate-master-deep-dive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId }),
+      }).catch((e) => console.error("Deep-dive trigger after gift failed:", e.message));
+    }
+
     return NextResponse.json({
       success: true,
       email: report.email,

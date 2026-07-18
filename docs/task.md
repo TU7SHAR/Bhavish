@@ -2,75 +2,50 @@
 
 ## Session Goals — July 2026
 
-> **Delete or clear this file after tasks are completed.** It keeps the working memory clean and focused on immediate work.
-
----
-
-## Active Tasks
-
-### Task 1: Run Rate Limit Migration
-**Priority:** P0 (rate limiting won't persist until this is done)
-**Status:** Pending (requires Supabase SQL Editor access)
-
-**Steps:**
-1. Open Supabase Dashboard → SQL Editor
-2. Copy SQL from `supabase/migrations/001_rate_limits_table.sql`
-3. Run it
-4. Verify: `SELECT * FROM rate_limits;` should return empty table
-5. Verify: `SELECT check_rate_limit('test:127.0.0.1', 5, 60000);` should return `{"allowed": true, "current_count": 1}`
-
----
-
-### Task 2: Verify IST Fix Doesn't Break Existing Indian Users
-**Priority:** P0 (most users are Indian — must not regress)
-**Status:** Pending
-
-**Steps:**
-1. Test with Mumbai coordinates (19.076, 72.877) → should get `timezoneOffsetMinutes: 330`
-2. Test with New York coordinates (40.7, -74.0) → should get `null` (uses LMT)
-3. Compare planetary positions for a known chart (e.g., 1990-01-15 10:30 Mumbai)
-4. Verify ascendant hasn't shifted from the previous calculation
-
----
-
-### Task 3: Store PDF URL in DB for Re-download
-**Priority:** P1 (nice-to-have for dashboard report view)
-**Status:** Not started
-
-**What:**
-- After `generate-pdf` succeeds during email send, store the base64 or a reference
-- Dashboard report view can offer "Download PDF" without regenerating
-- Consider: store in Supabase Storage (bucket) vs. inline in DB (JSONB is large)
+> **Delete or clear this file after tasks are completed.**
 
 ---
 
 ## Recently Completed
 
-- [x] Created project documentation suite (PRD, architecture, requirements, implementation plan, audit, bugs, testing)
-- [x] Fixed IST hardcoding in vedic-calculator.js
-- [x] Added server-side PDF download (client fallback)
-- [x] Replaced in-memory rate limiter with Supabase-backed persistence
-- [x] Updated PROJECT.md with migration SQL
+- [x] PR #150: Three-tier pricing (Essential/Premium/Master) — merged
+- [x] PR #151: Bug fixes (email undefined, footer overlay, deep-dive styling)
+- [x] PR #152: Admin panel tier refactor (revenue calc, tier badges, gift upgrades)
+- [x] PR #153: P0 payment & fulfillment hardening (security critical)
+- [x] PR #154: Admin gift upgrade buttons + howto email update + docs
 
 ---
 
-## Blocked / Waiting
+## Pending Merges (in order)
 
-| Item | Blocked On | Who |
-|------|-----------|-----|
-| Rate limit migration | Supabase dashboard access | Owner |
-| Bounce handling | Resend webhook setup | Owner (Resend dashboard) |
-| Error monitoring | Sentry account creation | Owner |
-
----
-
-## Notes for Next Session
-
-- The `fix/ist-pdf-ratelimit` PR (#148) needs to be merged before any of these tasks matter
-- After merge, test the preview generation flow end-to-end on production
-- Check Vercel logs for any `[rate-limit] Supabase error` messages (indicates migration not run yet)
-- The rate limiter gracefully falls back to local-only if migration hasn't been run
+1. **PR #153** — merge FIRST (security critical, fixes paywall bypass)
+2. **PR #151** — bug fixes (independent)
+3. **PR #152** — admin panel (depends on plan_tier columns)
+4. **PR #154** — admin gift buttons + howto (depends on #152's gift API types)
 
 ---
 
-*This file is ephemeral. Clear it after completing the above tasks and replace with the next set from `implementation_plan.md`.*
+## After Merging All PRs
+
+1. Run migration 002 + 004 in Supabase SQL Editor (if not already done)
+2. Deploy to Vercel
+3. Run migration 003 (RLS) — ONLY after deploy
+4. Test one complete real payment flow end-to-end
+5. Verify admin panel shows tier badges + gift buttons work
+6. Update live ad creatives (remove any "20-page ₹299" copy)
+
+---
+
+## Open Follow-ups (Future Sessions)
+
+- [ ] Kundli SVG chart rendering in the PDF generator
+- [ ] Store generated PDFs in Supabase Storage for re-download
+- [ ] Resend bounce/complaint webhook handling
+- [ ] Sentry error monitoring integration
+- [ ] Uptime monitoring (external ping)
+- [ ] Make preview save synchronous (await before enabling payment)
+- [ ] A/B test tier selection defaults
+
+---
+
+*This file is ephemeral. Clear after completing above and replace with next goals.*

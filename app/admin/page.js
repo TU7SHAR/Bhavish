@@ -1900,6 +1900,8 @@ function DetailCard({ person, expanded, onToggle, password }) {
         "howto-email": "/api/admin/send-howto-email",
         "gift-guidance": "/api/admin/gift",
         "gift-founder": "/api/admin/gift",
+        "gift-premium": "/api/admin/gift",
+        "gift-master": "/api/admin/gift",
       };
       const successMap = {
         "resend-report": (e) => `✅ Report re-sent to ${e}`,
@@ -1908,13 +1910,19 @@ function DetailCard({ person, expanded, onToggle, password }) {
         "howto-email": (e) => `✅ "How to use BhavishAI" email sent to ${e}`,
         "gift-guidance": (e) => `🎁 Gifted 12-Month Guidance Pack to ${e} + email sent`,
         "gift-founder": (e) => `🎁 Gifted Founder Membership to ${e} + email sent`,
+        "gift-premium": (e) => `⭐ Upgraded to Premium for ${e} + email sent`,
+        "gift-master": (e) => `★ Upgraded to Master for ${e} + email sent + deep-dive triggered`,
       };
       const url = urlMap[action] || "/api/admin/send-thankyou";
       const bodyPayload = action === "gift-guidance"
         ? { reportId: person.report_id, type: "guidance" }
         : action === "gift-founder"
           ? { reportId: person.report_id, type: "founder" }
-          : { reportId: person.report_id };
+          : action === "gift-premium"
+            ? { reportId: person.report_id, type: "upgrade_premium" }
+            : action === "gift-master"
+              ? { reportId: person.report_id, type: "upgrade_master" }
+              : { reportId: person.report_id };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
@@ -1930,6 +1938,8 @@ function DetailCard({ person, expanded, onToggle, password }) {
         if (action === "howto-email") person.howto_sent_at = new Date().toISOString();
         if (action === "gift-guidance") person.has_12_month_guidance = true;
         if (action === "gift-founder") person.is_founder_member = true;
+        if (action === "gift-premium") { person.plan_tier = "premium"; person.has_12_month_guidance = true; }
+        if (action === "gift-master") { person.plan_tier = "master"; person.has_12_month_guidance = true; }
       } else {
         setEmailAction({ status: "error", message: `❌ ${json.error}` });
       }
@@ -2100,6 +2110,25 @@ function DetailCard({ person, expanded, onToggle, password }) {
                     className="px-3 py-2 rounded-xl text-xs font-medium bg-gradient-to-r from-pink-600 to-rose-600 hover:opacity-90 disabled:opacity-50 text-white transition-colors"
                   >
                     {emailLoading === "gift-founder" ? "Gifting..." : "🎁 Gift Founder Upgrade"}
+                  </button>
+                )}
+                {/* Tier upgrade gifts — upgrade their report to Premium or Master */}
+                {person.payment_status === "paid" && person.plan_tier !== "premium" && person.plan_tier !== "master" && (
+                  <button
+                    onClick={() => { if (confirm(`Upgrade ${person.name}'s report to PREMIUM (₹499 tier)?\n\nThis will:\n- Set their plan to Premium\n- Add 12-month guidance\n- Send them a notification email\n\nTheir existing report content stays — they just get the Premium perks.`)) sendAdminAction("gift-premium"); }}
+                    disabled={!!emailLoading}
+                    className="px-3 py-2 rounded-xl text-xs font-medium bg-gradient-to-r from-purple-600 to-violet-600 hover:opacity-90 disabled:opacity-50 text-white transition-colors"
+                  >
+                    {emailLoading === "gift-premium" ? "Upgrading..." : "⭐ Upgrade to Premium"}
+                  </button>
+                )}
+                {person.payment_status === "paid" && person.plan_tier !== "master" && (
+                  <button
+                    onClick={() => { if (confirm(`Upgrade ${person.name}'s report to MASTER (₹999 tier)?\n\nThis will:\n- Set their plan to Master\n- Add 12-month guidance\n- Trigger a 7-section concern-specific deep-dive generation\n- Send them a notification email\n\nThe deep-dive will appear in their report after ~60 seconds.`)) sendAdminAction("gift-master"); }}
+                    disabled={!!emailLoading}
+                    className="px-3 py-2 rounded-xl text-xs font-medium bg-gradient-to-r from-amber-600 to-orange-600 hover:opacity-90 disabled:opacity-50 text-white transition-colors"
+                  >
+                    {emailLoading === "gift-master" ? "Upgrading..." : "★ Upgrade to Master"}
                   </button>
                 )}
               </div>
