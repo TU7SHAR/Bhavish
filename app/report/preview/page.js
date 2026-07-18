@@ -210,19 +210,17 @@ export default function ReportPreview() {
               const fullRes = await fetch("/api/generate-full-report", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  reportId: reportData.reportId,
-                  name: userData.name,
-                  gender: userData.gender,
-                  dateOfBirth: userData.dateOfBirth,
-                  timeOfBirth: userData.timeOfBirth,
-                  placeOfBirth: userData.placeOfBirth,
-                  chartData: reportData.chartData,
-                  personalQuestion: userData.personalQuestion || "",
-                  // Tier is resolved server-side from the paid DB row.
-                }),
+                // SECURITY: Only send reportId. The server loads all birth data,
+                // chart data, and plan tier from the database (single source of
+                // truth). This prevents wrong reports from stale localStorage.
+                body: JSON.stringify({ reportId: reportData.reportId }),
               });
-              if (!fullRes.ok) throw new Error(`Status ${fullRes.status}`);
+              if (!fullRes.ok) {
+                const errData = await fullRes.json().catch(() => ({}));
+                // 409 = report is already being generated (webhook beat us)
+                if (fullRes.status === 409) return errData;
+                throw new Error(errData.error || `Status ${fullRes.status}`);
+              }
               const data = await fullRes.json();
               const minOk = planId === "essential" ? 8 : 10;
               if (!data.sections || data.sections.length < minOk) throw new Error("Incomplete report");
@@ -685,7 +683,7 @@ export default function ReportPreview() {
           </div>
 
           {/* Locked Sections Preview */}
-          <div className="relative">
+          <div className="relative overflow-hidden min-h-[600px]">
             {/* Blur overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background z-10 pointer-events-none rounded-2xl"></div>
 
@@ -722,7 +720,7 @@ export default function ReportPreview() {
             </div>
 
             {/* CTA Overlay */}
-            <div className="absolute inset-0 z-20 flex items-center justify-center">
+            <div className="absolute inset-0 z-20 flex items-start justify-center pt-8">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
 
                 {/* Priority 9: Personalization banner — references their chart */}

@@ -32,14 +32,11 @@ export async function POST(request) {
       gender,
       summary,
       sections,
-      paymentId,
-      paymentStatus,
       attribution,
       personalQuestion,
       city,
       visitorId,
       chartData,
-      reportStatus,
     } = await request.json();
 
     if (!reportId || !name || !sections) {
@@ -81,6 +78,11 @@ export async function POST(request) {
     // If a field is not passed (e.g. attribution on second save after payment),
     // we must NOT include it — otherwise upsert sets it to null, wiping the
     // value that was stored on the first save.
+    //
+    // SECURITY: This is a PUBLIC endpoint. It must NEVER accept payment-related
+    // fields from the client. Only server-side code (verify-payment, webhook,
+    // fulfill-payment) may mark a report as paid. Accepting paymentStatus from
+    // the client would let anyone bypass the paywall entirely.
     const data = {
       report_id: reportId,
       name,
@@ -91,8 +93,9 @@ export async function POST(request) {
       gender,
       summary,
       sections,
-      payment_id: paymentId || null,
-      payment_status: paymentStatus || "unpaid",
+      // FORCED: public endpoint always writes "unpaid". Only server-side Razorpay
+      // verification code may ever set "paid".
+      payment_status: "unpaid",
     };
 
     // Only set user_id if user is logged in (don't wipe existing with null)
@@ -106,9 +109,8 @@ export async function POST(request) {
     if (city) data.city = city;
     if (visitorId) data.visitor_id = visitorId;
     if (chartData) data.chart_data = chartData;
-    if (reportStatus) data.report_status = reportStatus;
     if (deviceType && deviceType !== "unknown") data.device_type = deviceType;
-    if (paymentStatus !== "paid") data.preview_generated_at = new Date().toISOString();
+    data.preview_generated_at = new Date().toISOString();
 
     // Try with all fields first (works after migration)
     let { error } = await supabase.from("reports").upsert(data, { onConflict: "report_id" });
@@ -129,10 +131,8 @@ export async function POST(request) {
       );
     }
 
-    // SECURITY FIX: Trigger email sequence generation server-side.
-    // Previously this was called from the frontend (unauthenticated).
-    // Now it runs here with internal auth after a successful unpaid lead save.
-    if (paymentStatus !== "paid" && email && email.trim()) {
+    // Trigger email sequence generation server-side for unpaid leads with email.
+    if (email && email.trim()) {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
       const internalSecret = process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET;
       if (internalSecret) {

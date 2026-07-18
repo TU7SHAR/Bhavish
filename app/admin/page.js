@@ -328,12 +328,23 @@ function OverviewTab({ data }) {
     const founders = filtered.filter((r) => r.founder_upgrade_payment_id).length;
     const guidance = filtered.filter((r) => r.has_12_month_guidance && r.is_guidance_gifted !== true && r.payment_status === "paid").length;
     const founderFreeReports = filtered.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
-    const gross = (paid * 299) + (founders * 999) + (guidance * 149);
+
+    // Revenue uses plan_price when available (three-tier model), falls back to
+    // the legacy formula (₹299 + ₹149 guidance) for older rows.
+    const paidFiltered = filtered.filter((r) => r.payment_status === "paid" && !r.is_founder_free);
+    const reportGross = paidFiltered.reduce((sum, r) => {
+      if (r.plan_price && typeof r.plan_price === "number") return sum + r.plan_price;
+      let rev = 299;
+      if (r.has_12_month_guidance && r.is_guidance_gifted !== true) rev += 149;
+      return sum + rev;
+    }, 0);
+    const gross = reportGross + (founders * 999);
     const fees = Math.round(gross * 2.36 / 100);
     const net = gross - fees;
     const conversion = leads > 0 ? ((paid / leads) * 100).toFixed(1) : "0";
+    const aov = paid > 0 ? Math.round(gross / paid) : 0;
 
-    return { leads, paid, gross, net, fees, conversion, founders, guidance, founderFreeReports };
+    return { leads, paid, gross, net, fees, conversion, founders, guidance, founderFreeReports, aov };
   };
 
   const filtered = getFilteredStats();
@@ -475,9 +486,19 @@ function OverviewTab({ data }) {
           <StatCard label="Unpaid Leads" value={data.totalUnpaid} accent="amber" />
           <StatCard label="Founder Members" value={data.founderMembers} sub="₹999 upgrade" accent="pink" />
           <StatCard label="Founder Reports" value={data.totalFounderFree || 0} sub="free · not revenue" accent="pink" />
-          <StatCard label="12-Mo Guidance" value={data.with12MonthGuidance} sub="₹149 add-on" accent="blue" />
-          <StatCard label="Avg / Customer" value={`₹${data.totalPaid ? Math.round(data.totalRevenue / data.totalPaid) : 0}`} accent="green" />
+          <StatCard label="12-Mo Guidance" value={data.with12MonthGuidance} sub="included or add-on" accent="blue" />
+          <StatCard label="AOV" value={`₹${data.aov || (data.totalPaid ? Math.round(data.totalRevenue / data.totalPaid) : 0)}`} accent="green" />
         </div>
+
+        {/* Per-tier breakdown (three-tier model) */}
+        {data.tierCounts && (data.tierCounts.essential > 0 || data.tierCounts.premium > 0 || data.tierCounts.master > 0) && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+            <StatCard label="Essential" value={data.tierCounts.essential} sub={`₹${(data.tierRevenue?.essential || 0).toLocaleString("en-IN")}`} accent="gray" />
+            <StatCard label="Premium" value={data.tierCounts.premium} sub={`₹${(data.tierRevenue?.premium || 0).toLocaleString("en-IN")}`} accent="purple" />
+            <StatCard label="Master" value={data.tierCounts.master} sub={`₹${(data.tierRevenue?.master || 0).toLocaleString("en-IN")}`} accent="amber" />
+            <StatCard label="Legacy (Pre-Tier)" value={data.tierCounts.legacy} sub={`₹${(data.tierRevenue?.legacy || 0).toLocaleString("en-IN")}`} accent="gray" />
+          </div>
+        )}
       </div>
 
       <div>
@@ -1192,6 +1213,13 @@ function LeadsTab({ leads }) {
                     {show("status") && <td className="p-3 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${lead.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>{lead.payment_status}</span>
                       {lead.is_founder_member && <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-pink-500/20 text-pink-400">F</span>}
+                      {lead.plan_tier && !["premium_legacy", "legacy_founder"].includes(lead.plan_tier) && (
+                        <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                          lead.plan_tier === "master" ? "bg-amber-500/20 text-amber-300" :
+                          lead.plan_tier === "premium" ? "bg-purple-500/20 text-purple-300" :
+                          "bg-gray-500/20 text-gray-300"
+                        }`}>{lead.plan_tier === "essential" ? "E" : lead.plan_tier === "premium" ? "P" : "M"}{lead.plan_price ? ` ₹${lead.plan_price}` : ""}</span>
+                      )}
                     </td>}
                     {show("device") && <td className="p-3 text-center">
                       {lead.device_type === "mobile" ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">📱</span>
@@ -1291,9 +1319,16 @@ function PaymentsTab({ payments }) {
                   <td className="p-3 text-gray-400 text-xs">{p.email || "—"}</td>
                   <td className="p-3 text-xs font-mono text-gray-500">{p.payment_id || "—"}</td>
                   <td className="p-3">
+                    {p.plan_tier && !["premium_legacy", "legacy_founder"].includes(p.plan_tier) && (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium mr-1 ${
+                        p.plan_tier === "master" ? "bg-amber-500/20 text-amber-300" :
+                        p.plan_tier === "premium" ? "bg-purple-500/20 text-purple-300" :
+                        "bg-gray-500/20 text-gray-300"
+                      }`}>{p.plan_tier.charAt(0).toUpperCase() + p.plan_tier.slice(1)} ₹{p.plan_price || "?"}</span>
+                    )}
                     {p.is_founder_member && <span className={`px-2 py-0.5 rounded-full text-[11px] mr-1 ${p.is_founder_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-pink-500/20 text-pink-400"}`}>{p.is_founder_gifted ? "🎁 Founder (Gifted)" : "Founder ₹999"}</span>}
                     {p.has_12_month_guidance && <span className={`px-2 py-0.5 rounded-full text-[11px] ${p.is_guidance_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-blue-500/20 text-blue-400"}`}>{p.is_guidance_gifted ? "🎁 Guidance (Gifted)" : "Guidance ₹149"}</span>}
-                    {!p.is_founder_member && !p.has_12_month_guidance && <span className="text-gray-600 text-xs">Base only</span>}
+                    {!p.is_founder_member && !p.has_12_month_guidance && !p.plan_tier && <span className="text-gray-600 text-xs">Base only</span>}
                   </td>
                   <td className="p-3 text-gray-500 text-xs">{new Date(p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
                 </tr>
@@ -1989,6 +2024,13 @@ function DetailCard({ person, expanded, onToggle, password }) {
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
             person.payment_status === "paid" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
           }`}>{person.payment_status}</span>
+          {person.plan_tier && !["premium_legacy", "legacy_founder"].includes(person.plan_tier) && (
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              person.plan_tier === "master" ? "bg-amber-500/20 text-amber-300" :
+              person.plan_tier === "premium" ? "bg-purple-500/20 text-purple-300" :
+              "bg-gray-500/20 text-gray-300"
+            }`}>{person.plan_tier.charAt(0).toUpperCase() + person.plan_tier.slice(1)}{person.plan_price ? ` ₹${person.plan_price}` : ""}</span>
+          )}
           {person.report_status === "failed" && <span className="px-2 py-0.5 rounded-full text-[11px] bg-red-500/20 text-red-400 font-semibold">⚠️ Report Failed</span>}
           {person.is_founder_member && <span className={`px-2 py-0.5 rounded-full text-[11px] ${person.is_founder_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-pink-500/20 text-pink-400"}`}>{person.is_founder_gifted ? "🎁 Founder (Gifted)" : "Founder"}</span>}
           {person.has_12_month_guidance && <span className={`px-2 py-0.5 rounded-full text-[11px] ${person.is_guidance_gifted ? "bg-yellow-500/20 text-yellow-300" : "bg-blue-500/20 text-blue-400"}`}>{person.is_guidance_gifted ? "🎁 12-Mo (Gifted)" : "📅 12-Mo"}</span>}
