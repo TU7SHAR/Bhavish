@@ -28,6 +28,7 @@ export async function GET(request) {
   const specificReportId = searchParams.get("reportId");
   const specificPaymentId = searchParams.get("paymentId");
   const forceBump = searchParams.get("includeBump") === "true";
+  const forcePlanId = searchParams.get("planId") || null; // essential | premium | master
   const count = Math.min(Math.max(parseInt(searchParams.get("count") || "30", 10) || 30, 1), 100);
 
   const razorpay = new Razorpay({
@@ -41,6 +42,8 @@ export async function GET(request) {
       const result = await fulfillPayment({
         reportId: specificReportId,
         paymentId: specificPaymentId || null,
+        planId: forcePlanId,
+        includeGuidance: forceBump,
         includeBump: forceBump,
         source: "reconcile-one",
       });
@@ -57,6 +60,8 @@ export async function GET(request) {
       const result = await fulfillPayment({
         reportId: details.reportId,
         paymentId: payment.id,
+        planId: forcePlanId || details.planId,
+        includeGuidance: details.includeGuidance || forceBump,
         includeBump: details.includeBump || forceBump,
         source: "reconcile-payment",
       });
@@ -78,6 +83,8 @@ export async function GET(request) {
       const result = await fulfillPayment({
         reportId: details.reportId,
         paymentId: payment.id,
+        planId: details.planId,
+        includeGuidance: details.includeGuidance,
         includeBump: details.includeBump,
         source: "reconcile-scan",
       });
@@ -100,13 +107,25 @@ export async function GET(request) {
   }
 }
 
-// Resolve { reportId, includeBump } for a payment by reading its parent order.
+// Resolve { reportId, planId, includeGuidance, includeBump } for a payment by
+// reading its parent order notes.
+function planFromNotes(notes = {}, amount) {
+  return {
+    planId: notes.planId || null,
+    includeGuidance: notes.guidanceMonths
+      ? parseInt(notes.guidanceMonths, 10) > 0
+      : notes.has_12_month_guidance === "true" || amount === 44800,
+    // Legacy add-on flag (₹448 = base + guidance).
+    includeBump: notes.has_12_month_guidance === "true" || amount === 44800,
+  };
+}
+
 async function orderDetailsFromPayment(razorpay, payment) {
   // Payment notes may carry it directly.
   if (payment?.notes?.reportId) {
     return {
       reportId: payment.notes.reportId,
-      includeBump: payment.notes.has_12_month_guidance === "true",
+      ...planFromNotes(payment.notes, payment.amount),
     };
   }
   if (payment?.order_id) {
@@ -115,12 +134,11 @@ async function orderDetailsFromPayment(razorpay, payment) {
       const notes = order?.notes || {};
       return {
         reportId: notes.reportId || order?.receipt || null,
-        // Fallback: infer the add-on from the amount (₹448 = base + guidance).
-        includeBump: notes.has_12_month_guidance === "true" || payment.amount === 44800,
+        ...planFromNotes(notes, payment.amount),
       };
     } catch (e) {
       console.error("[reconcile] order fetch failed", payment.order_id, e.message);
     }
   }
-  return { reportId: null, includeBump: false };
+  return { reportId: null, planId: null, includeGuidance: false, includeBump: false };
 }

@@ -1,20 +1,17 @@
 import Razorpay from "razorpay";
 import { NextResponse } from "next/server";
 import { paymentLimiter } from "../../../lib/rate-limit.js";
-
-// Server-side prices — NEVER trust frontend amount
-const PRICE_BASE = parseInt(process.env.NEXT_PUBLIC_PRICE_BASE || "299");
-const PRICE_BUMP = parseInt(process.env.NEXT_PUBLIC_PRICE_BUMP || "149");
+import { resolvePlan, resolveLegacyBump } from "../../../lib/plans.js";
 
 export async function POST(request) {
   try {
     // Rate limiting — prevent order creation spam
-    const rateCheck = paymentLimiter(request);
+    const rateCheck = await paymentLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
-    const { reportId, email, name, includeBump } = await request.json();
+    const { reportId, email, name, planId, includeGuidance, includeBump } = await request.json();
 
     if (!reportId) {
       return NextResponse.json(
@@ -23,14 +20,25 @@ export async function POST(request) {
       );
     }
 
+    // SERVER decides the plan + price. The client only sends a planId (and, for
+    // Essential, whether the ₹149 guidance add-on was ticked). Never trust a
+    // price coming from the client.
+    //   New clients:  { planId: "essential"|"premium"|"master", includeGuidance }
+    //   Legacy clients (pre-tiers): { includeBump } → mapped onto Essential.
+    const plan = planId
+      ? resolvePlan(planId, { includeGuidance: !!includeGuidance })
+      : resolveLegacyBump(includeBump);
+
+    if (!plan) {
+      return NextResponse.json({ error: "Invalid plan selected." }, { status: 400 });
+    }
+
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    // SERVER decides the price — frontend cannot manipulate this
-    const totalPrice = includeBump ? PRICE_BASE + PRICE_BUMP : PRICE_BASE;
-    const amount = totalPrice * 100; // paise
+    const amount = plan.price * 100; // paise
 
     const order = await razorpay.orders.create({
       amount,
@@ -40,7 +48,14 @@ export async function POST(request) {
         reportId,
         customerEmail: email || "",
         customerName: name || "",
-        has_12_month_guidance: includeBump ? "true" : "false",
+        // New plan metadata (source of truth for fulfillment).
+        planId: plan.planId,
+        planTier: plan.tier,
+        guidanceMonths: String(plan.guidanceMonths),
+        deepDive: plan.deepDive ? "true" : "false",
+        // Legacy note kept so the webhook/reconciliation amount-based fallback
+        // and older code paths still understand guidance.
+        has_12_month_guidance: plan.guidanceMonths > 0 ? "true" : "false",
       },
     });
 
@@ -49,8 +64,11 @@ export async function POST(request) {
       amount: order.amount,
       currency: order.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
-      includeBump: !!includeBump,
-      totalPrice,
+      planId: plan.planId,
+      tier: plan.tier,
+      guidanceMonths: plan.guidanceMonths,
+      deepDive: plan.deepDive,
+      totalPrice: plan.price,
     });
   } catch (error) {
     console.error("Order creation error:", error);
