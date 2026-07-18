@@ -65,19 +65,47 @@ export async function GET(request) {
       const totalUnpaid = reports.filter((r) => r.payment_status === "unpaid").length;
       const totalFounderFree = reports.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
 
-      // Accurate revenue calculation (accounts for all products)
-      // BULLETPROOF: founder revenue counts ONLY rows with founder_upgrade_payment_id
-      // (proof of real ₹999 payment — gifts never set this field).
-      // Guidance revenue counts ONLY rows where has_12_month_guidance=true AND
-      // is_guidance_gifted is NOT true (gifted ones excluded).
+      // All genuinely paid reports (not founder-free). Used for revenue + tier stats.
+      const paidReportsAll = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free);
+
+      // Accurate revenue calculation — THREE-TIER AWARE.
+      // Uses plan_price from the DB when available (set by verify-payment for new
+      // purchases). Falls back to the legacy formula for older rows that predate
+      // the three-tier model (paid*299 + founder upgrades*999 + guidance*149).
+      //
+      // Gifted tiers are excluded from revenue (no real payment occurred).
       const founderMembers = reports.filter((r) => r.is_founder_member).length;
       const founderMembersPaid = reports.filter((r) => r.founder_upgrade_payment_id).length;
       const with12MonthGuidance = reports.filter((r) => r.has_12_month_guidance).length;
       const with12MonthGuidancePaid = reports.filter((r) => r.has_12_month_guidance && r.is_guidance_gifted !== true && r.payment_status === "paid").length;
-      const baseRevenue = totalPaid * 299;
+
+      // Helper: get the actual revenue for a single paid report.
+      // plan_price is set for new 3-tier purchases; legacy rows use the formula.
+      function reportRevenue(r) {
+        if (r.plan_price && typeof r.plan_price === "number") return r.plan_price;
+        // Legacy fallback: ₹299 base + ₹149 guidance (if paid, not gifted)
+        let rev = 299;
+        if (r.has_12_month_guidance && r.is_guidance_gifted !== true) rev += 149;
+        return rev;
+      }
+
+      // Total revenue from report purchases (excludes founder upgrades — counted separately).
+      const reportRevenueTotal = paidReportsAll.reduce((sum, r) => sum + reportRevenue(r), 0);
       const founderRevenue = founderMembersPaid * 999;
-      const guidanceRevenue = with12MonthGuidancePaid * 149;
-      const totalRevenue = baseRevenue + founderRevenue + guidanceRevenue;
+      const totalRevenue = reportRevenueTotal + founderRevenue;
+
+      // Per-tier breakdown (new 3-tier model). Legacy rows (plan_tier=null or premium_legacy)
+      // are counted under "Legacy (Pre-Tier)" for clarity.
+      const tierCounts = { essential: 0, premium: 0, master: 0, legacy: 0 };
+      const tierRevenue = { essential: 0, premium: 0, master: 0, legacy: 0 };
+      for (const r of paidReportsAll) {
+        const t = r.plan_tier;
+        if (t === "essential") { tierCounts.essential++; tierRevenue.essential += reportRevenue(r); }
+        else if (t === "premium") { tierCounts.premium++; tierRevenue.premium += reportRevenue(r); }
+        else if (t === "master") { tierCounts.master++; tierRevenue.master += reportRevenue(r); }
+        else { tierCounts.legacy++; tierRevenue.legacy += reportRevenue(r); }
+      }
+      const aov = totalPaid > 0 ? Math.round(totalRevenue / totalPaid) : 0;
 
       // Razorpay fee: 2% + 18% GST on the 2% = 2.36% effective
       const RAZORPAY_FEE_PERCENT = 2.36;
@@ -99,7 +127,7 @@ export async function GET(request) {
       };
       const todayStartMs = istDayStart(Date.now());
 
-      const paidReports = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free);
+      const paidReports = paidReportsAll; // same set, named for settlement logic below
 
       // A payment is settled once (its payment day + delay) has arrived.
       const isSettled = (r) => {
@@ -111,12 +139,11 @@ export async function GET(request) {
       const settledReports = paidReports.filter(isSettled);
       const pendingReports = paidReports.filter((r) => !isSettled(r));
 
-      // Calculate settled/pending amounts per product (exclude gifted from revenue)
+      // Calculate settled/pending amounts (uses plan_price when available)
       function calcRevenue(list) {
-        const base = list.length * 299;
+        const reportGross = list.reduce((sum, r) => sum + reportRevenue(r), 0);
         const founder = list.filter((r) => r.founder_upgrade_payment_id).length * 999;
-        const guidance = list.filter((r) => r.has_12_month_guidance && r.is_guidance_gifted !== true).length * 149;
-        const gross = base + founder + guidance;
+        const gross = reportGross + founder;
         const fees = Math.round(gross * RAZORPAY_FEE_PERCENT / 100);
         return { gross, net: gross - fees, fees };
       }
@@ -158,9 +185,11 @@ export async function GET(request) {
           totalRevenue,
           netRevenue,
           totalFees,
-          baseRevenue,
           founderRevenue,
-          guidanceRevenue,
+          aov,
+          // Per-tier breakdown (new three-tier model)
+          tierCounts,
+          tierRevenue,
           settledAmount: settled.net,
           settledGross: settled.gross,
           settledFees: settled.fees,
@@ -197,6 +226,8 @@ export async function GET(request) {
             has_12_month_guidance: !!r.has_12_month_guidance,
             is_guidance_gifted: !!r.is_guidance_gifted,
             paid_at: r.paid_at || null,
+            plan_tier: r.plan_tier || null,
+            plan_price: r.plan_price || null,
           })),
         },
       });
