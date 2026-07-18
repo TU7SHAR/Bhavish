@@ -94,6 +94,35 @@ export async function POST(request) {
       })
       .eq("report_id", reportId);
 
+    // NOW send the final email with ALL sections (main + deep-dive).
+    // This ensures Master customers receive a complete ₹999 report, not a
+    // partial Premium-style one. (Essential/Premium are emailed by fulfillPayment
+    // immediately; Master is held until here.)
+    if (report.email && report.email.trim()) {
+      try {
+        const { getInternalAuthHeaders } = await import("../../../lib/auth.js");
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+        await fetch(`${baseUrl}/api/send-report-email`, {
+          method: "POST",
+          headers: getInternalAuthHeaders(),
+          body: JSON.stringify({
+            email: report.email,
+            name: report.name,
+            reportId: report.report_id,
+            sections: merged,
+            summary: report.summary,
+            chartData: report.chart_data,
+            dateOfBirth: report.date_of_birth,
+            timeOfBirth: report.time_of_birth,
+            placeOfBirth: report.place_of_birth,
+            includeBump: true, // Master always includes guidance
+          }),
+        });
+      } catch (emailErr) {
+        console.error("[deep-dive] Final email send failed:", emailErr.message);
+      }
+    }
+
     return NextResponse.json({
       status: "completed",
       reportId,

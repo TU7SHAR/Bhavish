@@ -13,8 +13,8 @@ import { createServiceClient } from "../../../../lib/supabase-service.js";
 // Body: { name, gender, dateOfBirth, timeOfBirth, placeOfBirth, personalQuestion }
 export const maxDuration = 60;
 
-// 0 = unlimited. Set to e.g. 1 for "1 free report per month".
-const FOUNDER_MONTHLY_LIMIT = parseInt(process.env.FOUNDER_MONTHLY_LIMIT || "0", 10);
+// Contractual default: 5 reports/month. Override via env if needed.
+const FOUNDER_MONTHLY_LIMIT = parseInt(process.env.FOUNDER_MONTHLY_LIMIT || "5", 10);
 
 export async function POST(request) {
   try {

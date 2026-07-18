@@ -30,16 +30,19 @@ export async function POST(request) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
-    const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender, personalQuestion } =
-      await request.json();
+    const rawBody = await request.json();
 
-    // Basic validation
-    if (!name || !dateOfBirth || !timeOfBirth || !placeOfBirth) {
-      return NextResponse.json(
-        { error: "All required fields must be filled" },
-        { status: 400 }
-      );
+    // Zod validation — enforces type safety + format constraints on all inputs.
+    let validated;
+    try {
+      validated = inputSchema.parse(rawBody);
+    } catch (zodErr) {
+      const msg = zodErr.errors?.[0]?.message || "Invalid input data";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
+
+    const { name, dateOfBirth, timeOfBirth, placeOfBirth, gender } = validated;
+    const personalQuestion = rawBody.personalQuestion || "";
 
     // Step 1: Geocode the birth place
     const location = await geocodePlace(placeOfBirth);
