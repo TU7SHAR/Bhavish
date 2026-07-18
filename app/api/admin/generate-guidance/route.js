@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { verifyAdmin } from "../../../../lib/auth.js";
+import { mdToHtml } from "../../../../lib/markdown.js";
 
 // Admin route: Generate a single month's guidance report for a customer.
 // POST /api/admin/generate-guidance
@@ -270,7 +271,7 @@ function buildGuidanceEmailHtml({ name, monthNumber, calendarMonth, calendarYear
   const sectionsHtml = sections.map((s) => `
     <div style="margin-bottom:20px;padding:16px;background:#1a1a2e;border-radius:12px;border-left:4px solid #3b82f6;">
       <h3 style="color:#93c5fd;margin:0 0 8px 0;font-size:15px;">${s.title}</h3>
-      <p style="color:#e2e8f0;margin:0;font-size:13px;line-height:1.7;white-space:pre-line;">${s.content.substring(0, 300)}${s.content.length > 300 ? "..." : ""}</p>
+      <p style="color:#e2e8f0;margin:0;font-size:13px;line-height:1.7;">${mdToHtml(s.content.substring(0, 300) + (s.content.length > 300 ? "..." : ""))}</p>
     </div>
   `).join("");
 

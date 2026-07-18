@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { NextResponse } from "next/server";
+import { mdToPlain } from "../../../lib/markdown.js";
 
 // Server-side PDF generation for the full astrology report.
 // POST /api/generate-pdf
@@ -197,7 +198,7 @@ export async function POST(request) {
       // Section content
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(10);
-      const lines = doc.splitTextToSize(section.content || "", contentWidth);
+      const lines = doc.splitTextToSize(mdToPlain(section.content || ""), contentWidth);
       for (const line of lines) {
         checkPage(7);
         doc.text(line, margin, y);

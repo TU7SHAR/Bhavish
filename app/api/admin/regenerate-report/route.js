@@ -1,27 +1,39 @@
 import { createClient } from "@supabase/supabase-js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { generateWithRetry } from "../../../../lib/gemini-retry.js";
 import { calculateBirthChart } from "../../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../../lib/geocode.js";
 import { verifyAdmin } from "../../../../lib/auth.js";
+import { generateFullReport } from "../../../../lib/report-generation.js";
+import { generateDeepDive } from "../../../../lib/deep-dive.js";
+import { resolvePlan } from "../../../../lib/plans.js";
 
-// Admin endpoint: regenerate a customer's FULL report from scratch.
-// Recalculates the chart from birth details, then generates all 20 sections.
+// Admin endpoint: regenerate a customer's report from scratch, TIER-AWARE.
+// Recalculates the chart from birth details, then generates exactly what the
+// chosen tier includes (reusing the same shared generators as the live flow):
+//   - essential → 10 core sections + personal answer (+ 12-month guidance if requested)
+//   - premium   → 20 core sections + personal answer + 12-month guidance
+//   - master    → premium main report + a 7-section concern deep-dive + 24-month roadmap
+//
 // POST /api/admin/regenerate-report
 // Header: Authorization: Bearer <ADMIN_SECRET>
-// Body: { reportId }
+// Body: { reportId, tier?: "essential"|"premium"|"master", includeGuidance?: boolean }
+// Defaults to "premium" when no tier is passed (preserves the old 20-section behavior).
 export const maxDuration = 60;
 
 export async function POST(request) {
-  // SECURITY FIX: Use timing-safe comparison
   const auth = verifyAdmin(request);
   if (!auth.authorized) return auth.error;
 
   try {
-    const { reportId } = await request.json();
+    const { reportId, tier: rawTier, includeGuidance } = await request.json();
     if (!reportId) {
       return NextResponse.json({ error: "Missing reportId" }, { status: 400 });
+    }
+
+    const tierId = ["essential", "premium", "master"].includes(rawTier) ? rawTier : "premium";
+    const plan = resolvePlan(tierId, { includeGuidance: !!includeGuidance });
+    if (!plan) {
+      return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
     }
 
     const supabase = createClient(
@@ -29,7 +41,6 @@ export async function POST(request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
-    // Fetch the report's birth details
     const { data: report, error: fetchErr } = await supabase
       .from("reports")
       .select("report_id, name, gender, date_of_birth, time_of_birth, place_of_birth, personal_question")
@@ -44,10 +55,8 @@ export async function POST(request) {
       return NextResponse.json({ error: "Report is missing birth details — cannot recalculate chart" }, { status: 400 });
     }
 
-    // Step 1: Geocode the birth place
+    // Recalculate the birth chart from stored birth details.
     const location = await geocodePlace(report.place_of_birth);
-
-    // Step 2: Recalculate the birth chart
     const chartData = calculateBirthChart({
       dateOfBirth: report.date_of_birth,
       timeOfBirth: report.time_of_birth,
@@ -56,143 +65,105 @@ export async function POST(request) {
       timezoneOffsetMinutes: location.timezoneOffsetMinutes,
     });
 
-    // Step 3: Build the full report prompt
-    const planetaryTable = Object.entries(chartData.planets)
-      .map(([planet, data]) => `${planet}: ${data.sign} (${data.degree}) | House ${data.house} | Navamsa D9: ${data.navamsa} | ${data.dignity}`)
-      .join("\n");
-    const dashaTable = (chartData.dasha || [])
-      .map((d, i) => `${i + 1}. ${d.planet} Mahadasha: ${d.years} years`)
-      .join("\n");
+    // Generate the tier-appropriate main report via the shared generator.
+    const { summary, sections } = await generateFullReport({
+      name: report.name,
+      gender: report.gender,
+      dateOfBirth: report.date_of_birth,
+      timeOfBirth: report.time_of_birth,
+      placeOfBirth: report.place_of_birth,
+      chartData,
+      personalQuestion: report.personal_question,
+      tier: plan.tier,
+      guidanceMonths: plan.guidanceMonths,
+    });
 
-    // Lucky factors (pre-computed from ascendant lord) — must be used in Section 18
-    const signGemsLookup = {
-      1: { gem: "Red Coral", color: "Red", lucky: "9, 1, 3", day: "Tuesday" },
-      2: { gem: "Diamond", color: "White", lucky: "6, 2, 7", day: "Friday" },
-      3: { gem: "Emerald", color: "Green", lucky: "5, 3, 8", day: "Wednesday" },
-      4: { gem: "Pearl", color: "White/Silver", lucky: "2, 7, 9", day: "Monday" },
-      5: { gem: "Ruby", color: "Gold/Orange", lucky: "1, 4, 9", day: "Sunday" },
-      6: { gem: "Emerald", color: "Green", lucky: "5, 3, 6", day: "Wednesday" },
-      7: { gem: "Diamond", color: "White/Pink", lucky: "6, 7, 2", day: "Friday" },
-      8: { gem: "Red Coral", color: "Dark Red", lucky: "9, 1, 8", day: "Tuesday" },
-      9: { gem: "Yellow Sapphire", color: "Yellow", lucky: "3, 9, 5", day: "Thursday" },
-      10: { gem: "Blue Sapphire", color: "Blue/Black", lucky: "8, 4, 6", day: "Saturday" },
-      11: { gem: "Blue Sapphire", color: "Blue", lucky: "8, 4, 7", day: "Saturday" },
-      12: { gem: "Yellow Sapphire", color: "Yellow", lucky: "3, 9, 7", day: "Thursday" },
+    // Persist the main report first so it's never lost if the (optional,
+    // longer) Master deep-dive step times out or fails.
+    const baseUpdate = {
+      summary,
+      sections,
+      chart_data: chartData,
+      plan_tier: plan.tier,
+      plan_price: plan.price,
+      guidance_months: plan.guidanceMonths,
     };
-    const signIdx = chartData.ascendant.signIndex || 1;
-    const luckyFactors = signGemsLookup[signIdx] || signGemsLookup[1];
-
-    const personalQuestion = report.personal_question || "";
-    const name = report.name;
-
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
-
-    const fullPrompt = `You are an expert Vedic astrologer (Jyotishi). Interpret these EXACT calculated positions (Swiss Ephemeris, Lahiri Ayanamsa). Do NOT recalculate.
-
-BIRTH DATA: ${name} | ${report.gender} | ${report.date_of_birth} | ${report.time_of_birth} | ${report.place_of_birth}
-
-CHART:
-Ascendant: ${chartData.ascendant.sign} at ${chartData.ascendant.degree} | Navamsa D9: ${chartData.ascendant.navamsa}
-Moon Nakshatra: ${chartData.nakshatra.name} (Pada ${chartData.nakshatra.pada}), Lord: ${chartData.nakshatra.ruler}
-Rashi: ${chartData.rashi}
-
-PLANETS:
-${planetaryTable}
-
-DASHA SEQUENCE (from birth):
-${dashaTable}
-
-CURRENT DASHA (USE THIS EXACTLY — do NOT guess or recalculate):
-${chartData.dashaTimeline?.summary || "Not available"}
-CRITICAL TIMELINE INSTRUCTION: The Mahadasha/Antardasha period stated above is a HARD FACT computed from the Moon's exact birth degree — treat it as ground truth. You MUST use this exact running period and its dates in Sections 12, 13, 16, 19, and 21. You are strictly forbidden from calculating, inferring, or guessing the current dasha from the person's age or from the dasha sequence years. Every timeline-based prediction in those sections must be anchored to the period stated above.
-
-NAVAMSA (D9) INSTRUCTION: Each planet's and the Ascendant's Navamsa (D9) sign is listed above as a HARD FACT. The Nakshatra pada's navamsa equals the Moon's Navamsa (D9) sign shown above. Whenever you reference a navamsa (e.g. Section 4), you MUST use these exact D9 signs and are strictly forbidden from computing or guessing any navamsa yourself.
-
-MANGLIK (MANGAL DOSHA) STATUS (computed — USE EXACTLY): ${chartData.manglik?.summary || "Not available"}
-MANGLIK INSTRUCTION: In Section 14 you MUST use the Manglik verdict and reasoning stated above. Do NOT decide Manglik status yourself or invent which house triggers it — Manglik houses are only 1, 2, 4, 7, 8, and 12 (never the 9th).
-
-YOGAS (computed — USE EXACTLY): ${chartData.yogas?.summary || "Not available"}
-YOGA INSTRUCTION: In Section 15 (Kaal Sarp & Other Yoga Analysis) you MUST use the exact Kaal Sarp verdict and the exact list of yogas stated above. If Kaal Sarp is ABSENT, clearly state it is absent — never claim a full or partial Kaal Sarp. Do NOT invent, add, or imply any yoga that is not in the list above, and do NOT contradict it. Only describe the yogas listed.
-
-Generate a 20-section report. Each section 250-350 words referencing specific planets/houses/degrees.
-
-Format JSON:
-{
-  "summary": "2-3 sentences with specific positions",
-  "sections": [{ "title": "...", "content": "..." }]
-}
-
-Sections:
-1. Rashi (Moon Sign) & Personality
-2. Lagna (Ascendant) & Physical Traits
-3. Sun Sign & Core Identity
-4. Nakshatra (Birth Star) Analysis
-5. Planetary Positions & Strengths
-6. Career & Professional Life
-7. Wealth & Financial Prospects
-8. Marriage & Love Life
-9. Family & Relationships
-10. Health & Physical Wellbeing
-11. Education & Intellectual Growth
-12. Current Mahadasha Analysis
-13. Upcoming Dasha Predictions (Next 5 Years)
-14. Manglik Dosha Analysis
-15. Kaal Sarp & Other Yoga Analysis
-16. Favorable & Unfavorable Periods
-17. Remedies & Spiritual Guidance
-18. Lucky Factors (Numbers, Colors, Gems, Days) — IMPORTANT: You MUST use these exact primary lucky factors (computed from Ascendant Lord): Primary Gem = ${luckyFactors.gem}, Primary Color = ${luckyFactors.color}, Primary Numbers = ${luckyFactors.lucky}, Primary Day = ${luckyFactors.day}. You may add secondary factors from Moon sign or strongest planet, but the PRIMARY factors listed here must appear first and must not be contradicted.
-19. Monthly Predictions for 2026-2027
-20. Life Purpose & Spiritual Path${personalQuestion ? `\n21. Personal Concern: Answer "${personalQuestion}" using relevant houses/planets/transits. Be specific about timing.` : ""}
-
-Use ${name}'s name. Mix Hindi/Sanskrit with English. Return ONLY valid JSON.`;
-
-    const result = await generateWithRetry(model, fullPrompt);
-    const responseText = result.response.text();
-
-    let reportData;
-    try {
-      const match = responseText.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("No JSON found");
-      reportData = JSON.parse(match[0]);
-    } catch (parseError) {
-      return NextResponse.json({ error: "AI returned invalid format. Try again." }, { status: 500 });
+    if (plan.deepDive) {
+      baseUpdate.deep_dive_status = "generating";
     }
 
-    if (!reportData.sections || reportData.sections.length < 15) {
-      return NextResponse.json({ error: `Only ${reportData.sections?.length || 0} sections generated. Try again.` }, { status: 500 });
-    }
-
-    // Step 4: Save the regenerated report to DB (incl. chart_data for kundli/lucky/remedies)
-    let { error: updateErr } = await supabase
-      .from("reports")
-      .update({
-        summary: reportData.summary,
-        sections: reportData.sections,
-        chart_data: chartData,
-      })
-      .eq("report_id", reportId);
-
-    // If chart_data column doesn't exist yet, retry without it
-    if (updateErr) {
-      const retry = await supabase
-        .from("reports")
-        .update({ summary: reportData.summary, sections: reportData.sections })
-        .eq("report_id", reportId);
-      updateErr = retry.error;
-    }
-
+    let updateErr = (await saveReport(supabase, reportId, baseUpdate)).error;
     if (updateErr) {
       return NextResponse.json({ error: "Report generated but DB save failed: " + updateErr.message }, { status: 500 });
+    }
+
+    // Master: append the concern-specific deep-dive + 24-month roadmap.
+    let deepDiveFocus = null;
+    let deepDiveSectionCount = 0;
+    if (plan.deepDive) {
+      try {
+        const dd = await generateDeepDive({
+          name: report.name,
+          chartData,
+          personalQuestion: report.personal_question,
+        });
+        deepDiveFocus = dd.focus;
+        deepDiveSectionCount = dd.sections.length;
+        const finalSections = [...sections, ...dd.sections];
+        const ddErr = (
+          await saveReport(supabase, reportId, {
+            sections: finalSections,
+            deep_dive_status: "completed",
+            deep_dive_focus: deepDiveFocus,
+          })
+        ).error;
+        if (ddErr) {
+          return NextResponse.json({ error: "Deep-dive generated but DB save failed: " + ddErr.message }, { status: 500 });
+        }
+      } catch (ddError) {
+        // Main report is already saved; report the partial failure so the
+        // admin can retry just the Master regen.
+        await saveReport(supabase, reportId, { deep_dive_status: "failed" });
+        return NextResponse.json(
+          {
+            success: false,
+            partial: true,
+            reportId,
+            tier: plan.tier,
+            sectionCount: sections.length,
+            error: "Main report regenerated, but deep-dive failed: " + ddError.message + ". Click Regen Master again to retry.",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({
       success: true,
       reportId,
-      sectionCount: reportData.sections.length,
+      tier: plan.tier,
+      price: plan.price,
+      sectionCount: sections.length + deepDiveSectionCount,
+      deepDiveFocus,
     });
   } catch (error) {
     console.error("regenerate-report error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+// Update the report; if newer columns (plan_tier, chart_data, deep_dive_*)
+// don't exist yet in the DB, retry with only the always-present fields so
+// regeneration still succeeds on un-migrated databases.
+async function saveReport(supabase, reportId, update) {
+  let { error } = await supabase.from("reports").update(update).eq("report_id", reportId);
+  if (error) {
+    const fallback = {};
+    if ("summary" in update) fallback.summary = update.summary;
+    if ("sections" in update) fallback.sections = update.sections;
+    if (Object.keys(fallback).length === 0) return { error: null };
+    const retry = await supabase.from("reports").update(fallback).eq("report_id", reportId);
+    error = retry.error;
+  }
+  return { error };
 }

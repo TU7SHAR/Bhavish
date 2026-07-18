@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyInternal } from "../../../lib/auth.js";
 import { ensureAccessToken, reportViewUrl } from "../../../lib/report-access.js";
+import { mdToHtml } from "../../../lib/markdown.js";
 
 export const maxDuration = 30;
 
@@ -167,7 +168,7 @@ function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl
       (s, i) => `
     <div class="section">
       <h2>${i + 1}. ${(s.title || "").replace(/^\d+\.\s*/, "")}</h2>
-      <p>${(s.content || "").replace(/\n/g, "<br>")}</p>
+      <p>${mdToHtml(s.content || "")}</p>
     </div>`
     )
     .join("")}
