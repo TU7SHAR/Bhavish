@@ -387,14 +387,14 @@ Revenue per customer: ₹299 (base) to ₹1,447 (base + guidance + founder).
 - **Non-critical DB errors don't break flow** — payment verification succeeds even if DB save fails
 
 ### What is NOT implemented (vulnerabilities):
-- **No rate limiting** on public API routes (generate-preview, save-report, etc.)
+- ~~**No rate limiting** on public API routes~~ → **FIXED** (Supabase-backed persistent rate limiting)
 - **No CSRF protection** — API routes accept any POST without token verification
 - **No middleware auth guard** — report/full page is "protected" by sessionStorage flag (trivially bypassable)
-- **No server-side paywall enforcement** — full report generation endpoint doesn't verify payment was actually made before generating
+- ~~**No server-side paywall enforcement**~~ → **FIXED** (generate-full-report verifies payment_status=paid in DB)
 - **Supabase RLS not visible** — if RLS is disabled, any anon key holder can read/write all data
 - **Report data in browser storage** — full report content lives in sessionStorage/localStorage (accessible to browser extensions)
-- **No webhook verification for Razorpay** — relies on client-side callback, no server-side webhook listener
-- **Email endpoints (send-report-email, notify-sale) have no auth** — could be called externally to send spam
+- ~~**No webhook verification for Razorpay**~~ → **FIXED** (Razorpay webhook with HMAC verification + fulfillPayment safety net)
+- ~~**Email endpoints (send-report-email, notify-sale) have no auth**~~ → **FIXED** (verifyInternal for send-report-email, notify-sale uses internal auth headers)
 
 ---
 
@@ -521,4 +521,97 @@ gemini-2.5-flash (503 errors constantly)
 
 ---
 
-*Last updated: June 2026*
+## Supabase Migrations
+
+### Rate Limits Table (required for persistent rate limiting)
+
+Run this in the **Supabase SQL Editor** (Dashboard → SQL Editor → New Query):
+
+```sql
+-- Rate limiting table for persistent, cross-instance rate limit enforcement.
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 1,
+  window_start TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits (window_start);
+
+-- Atomic rate limit check function.
+CREATE OR REPLACE FUNCTION check_rate_limit(
+  p_key TEXT,
+  p_max_requests INTEGER,
+  p_window_ms BIGINT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_record rate_limits%ROWTYPE;
+  v_now TIMESTAMPTZ := now();
+  v_window_start TIMESTAMPTZ := v_now - (p_window_ms || ' milliseconds')::INTERVAL;
+  v_allowed BOOLEAN;
+  v_count INTEGER;
+BEGIN
+  SELECT * INTO v_record FROM rate_limits WHERE key = p_key FOR UPDATE;
+
+  IF v_record IS NULL THEN
+    INSERT INTO rate_limits (key, count, window_start)
+    VALUES (p_key, 1, v_now)
+    ON CONFLICT (key) DO UPDATE SET count = 1, window_start = v_now;
+    RETURN json_build_object('allowed', true, 'current_count', 1);
+  END IF;
+
+  IF v_record.window_start < v_window_start THEN
+    UPDATE rate_limits SET count = 1, window_start = v_now WHERE key = p_key;
+    RETURN json_build_object('allowed', true, 'current_count', 1);
+  END IF;
+
+  v_count := v_record.count + 1;
+  UPDATE rate_limits SET count = v_count WHERE key = p_key;
+
+  v_allowed := v_count <= p_max_requests;
+  RETURN json_build_object('allowed', v_allowed, 'current_count', v_count);
+END;
+$$;
+
+-- Cleanup function (call periodically to remove stale entries)
+CREATE OR REPLACE FUNCTION cleanup_rate_limits()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  DELETE FROM rate_limits WHERE window_start < now() - INTERVAL '2 hours';
+END;
+$$;
+
+-- Grant access
+GRANT ALL ON rate_limits TO anon;
+GRANT ALL ON rate_limits TO service_role;
+GRANT EXECUTE ON FUNCTION check_rate_limit TO anon;
+GRANT EXECUTE ON FUNCTION check_rate_limit TO service_role;
+GRANT EXECUTE ON FUNCTION cleanup_rate_limits TO service_role;
+```
+
+The full migration file is also available at: `supabase/migrations/001_rate_limits_table.sql`
+
+---
+
+## Project Documentation
+
+Detailed project docs live in the `/docs` directory:
+
+| Document | Purpose |
+|----------|---------|
+| [docs/prd.md](docs/prd.md) | Product Requirements Document — purpose, audience, MVP features, out of scope |
+| [docs/architecture.md](docs/architecture.md) | System architecture — components, data flow, infrastructure |
+| [docs/requirements.md](docs/requirements.md) | Technical requirements — constraints, dependencies, non-functional specs |
+| [docs/implementation_plan.md](docs/implementation_plan.md) | Phase-based roadmap with checkboxes |
+| [docs/task.md](docs/task.md) | Current session goals (rotate after completion) |
+| [docs/audit.md](docs/audit.md) | Code audit against implementation plan |
+| [docs/bugs.md](docs/bugs.md) | Structured bug log with symptoms and hypotheses |
+| [docs/testing.md](docs/testing.md) | Test cases checklist for feature verification |
+
+---
+
+*Last updated: July 2026*
