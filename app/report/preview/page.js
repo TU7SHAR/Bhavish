@@ -180,7 +180,7 @@ export default function ReportPreview() {
 
           const verifyData = await verifyRes.json();
 
-          if (verifyData.success) {
+          if (verifyData.success || verifyData.paymentConfirmed) {
             // Fire Meta Pixel Purchase event
             if (typeof window !== "undefined" && window.fbq) {
               window.fbq("track", "Purchase", {
@@ -259,14 +259,9 @@ export default function ReportPreview() {
               (!guidanceOn || hasGuidance)
             );
 
-            // Master: kick off the concern-specific deep-dive as its OWN job.
-            // It appends to the report server-side; /report/full will poll for it.
-            if (isMaster && isComplete) {
-              fetch("/api/generate-master-deep-dive", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reportId: reportData.reportId }),
-              }).catch(console.error);
+            // Master deep-dive is triggered by fulfillPayment (server-side).
+            // The /report/full page polls for it automatically.
+            if (isMaster) {
               sessionStorage.setItem("masterDeepDivePending", "true");
             }
 
@@ -278,75 +273,20 @@ export default function ReportPreview() {
             sessionStorage.setItem("paymentVerified", "true");
             localStorage.setItem("paymentVerified_backup", "true");
             sessionStorage.setItem("paymentId", response.razorpay_payment_id);
-            // Flag so /report/full shows an honest "being prepared" screen instead of a partial report
             if (isComplete) sessionStorage.removeItem("reportPending");
             else sessionStorage.setItem("reportPending", "true");
 
-            // Always persist the payment; record report_status so admin knows delivery state.
-            fetch("/api/save-report", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                reportId: reportData.reportId,
-                name: userData.name,
-                email: userData.email,
-                dateOfBirth: userData.dateOfBirth,
-                timeOfBirth: userData.timeOfBirth,
-                placeOfBirth: userData.placeOfBirth,
-                gender: userData.gender,
-                summary: finalSummary,
-                sections: finalSections,
-                paymentId: response.razorpay_payment_id,
-                paymentStatus: "paid",
-                reportStatus: isComplete ? "completed" : "failed",
-                visitorId: getVisitorId(),
-                chartData: reportData.chartData,
-                planId,
-                includeGuidance,
-              }),
-            }).catch(console.error);
+            // SERVER OWNS FULFILLMENT: The webhook/fulfillPayment handles:
+            //   - persisting the paid report to DB
+            //   - emailing the customer (including PDF)
+            //   - notifying the owner
+            //   - triggering Master deep-dive
+            // The browser does NOT call save-report, send-report-email,
+            // notify-sale, or generate-master-deep-dive after payment.
+            // This eliminates the paid→unpaid regression, duplicate emails,
+            // and duplicate Gemini calls.
 
-            // Email the customer ONLY if the report passed the quality check.
-            if (isComplete && userData.email) {
-              fetch("/api/send-report-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  email: userData.email,
-                  name: userData.name,
-                  reportId: reportData.reportId,
-                  sections: finalSections,
-                  summary: finalSummary,
-                  chartData: reportData.chartData,
-                  dateOfBirth: userData.dateOfBirth,
-                  timeOfBirth: userData.timeOfBirth,
-                  placeOfBirth: userData.placeOfBirth,
-                  includeBump: guidanceOn,
-                }),
-              }).catch(console.error);
-            }
-
-            // Notify owner about the sale — flag failures so YOU can regenerate
-            // and resend before the customer even notices.
-            fetch("/api/notify-sale", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                reportId: reportData.reportId,
-                customerName: userData.name,
-                customerEmail: userData.email,
-                paymentId: response.razorpay_payment_id,
-                amount: String(price),
-                planTier: planId,
-                placeOfBirth: userData.placeOfBirth,
-                dateOfBirth: userData.dateOfBirth,
-                includeBump: guidanceOn,
-                reportComplete: isComplete,
-              }),
-            }).catch(console.error);
-
-            // Go straight to the full report. The Founder upsell has been retired
-            // for new buyers (existing Founder members are grandfathered).
+            // Go to the full report page.
             router.push("/report/full");
           } else {
             alert("Payment verification failed. Please contact support.");

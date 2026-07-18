@@ -60,7 +60,32 @@ export async function POST(request) {
 
     const focus = report.deep_dive_focus || classifyFocus(report.personal_question);
 
-    // Mark generating (best-effort).
+    // ATOMIC CLAIM — only one process generates the deep-dive.
+    let claimed = false;
+    try {
+      const { data: claimResult } = await supabase.rpc("claim_deep_dive_generation", { p_report_id: reportId });
+      claimed = !!claimResult;
+    } catch {
+      // RPC not available — fallback
+      const { data: rows } = await supabase
+        .from("reports")
+        .update({ deep_dive_status: "generating", deep_dive_focus: focus })
+        .eq("report_id", reportId)
+        .in("deep_dive_status", ["pending", "failed"])
+        .select("report_id");
+      claimed = Array.isArray(rows) && rows.length > 0;
+    }
+
+    if (!claimed) {
+      // Already being generated or completed — return existing sections.
+      const { data: current } = await supabase.from("reports").select("sections, deep_dive_status").eq("report_id", reportId).single();
+      if (current?.deep_dive_status === "completed") {
+        return NextResponse.json({ status: "already_done", reportId, sections: current.sections || [] });
+      }
+      return NextResponse.json({ status: "generating", reportId }, { status: 202 });
+    }
+
+    // Mark generating with focus
     await supabase
       .from("reports")
       .update({ deep_dive_status: "generating", deep_dive_focus: focus })

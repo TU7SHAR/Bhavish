@@ -59,15 +59,15 @@ export async function POST(request) {
       order = await razorpay.orders.fetch(razorpay_order_id);
     } catch (fetchErr) {
       console.error("Failed to fetch Razorpay order:", fetchErr.message);
-      // Even if the fetch fails, the signature IS valid — payment happened.
-      // Return success so the user isn't stuck, but log for investigation.
+      // Signature IS valid so payment happened. But we cannot determine which
+      // report to mark paid or what tier they bought. Return a distinct status
+      // so the client shows "payment confirmed, report being prepared" instead
+      // of "success!" — the webhook/reconciliation will complete fulfillment.
       return NextResponse.json({
-        success: true,
+        paymentConfirmed: true,
+        fulfillmentPending: true,
         paymentId: razorpay_payment_id,
-        message: "Payment verified (order fetch failed — reconcile later)",
-        tier: "premium",
-        guidanceMonths: 0,
-        deepDive: false,
+        message: "Payment confirmed. Your report is being prepared and will be emailed to you shortly.",
       });
     }
 
@@ -78,15 +78,12 @@ export async function POST(request) {
     const orderIncludeGuidance = orderGuidanceMonths > 0 || notes.has_12_month_guidance === "true";
 
     if (!reportId) {
-      // Payment is valid but we can't identify which report it belongs to.
-      // Return success (don't block the user) — webhook/reconcile will fix it.
+      // Payment valid but can't identify report. Webhook/reconcile will fix.
       return NextResponse.json({
-        success: true,
+        paymentConfirmed: true,
+        fulfillmentPending: true,
         paymentId: razorpay_payment_id,
-        message: "Payment verified (no reportId in order — reconcile needed)",
-        tier: "premium",
-        guidanceMonths: 0,
-        deepDive: false,
+        message: "Payment confirmed. Your report is being prepared.",
       });
     }
 

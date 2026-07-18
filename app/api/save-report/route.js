@@ -14,46 +14,51 @@ function detectDevice(userAgent) {
   return "desktop";
 }
 
+// PUBLIC endpoint: saves the initial PREVIEW lead to the database.
+//
+// SECURITY RULES:
+// 1. This endpoint can only CREATE new unpaid rows or UPDATE existing UNPAID rows.
+// 2. It NEVER touches a row whose payment_status is already "paid" or "founder".
+// 3. It NEVER accepts payment_status, payment_id, plan_tier, plan_price,
+//    report_status from the client — those are server-only fields.
+// 4. Server-side sanitization is applied to name/place/question.
+
 export async function POST(request) {
   try {
-    // Rate limiting — prevent fake lead injection
+    // Rate limiting
     const rateCheck = await saveLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
+    const body = await request.json();
     const {
       reportId,
-      name,
       email,
       dateOfBirth,
       timeOfBirth,
-      placeOfBirth,
       gender,
       summary,
       sections,
       attribution,
-      personalQuestion,
       city,
       visitorId,
       chartData,
-    } = await request.json();
+    } = body;
+
+    // Server-side sanitization (defense in depth — don't trust browser sanitization)
+    const name = sanitizeName(body.name, 100);
+    const placeOfBirth = sanitizePlace(body.placeOfBirth, 200);
+    const personalQuestion = sanitizeForPrompt(body.personalQuestion || "", 300);
 
     if (!reportId || !name || !sections) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Detect device type from request headers
     const userAgent = request.headers.get("user-agent") || "";
     const deviceType = detectDevice(userAgent);
 
-    // Auth client (cookie-based) — used ONLY to read the logged-in user so we
-    // can link the report to their account. All actual DB writes go through the
-    // service-role client below, which is required now that RLS is enabled
-    // (guest leads have no auth session and could not write otherwise).
+    // Auth client — only for reading logged-in user
     const cookieStore = await cookies();
     const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -67,22 +72,23 @@ export async function POST(request) {
         },
       }
     );
-
-    // Service-role client for the write (bypasses RLS).
     const supabase = createServiceClient();
-
-    // Check if user is logged in
     const { data: { user } } = await authClient.auth.getUser();
 
-    // CRITICAL: Only include fields that are ACTUALLY provided in this request.
-    // If a field is not passed (e.g. attribution on second save after payment),
-    // we must NOT include it — otherwise upsert sets it to null, wiping the
-    // value that was stored on the first save.
-    //
-    // SECURITY: This is a PUBLIC endpoint. It must NEVER accept payment-related
-    // fields from the client. Only server-side code (verify-payment, webhook,
-    // fulfill-payment) may mark a report as paid. Accepting paymentStatus from
-    // the client would let anyone bypass the paywall entirely.
+    // Check if this report already exists
+    const { data: existing } = await supabase
+      .from("reports")
+      .select("report_id, payment_status")
+      .eq("report_id", reportId)
+      .maybeSingle();
+
+    // CRITICAL GUARD: Never overwrite a paid or founder row.
+    // If the browser calls save-report after payment (legacy code path),
+    // we simply return success without touching the paid row.
+    if (existing && ["paid", "founder"].includes(existing.payment_status)) {
+      return NextResponse.json({ success: true, note: "already_paid" });
+    }
+
     const data = {
       report_id: reportId,
       name,
@@ -93,18 +99,11 @@ export async function POST(request) {
       gender,
       summary,
       sections,
-      // FORCED: public endpoint always writes "unpaid". Only server-side Razorpay
-      // verification code may ever set "paid".
       payment_status: "unpaid",
     };
 
-    // Only set user_id if user is logged in (don't wipe existing with null)
     if (user?.id) data.user_id = user.id;
-
-    // Only include attribution if actually provided (prevents wipe on 2nd save)
     if (attribution) data.attribution = attribution;
-
-    // Enhanced tracking fields — only include when provided (prevents wipe)
     if (personalQuestion) data.personal_question = personalQuestion;
     if (city) data.city = city;
     if (visitorId) data.visitor_id = visitorId;
@@ -112,55 +111,53 @@ export async function POST(request) {
     if (deviceType && deviceType !== "unknown") data.device_type = deviceType;
     data.preview_generated_at = new Date().toISOString();
 
-    // Try with all fields first (works after migration)
-    let { error } = await supabase.from("reports").upsert(data, { onConflict: "report_id" });
+    let error;
+    if (!existing) {
+      // INSERT new row (first save — preview just generated)
+      ({ error } = await supabase.from("reports").insert(data));
+    } else {
+      // UPDATE existing unpaid row (user re-submitted or page refreshed)
+      const { report_id, payment_status, ...updateFields } = data;
+      ({ error } = await supabase
+        .from("reports")
+        .update(updateFields)
+        .eq("report_id", reportId)
+        .eq("payment_status", "unpaid")); // extra guard
+    }
 
-    // If enhanced columns don't exist yet, strip them and retry
+    // Fallback: strip enhanced columns if they don't exist yet
     if (error) {
-      console.warn("Enhanced save failed, falling back:", error.message);
-      const { personal_question, city: c, device_type, preview_generated_at, visitor_id, chart_data, report_status, ...coreOnly } = data;
-      const fallback = await supabase.from("reports").upsert(coreOnly, { onConflict: "report_id" });
-      error = fallback.error;
+      console.warn("Save failed, retrying with core fields:", error.message);
+      const { personal_question, city: c, device_type, preview_generated_at, visitor_id, chart_data, ...coreOnly } = data;
+      if (!existing) {
+        ({ error } = await supabase.from("reports").insert(coreOnly));
+      } else {
+        const { report_id, payment_status, ...coreUpdate } = coreOnly;
+        ({ error } = await supabase.from("reports").update(coreUpdate).eq("report_id", reportId).eq("payment_status", "unpaid"));
+      }
     }
 
     if (error) {
       console.error("Supabase save error:", error);
-      return NextResponse.json(
-        { error: "Failed to save report. Report is still available on-screen." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to save report." }, { status: 500 });
     }
 
-    // Trigger email sequence generation server-side for unpaid leads with email.
+    // Trigger email sequence for unpaid leads with email
     if (email && email.trim()) {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
       const internalSecret = process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET;
       if (internalSecret) {
         fetch(`${baseUrl}/api/generate-email-sequence`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${internalSecret}`,
-          },
-          body: JSON.stringify({
-            reportId,
-            name,
-            summary,
-            sections,
-            dateOfBirth,
-            placeOfBirth,
-            personalQuestion: personalQuestion || "",
-          }),
-        }).catch((err) => console.error("Email sequence generation failed (non-critical):", err.message));
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${internalSecret}` },
+          body: JSON.stringify({ reportId, name, summary, sections, dateOfBirth, placeOfBirth, personalQuestion }),
+        }).catch((err) => console.error("Email sequence failed (non-critical):", err.message));
       }
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Save report error:", error);
-    return NextResponse.json(
-      { error: "Failed to save report." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save report." }, { status: 500 });
   }
 }
