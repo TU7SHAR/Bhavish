@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { getVisitorId } from "../../components/VisitorTracker";
-import { NorthIndianChart, PlanetTable } from "../../components/KundliCharts";
 import { track } from "@vercel/analytics";
 import { resolvePlan } from "../../../lib/plans.js";
 
