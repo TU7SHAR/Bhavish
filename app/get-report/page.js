@@ -120,30 +120,32 @@ export default function GetReport() {
       localStorage.setItem("reportData_backup", JSON.stringify(data));
       localStorage.setItem("userData_backup", JSON.stringify(cleanData));
 
-      // Save report to DB as "unpaid" (captures email for future reference)
-      // Non-blocking — failure here must NOT break the flow
-      // NOTE: Email sequence generation is now triggered server-side within save-report
-      fetch("/api/save-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: data.reportId,
-          name: formData.name,
-          email: formData.email,
-          dateOfBirth: formData.dateOfBirth,
-          timeOfBirth: formData.timeOfBirth,
-          placeOfBirth: formData.placeOfBirth,
-          gender: formData.gender,
-          summary: data.summary,
-          sections: data.sections || data.previewSections || [],
-          paymentStatus: "unpaid",
-          attribution: getAttribution(),
-          personalQuestion: formData.personalQuestion || "",
-          city: data.city || "",
-          visitorId: getVisitorId(),
-          chartData: data.chartData || null,
-        }),
-      }).catch(console.error);
+      // Save report to DB as "unpaid" — MUST succeed before payment is possible.
+      // Uses cleanData (sanitized) for all user-supplied fields.
+      try {
+        await fetch("/api/save-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reportId: data.reportId,
+            name: cleanData.name,
+            email: cleanData.email,
+            dateOfBirth: cleanData.dateOfBirth,
+            timeOfBirth: cleanData.timeOfBirth,
+            placeOfBirth: cleanData.placeOfBirth,
+            gender: cleanData.gender,
+            summary: data.summary,
+            sections: data.sections || data.previewSections || [],
+            attribution: getAttribution(),
+            personalQuestion: cleanData.personalQuestion || "",
+            city: data.city || "",
+            visitorId: getVisitorId(),
+            chartData: data.chartData || null,
+          }),
+        });
+      } catch (saveErr) {
+        console.error("Preview save failed (non-critical):", saveErr.message);
+      }
 
       // Small delay to show 100% before redirect
       setTimeout(() => {
