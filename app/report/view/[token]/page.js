@@ -25,10 +25,12 @@ const isDeepDiveSection = (title) => {
 };
 
 export async function generateMetadata() {
-  // Never index these private report links.
+  // Never index these private report links. Also suppress analytics crawling.
   return {
     title: "Your Report",
     robots: { index: false, follow: false },
+    // Signal to layout.js that this page should not fire marketing pixels.
+    other: { "x-private-page": "true" },
   };
 }
 

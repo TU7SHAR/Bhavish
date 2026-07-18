@@ -99,7 +99,7 @@ export default function GetReport() {
       const res = await fetch("/api/generate-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(cleanData),
       });
 
       const data = await res.json();
@@ -116,9 +116,9 @@ export default function GetReport() {
 
       // Store report data in sessionStorage AND localStorage (backup)
       sessionStorage.setItem("reportData", JSON.stringify(data));
-      sessionStorage.setItem("userData", JSON.stringify(formData));
+      sessionStorage.setItem("userData", JSON.stringify(cleanData));
       localStorage.setItem("reportData_backup", JSON.stringify(data));
-      localStorage.setItem("userData_backup", JSON.stringify(formData));
+      localStorage.setItem("userData_backup", JSON.stringify(cleanData));
 
       // Save report to DB as "unpaid" (captures email for future reference)
       // Non-blocking — failure here must NOT break the flow
