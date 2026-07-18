@@ -23,7 +23,7 @@ const SIGN_GEMS = {
   12: { gem: "Yellow Sapphire", lucky: "3, 9, 7", day: "Thursday", color: "Yellow" },
 };
 
-function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl }) {
+function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl, email }) {
   const planetOrder = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"];
 
   // Build planet table rows
@@ -233,7 +233,7 @@ export async function POST(request) {
       if (token) viewUrl = reportViewUrl(token);
     }
 
-    const html = buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl });
+    const html = buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl, email });
 
     // Generate PDF server-side (non-blocking — if it fails, still send HTML email)
     let pdfBuffer = null;
