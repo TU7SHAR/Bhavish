@@ -685,7 +685,7 @@ export default function ReportPreview() {
           </div>
 
           {/* Locked Sections Preview */}
-          <div className="relative">
+          <div className="relative overflow-hidden min-h-[600px]">
             {/* Blur overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background z-10 pointer-events-none rounded-2xl"></div>
 
@@ -722,7 +722,7 @@ export default function ReportPreview() {
             </div>
 
             {/* CTA Overlay */}
-            <div className="absolute inset-0 z-20 flex items-center justify-center">
+            <div className="absolute inset-0 z-20 flex items-start justify-center pt-8">
               <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-4 glow">
 
                 {/* Priority 9: Personalization banner — references their chart */}
