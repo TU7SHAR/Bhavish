@@ -620,9 +620,29 @@ export default function ReportPreview() {
             </div>
           </div>
 
-          {/* Paywall CTA — replaces locked sections */}
-          <div className="mt-6">
-              <div className="bg-surface border-2 border-primary rounded-2xl p-8 text-center max-w-md mx-auto glow">
+          {/* Teaser: locked sections with fade (builds desire before paywall) */}
+          <div className="relative mb-6">
+            <div className="space-y-3 opacity-50">
+              {lockedSections.slice(0, 2).map((section, i) => (
+                <div key={i} className="bg-surface border border-border rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                    </svg>
+                    <span className="text-muted text-sm">Locked</span>
+                  </div>
+                  <h3 className="text-lg font-bold mb-1">{section.title.replace(/^\d+\.\s*/, "")}</h3>
+                  <p className="text-muted text-sm line-clamp-2">{section.content.substring(0, 120)}...</p>
+                </div>
+              ))}
+            </div>
+            {/* Fade overlay */}
+            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent pointer-events-none"></div>
+          </div>
+
+          {/* Paywall CTA */}
+          <div className="mb-8">
+              <div className="bg-surface border-2 border-primary rounded-2xl p-6 md:p-8 text-center glow">
 
                 {/* Priority 9: Personalization banner — references their chart */}
                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-2.5 mb-5 text-left">
@@ -815,6 +835,67 @@ export default function ReportPreview() {
                   Secure Razorpay payment · Instant access · Sent to your email
                 </p>
               </div>
+          </div>
+
+          {/* Why BhavishAI — Trust Section */}
+          <div className="mt-8 bg-surface border border-border rounded-2xl p-6">
+            <h3 className="text-sm font-bold mb-4 text-primary-light text-center">Why BhavishAI is Different</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { icon: "🪐", text: "Swiss Ephemeris precision" },
+                { icon: "📍", text: "Exact birth coordinates" },
+                { icon: "🕉️", text: "Vedic astrology system" },
+                { icon: "🎯", text: "Personalized to YOUR chart" },
+                { icon: "📊", text: "Structured, in-depth report" },
+                { icon: "🚫", text: "Not a generic AI response" },
+              ].map((item) => (
+                <div key={item.text} className="flex items-center gap-2 text-xs text-muted">
+                  <span>{item.icon}</span>
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* All 20 section titles */}
+          <div className="mt-6 bg-surface border border-border rounded-2xl p-6">
+            <h3 className="text-lg font-bold mb-4">
+              Your Full Report Includes:
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {allSections.map((section, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  {i === 0 ? (
+                    <svg
+                      className="w-4 h-4 text-green-400 shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4 text-accent shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
+                  <span className={i === 0 ? "text-foreground" : "text-muted"}>
+                    {i + 1}. {section.title.replace(/^\d+\.\s*/, "")}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>
