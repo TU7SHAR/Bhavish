@@ -25,7 +25,7 @@ const inputSchema = z.object({
 export async function POST(request) {
   try {
     // Rate limiting — prevent Gemini token abuse (3 req/min per IP)
-    const rateCheck = previewLimiter(request);
+    const rateCheck = await previewLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
@@ -50,6 +50,7 @@ export async function POST(request) {
       timeOfBirth,
       latitude: location.latitude,
       longitude: location.longitude,
+      timezoneOffsetMinutes: location.timezoneOffsetMinutes,
     });
 
     // Step 3: Generate Kundli SVG

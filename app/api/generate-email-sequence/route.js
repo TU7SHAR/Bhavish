@@ -18,7 +18,7 @@ export async function POST(request) {
     if (!auth.authorized) return auth.error;
 
     // Additional rate limiting as defense-in-depth
-    const rateCheck = emailGenLimiter(request);
+    const rateCheck = await emailGenLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }

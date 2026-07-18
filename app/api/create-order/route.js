@@ -9,7 +9,7 @@ const PRICE_BUMP = parseInt(process.env.NEXT_PUBLIC_PRICE_BUMP || "149");
 export async function POST(request) {
   try {
     // Rate limiting — prevent order creation spam
-    const rateCheck = paymentLimiter(request);
+    const rateCheck = await paymentLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }

@@ -53,6 +53,7 @@ export async function POST(request) {
       timeOfBirth: report.time_of_birth,
       latitude: location.latitude,
       longitude: location.longitude,
+      timezoneOffsetMinutes: location.timezoneOffsetMinutes,
     });
 
     // Step 3: Build the full report prompt

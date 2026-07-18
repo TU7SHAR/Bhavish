@@ -16,7 +16,7 @@ function detectDevice(userAgent) {
 export async function POST(request) {
   try {
     // Rate limiting — prevent fake lead injection
-    const rateCheck = saveLimiter(request);
+    const rateCheck = await saveLimiter(request);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
