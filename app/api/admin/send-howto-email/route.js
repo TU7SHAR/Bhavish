@@ -26,19 +26,23 @@ function buildHowToHtml(name, email, reportId) {
 
       <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">📅 Your 12-Month Guidance Pack</h3>
       <p style="font-size: 14px; line-height: 1.7; margin: 0 0 4px; color: #374151;">
-        If you purchased the ₹149 add-on, your month-by-month guidance is included as a dedicated section near the end of your full report — best months, caution periods, timing windows, and a monthly action plan.
+        If you purchased Premium (₹499) or Master (₹999), or added the ₹149 guidance pack to Essential — your month-by-month guidance is included as a dedicated section near the end of your report. It covers best months, caution periods, timing windows, and a monthly action plan.
       </p>
 
-      <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">🎖️ Founder Access</h3>
+      <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">★ Master Deep-Dive</h3>
       <p style="font-size: 14px; line-height: 1.7; margin: 0 0 4px; color: #374151;">
-        Founder members can generate up to 5 personalized reports every month for 2 years — for yourself or close family. Just sign in and use "Generate New Report" from your dashboard.
+        Master (₹999) customers get a 7-part specialized deep-dive focused on their biggest concern (career, marriage, wealth, etc.) plus a 24-month personalized roadmap. This appears after the main report sections.
+      </p>
+
+      <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">🎖️ Founder Access (Legacy)</h3>
+      <p style="font-size: 14px; line-height: 1.7; margin: 0 0 4px; color: #374151;">
+        Existing Founder members can generate up to 5 personalized reports every month for 2 years — for yourself or close family. Just sign in and use "Generate New Report" from your dashboard.
       </p>
 
       <h3 style="font-size: 15px; color: #1a1a2e; margin: 20px 0 6px;">📂 Accessing your reports anytime</h3>
       <p style="font-size: 14px; line-height: 1.7; margin: 0 0 4px; color: #374151;">
-        1. Go to <a href="https://www.bhavishai.in" style="color:#7c3aed;">bhavishai.in</a><br/>
-        2. Click <strong>Sign in with Google</strong> using <strong>${email || "this email address"}</strong><br/>
-        3. Open <strong>My Reports</strong> — all your reports will be there.
+        <strong>Option 1 (easiest):</strong> Use the "View My Report Online" link in your report delivery email — no login needed.<br/>
+        <strong>Option 2:</strong> Go to <a href="https://www.bhavishai.in" style="color:#7c3aed;">bhavishai.in</a>, sign in with Google using <strong>${email || "this email address"}</strong>, and open <strong>My Reports</strong>.
       </p>
       <p style="font-size: 13px; line-height: 1.6; color: #6b7280; margin: 8px 0 16px;">
         Tip: sign in with the same email this message was sent to, so your reports are linked to your account.
