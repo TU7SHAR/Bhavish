@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import RichText from "../components/RichText";
 
 export default function AdminDashboard() {
   const [authed, setAuthed] = useState(false);
@@ -1998,21 +1999,30 @@ function DetailCard({ person, expanded, onToggle, password }) {
     setEmailLoading("");
   };
 
-  const regenerateReport = async () => {
-    if (!confirm("Regenerate the FULL report for this customer? This recalculates their chart and generates all 20 sections fresh. Their old report will be replaced.")) return;
-    setEmailLoading("regenerate");
+  // Tier-aware regeneration. `tier` is "essential" | "premium" | "master".
+  // Essential includes the ₹149 12-month guidance only when includeGuidance=true.
+  const regenerateReport = async (tier, includeGuidance = false) => {
+    const tierMeta = {
+      essential: { label: "Essential (₹299)", desc: includeGuidance ? "10 core sections + personal answer + 12-month guidance" : "10 core sections + personal answer" },
+      premium: { label: "Premium (₹499)", desc: "20 core sections + personal answer + 12-month guidance" },
+      master: { label: "Master (₹999)", desc: "20 core sections + 7-section deep-dive + 24-month roadmap (~50s)" },
+    }[tier];
+    if (!tierMeta) return;
+    if (!confirm(`Regenerate this customer's report as ${tierMeta.label}?\n\nThis recalculates their chart and generates: ${tierMeta.desc}.\n\nTheir current report will be REPLACED.`)) return;
+
+    setEmailLoading(`regenerate-${tier}`);
     setEmailAction(null);
     try {
       const res = await fetch("/api/admin/regenerate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
-        body: JSON.stringify({ reportId: person.report_id }),
+        body: JSON.stringify({ reportId: person.report_id, tier, includeGuidance }),
       });
       const json = await res.json();
-      if (res.ok) {
-        setEmailAction({ status: "success", message: `✅ Regenerated ${json.sectionCount} sections. Refresh to see, then use "Resend Report" to email it.` });
+      if (res.ok && json.success) {
+        setEmailAction({ status: "success", message: `✅ Regenerated as ${tierMeta.label} — ${json.sectionCount} sections${json.deepDiveFocus ? ` (${json.deepDiveFocus} deep-dive)` : ""}. Refresh to see, then use "Resend Report" to email it.` });
       } else {
-        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+        setEmailAction({ status: "error", message: `❌ ${json.error || "Regeneration failed"}` });
       }
     } catch (err) {
       setEmailAction({ status: "error", message: `❌ ${err.message}` });
@@ -2083,13 +2093,42 @@ function DetailCard({ person, expanded, onToggle, password }) {
                     >
                       {emailLoading === "thankyou" ? "Sending..." : person.thankyou_sent_at ? `✅ Thank You Sent (${new Date(person.thankyou_sent_at).toLocaleDateString("en-IN", {day: "numeric", month: "short"})})` : "🙏 Send Thank You (from Founder)"}
                     </button>
-                    <button
-                      onClick={() => regenerateReport()}
-                      disabled={!!emailLoading}
-                      className="px-3 py-2 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-colors"
-                    >
-                      {emailLoading === "regenerate" ? "Regenerating... (~30s)" : "🔄 Regenerate Full Report"}
-                    </button>
+                    {/* Tier-aware regenerate — each button rebuilds exactly what that plan includes */}
+                    <div className="w-full flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] text-gray-500 uppercase tracking-wider w-full">🔄 Regenerate report as:</span>
+                      <button
+                        onClick={() => regenerateReport("essential")}
+                        disabled={!!emailLoading}
+                        title="10 core sections + personal answer"
+                        className="px-3 py-2 rounded-xl text-xs font-medium bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white transition-colors"
+                      >
+                        {emailLoading === "regenerate-essential" ? "Regenerating… (~25s)" : "Regen Essential ₹299"}
+                      </button>
+                      <button
+                        onClick={() => regenerateReport("essential", true)}
+                        disabled={!!emailLoading}
+                        title="10 core sections + personal answer + 12-month guidance"
+                        className="px-3 py-2 rounded-xl text-xs font-medium bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white transition-colors"
+                      >
+                        {emailLoading === "regenerate-essential" ? "…" : "Regen Essential+Guidance ₹448"}
+                      </button>
+                      <button
+                        onClick={() => regenerateReport("premium")}
+                        disabled={!!emailLoading}
+                        title="20 core sections + personal answer + 12-month guidance"
+                        className="px-3 py-2 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-colors"
+                      >
+                        {emailLoading === "regenerate-premium" ? "Regenerating… (~30s)" : "Regen Premium ₹499"}
+                      </button>
+                      <button
+                        onClick={() => regenerateReport("master")}
+                        disabled={!!emailLoading}
+                        title="20 core sections + 7-section deep-dive + 24-month roadmap"
+                        className="px-3 py-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white transition-colors"
+                      >
+                        {emailLoading === "regenerate-master" ? "Regenerating… (~50s)" : "Regen Master ₹999"}
+                      </button>
+                    </div>
                     {/* 12-Month Guidance confirmation — only for customers who bought the ₹149 add-on */}
                     {person.has_12_month_guidance && (
                       <button
@@ -2909,12 +2948,12 @@ function MonthlyGuidanceAdmin({ person, password }) {
                     r.sections.map((s, i) => (
                       <div key={i} className="bg-[#0d0d1a] border border-white/5 rounded-xl p-4">
                         <h4 className="text-sm font-semibold text-blue-300 mb-2">{s.title}</h4>
-                        <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{s.content}</p>
+                        <RichText text={s.content} className="text-xs text-gray-300 leading-relaxed" />
                       </div>
                     ))
                   ) : r.full_text ? (
                     <div className="bg-[#0d0d1a] border border-white/5 rounded-xl p-4">
-                      <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{r.full_text}</p>
+                      <RichText text={r.full_text} className="text-xs text-gray-300 leading-relaxed" />
                     </div>
                   ) : (
                     <p className="text-xs text-gray-500">No content available.</p>

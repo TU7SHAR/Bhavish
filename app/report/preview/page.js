@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { getVisitorId } from "../../components/VisitorTracker";
+import RichText from "../../components/RichText";
 import { track } from "@vercel/analytics";
 import { resolvePlan } from "../../../lib/plans.js";
 
@@ -61,9 +62,9 @@ export default function ReportPreview() {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [retryMessage, setRetryMessage] = useState(null);
-  // Three-tier selector. Essential is the DEFAULT (₹299 ad promise); Premium is
-  // highlighted as Most Popular but NOT auto-selected (avoids bait-and-switch).
-  const [selectedPlan, setSelectedPlan] = useState("essential");
+  // Three-tier selector. Premium (₹499) is the DEFAULT selection — it's the
+  // "Most Popular" plan and anchors AOV higher; users can downgrade to Essential.
+  const [selectedPlan, setSelectedPlan] = useState("premium");
   const [includeGuidance, setIncludeGuidance] = useState(false); // ₹149 add-on (Essential only)
   const [paymentError, setPaymentError] = useState(null);
 
@@ -615,9 +616,7 @@ export default function ReportPreview() {
             <h2 className="text-2xl font-bold mb-4">
               {firstSection.title.replace(/^\d+\.\s*/, "")}
             </h2>
-            <div className="text-muted leading-relaxed whitespace-pre-line">
-              {firstSection.content}
-            </div>
+            <RichText text={firstSection.content} className="text-muted leading-relaxed" />
           </div>
 
           {/* Locked sections as blurred background behind paywall CTA */}

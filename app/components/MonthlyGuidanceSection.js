@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import RichText from "./RichText";
 
 // Client component that fetches + displays individual monthly guidance reports.
 // Shown on the user dashboard when they have the ₹149 add-on.
@@ -155,12 +156,12 @@ export default function MonthlyGuidanceSection({ reportId, startDate, currentMon
               {sections.map((section, i) => (
                 <div key={i} className="bg-surface/50 border border-border rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-blue-300 mb-2">{section.title}</h4>
-                  <p className="text-sm text-muted leading-relaxed whitespace-pre-line">{section.content}</p>
+                  <RichText text={section.content} className="text-sm text-muted leading-relaxed" />
                 </div>
               ))}
               {sections.length === 0 && m.report.full_text && (
                 <div className="bg-surface/50 border border-border rounded-xl p-4">
-                  <p className="text-sm text-muted leading-relaxed whitespace-pre-line">{m.report.full_text}</p>
+                  <RichText text={m.report.full_text} className="text-sm text-muted leading-relaxed" />
                 </div>
               )}
             </div>
