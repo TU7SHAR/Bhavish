@@ -23,6 +23,13 @@ const TOTAL_EMAILS = EMAIL_SCHEDULE_HOURS.length;
 const SEND_DELAY_MS = 600;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Stop sending before Vercel kills the function. On the free/Hobby tier
+// functions are terminated at ~10s regardless of maxDuration, which produced a
+// non-JSON error page and the "Unexpected token" error in the admin UI.
+// We stop early and report how many leads were deferred so the admin can click
+// again to continue — nothing is lost. Override with ?budget=<ms> on Pro.
+const DEFAULT_TIME_BUDGET_MS = 8500;
+
 function buildHtml(lead, draft, emailNum) {
   const firstName = (lead.name || "there").split(" ")[0];
   const reportUrl = `https://www.bhavishai.in/get-report`;
@@ -59,10 +66,12 @@ export async function GET(request) {
   const auth = verifyCron(request);
   if (!auth.authorized) return auth.error;
 
+  const startTime = Date.now();
   const { searchParams } = new URL(request.url);
   const forceMode = searchParams.get("force") === "true";
   const freshOnly = searchParams.get("fresh") === "true";
   const filterEmail = searchParams.get("email");
+  const timeBudgetMs = Number(searchParams.get("budget")) || DEFAULT_TIME_BUDGET_MS;
 
   try {
     const supabase = createClient(
@@ -105,10 +114,18 @@ export async function GET(request) {
 
     const now = new Date();
     let totalSent = 0;
+    let deferred = 0;
     const results = [];
     const errors = [];
 
     for (const lead of leads) {
+      // Time guard — stop before Vercel kills the function; the rest are picked
+      // up on the next click/cron run so nothing is lost.
+      if (Date.now() - startTime > timeBudgetMs) {
+        deferred = leads.length - leads.indexOf(lead);
+        break;
+      }
+
       try {
         const drafts = Array.isArray(lead.email_drafts) ? lead.email_drafts : [];
         if (drafts.length === 0) continue;
@@ -184,6 +201,8 @@ export async function GET(request) {
       mode: freshOnly ? "fresh" : forceMode ? "force" : "scheduled",
       processed: leads.length,
       sent: totalSent,
+      deferredToNextRun: deferred,
+      note: deferred > 0 ? `Stopped at the ${Math.round(timeBudgetMs / 1000)}s budget — ${deferred} lead(s) remaining. Click again to continue.` : undefined,
       errors,
       results,
     });

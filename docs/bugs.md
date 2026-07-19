@@ -2,7 +2,23 @@
 
 ## BhavishAI — Structured Issue Tracker
 
-**Last Updated:** July 2026 (post-hardening pass)
+**Last Updated:** July 2026 (admin actions pass)
+
+---
+
+## Fixed Bugs (Admin Actions)
+
+### BUG-019: Admin Actions showed "Unexpected token 'A'... is not valid JSON"
+**Status:** Fixed
+**Severity:** Medium (admin ops — confusing failure + silent timeout)
+
+**Symptom:** Clicking an Actions button (e.g. "Send First Email to New Leads Only") showed `{"error":"Unexpected token 'A', \"An error o\"... is not valid JSON"}` in the Result box.
+**Root Cause:** Two issues combined:
+1. `runAction()` called `res.json()` directly. When `/api/manual-send-emails` **timed out**, Vercel returned a non-JSON error page ("An error occurred…"), so `res.json()` threw the cryptic parse error.
+2. `/api/manual-send-emails` had **no time budget** (unlike the cron route). On Vercel's free/Hobby tier functions are killed at ~10s, and with a 600ms/lead pace even ~10 leads exceed that → timeout.
+**Fix:**
+- `runAction()` now reads the response as text and parses defensively, surfacing a clear "action timed out / non-JSON" message with the HTTP status instead of a parse error.
+- `/api/manual-send-emails` now stops at an ~8.5s budget (overridable via `?budget=<ms>`), returns valid JSON, and reports `deferredToNextRun` so the admin can click again to continue. No leads are lost.
 
 ---
 
