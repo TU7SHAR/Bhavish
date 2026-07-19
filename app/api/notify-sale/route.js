@@ -2,17 +2,15 @@ import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { verifyInternal } from "../../../lib/auth.js";
 
-// Sends YOU (the owner) a notification whenever someone buys a report
+// Sends YOU (the owner) a notification whenever someone buys a report.
+// Now tier-aware: shows correct amount and plan for Essential/Premium/Master.
 export async function POST(request) {
   try {
     // SECURITY FIX: Verify authorization.
-    // Accept either:
-    // 1. Internal auth header (server-to-server calls), OR
-    // 2. Verify the report has a valid payment in DB (for client post-payment calls)
     const auth = verifyInternal(request);
     const isInternalCall = auth.authorized;
 
-    const { reportId, customerName, customerEmail, paymentId, amount, placeOfBirth, dateOfBirth, includeBump, isUpgrade, reportComplete } =
+    const { reportId, customerName, customerEmail, paymentId, amount, planTier, placeOfBirth, dateOfBirth, includeBump, isUpgrade, reportComplete } =
       await request.json();
 
     // If not an internal call, verify the payment actually exists
@@ -53,13 +51,27 @@ export async function POST(request) {
       },
     });
 
-    // Build breakdown
+    // Build breakdown — TIER-AWARE.
+    // The old `includeBump` logic only applies to Essential+guidance (₹299+₹149=₹448).
+    // Premium (₹499) and Master (₹999) include guidance in their base price, so
+    // we must NOT show the ₹299+₹149 split for them — that's what caused the
+    // "₹449" (actually ₹448) confusion on a ₹499 purchase.
+    const tierLabel = { essential: "Essential", premium: "Premium", master: "Master" }[planTier] || planTier || "";
+
     let breakdown = `<tr style="border-bottom: 1px solid #e5e7eb;">
       <td style="padding: 8px 0; font-weight: bold; color: #374151;">Amount</td>
       <td style="padding: 8px 0; color: #059669; font-weight: bold; font-size: 18px;">₹${amount || "299"}</td>
     </tr>`;
 
-    if (includeBump) {
+    if (tierLabel) {
+      breakdown += `<tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 8px 0; font-weight: bold; color: #374151;">Plan</td>
+        <td style="padding: 8px 0; font-weight: bold; color: #7c3aed;">${tierLabel}${planTier === "master" ? " ⭐" : planTier === "premium" ? " 💜" : ""}</td>
+      </tr>`;
+    }
+
+    // Only show the ₹299+₹149 breakdown for Essential+guidance (₹448).
+    if (includeBump && planTier === "essential") {
       breakdown += `<tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 8px 0; font-weight: bold; color: #374151;">Breakdown</td>
         <td style="padding: 8px 0;">₹299 (Report) + ₹149 (12-Month Guidance) = <strong>₹448</strong></td>
@@ -68,6 +80,17 @@ export async function POST(request) {
         <td style="padding: 8px 0; font-weight: bold; color: #374151;">📅 Guidance</td>
         <td style="padding: 8px 0; color: #f59e0b; font-weight: bold;">12-Month Personal Guidance PURCHASED ✅</td>
       </tr>`;
+    } else if (planTier === "premium" || planTier === "master") {
+      breakdown += `<tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 8px 0; font-weight: bold; color: #374151;">📅 Guidance</td>
+        <td style="padding: 8px 0; color: #059669;">12-Month Guidance included ✅</td>
+      </tr>`;
+      if (planTier === "master") {
+        breakdown += `<tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 8px 0; font-weight: bold; color: #374151;">🔮 Deep-Dive</td>
+          <td style="padding: 8px 0; color: #f59e0b; font-weight: bold;">7-Section Concern Deep-Dive + 24-Month Roadmap ⭐</td>
+        </tr>`;
+      }
     }
 
     if (isUpgrade) {
@@ -129,7 +152,7 @@ export async function POST(request) {
       ? `🎖️ FOUNDER UPGRADE! ${customerName} paid ₹${amount || "999"} — BhavishAI`
       : reportFailed
         ? `⚠️ ACTION NEEDED: ${customerName} paid ₹${amount || "299"} but report FAILED — regenerate & resend`
-        : `💰 New Sale! ${customerName} paid ₹${amount || "299"}${includeBump ? " (includes 12-mo guidance)" : ""} — BhavishAI`;
+        : `💰 New Sale! ${customerName} paid ₹${amount || "299"} [${tierLabel}]${includeBump && planTier === "essential" ? " (includes 12-mo guidance)" : ""} — BhavishAI`;
 
     await transporter.sendMail({
       from: `BhavishAI Sales <${ownerEmail}>`,
