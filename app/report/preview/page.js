@@ -857,38 +857,54 @@ export default function ReportPreview() {
             </div>
           </div>
 
-          {/* Section names by tier */}
+          {/* Section names — dynamic, shows ONLY what the selected plan includes */}
           <div className="mt-6 bg-surface border border-border rounded-2xl p-6">
             <h3 className="text-lg font-bold mb-4">Your Full Report Includes:</h3>
 
-            <div className="mb-5">
-              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Essential — ₹299</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {["Rashi & Personality","Lagna & Core Identity","Career & Professional Direction","Money & Financial Outlook","Love & Marriage","Health & Wellbeing","Current Mahadasha & Antardasha","Important Yogas & Doshas","Remedies & Practical Guidance","Key Strengths & Lucky Factors","Direct Answer to Your Question"].map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-green-400 text-xs">✓</span><span>{s}</span></div>
-                ))}
-                <div className="flex items-center gap-2 text-sm text-blue-300 italic"><span className="text-xs">+</span><span>12-Month Guidance (optional +₹149)</span></div>
+            {selectedPlan === "essential" && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Essential — ₹{includeGuidance ? "448" : "299"}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {["Rashi & Personality","Lagna & Core Identity","Career & Professional Direction","Money & Financial Outlook","Love & Marriage","Health & Wellbeing","Current Mahadasha & Antardasha","Important Yogas & Doshas","Remedies & Practical Guidance","Key Strengths & Lucky Factors","Direct Answer to Your Question"].map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-green-400 text-xs">✓</span><span>{s}</span></div>
+                  ))}
+                  {includeGuidance && (
+                    <div className="flex items-center gap-2 text-sm text-blue-300"><span className="text-blue-400 text-xs">✓</span><span>12-Month Personal Guidance Pack</span></div>
+                  )}
+                  {!includeGuidance && (
+                    <div className="flex items-center gap-2 text-sm text-blue-300 italic"><span className="text-xs">+</span><span>12-Month Guidance (optional +₹149)</span></div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="mb-5">
-              <p className="text-xs text-purple-400 uppercase tracking-wider font-semibold mb-2">Premium — ₹499 <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-1">Most Popular</span></p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {["Rashi (Moon Sign) & Personality","Lagna (Ascendant) & Physical Traits","Sun Sign & Core Identity","Nakshatra (Birth Star) Analysis","Planetary Positions & Strengths","Career & Professional Life","Wealth & Financial Prospects","Marriage & Love Life","Family & Relationships","Health & Physical Wellbeing","Education & Intellectual Growth","Current Mahadasha Analysis","Upcoming Dasha Predictions (5 Years)","Manglik Dosha Analysis","Kaal Sarp & Other Yogas","Favorable & Unfavorable Periods","Remedies & Spiritual Guidance","Lucky Factors (Numbers, Colors, Gems)","Monthly Predictions 2026-2027","Life Purpose & Spiritual Path","Direct Answer to Your Question","12-Month Personal Guidance Pack"].map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-purple-400 text-xs">✓</span><span>{s}</span></div>
-                ))}
+            {selectedPlan === "premium" && (
+              <div>
+                <p className="text-xs text-purple-400 uppercase tracking-wider font-semibold mb-2">Premium — ₹499 <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-1">Most Popular</span></p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {["Rashi (Moon Sign) & Personality","Lagna (Ascendant) & Physical Traits","Sun Sign & Core Identity","Nakshatra (Birth Star) Analysis","Planetary Positions & Strengths","Career & Professional Life","Wealth & Financial Prospects","Marriage & Love Life","Family & Relationships","Health & Physical Wellbeing","Education & Intellectual Growth","Current Mahadasha Analysis","Upcoming Dasha Predictions (5 Years)","Manglik Dosha Analysis","Kaal Sarp & Other Yogas","Favorable & Unfavorable Periods","Remedies & Spiritual Guidance","Lucky Factors (Numbers, Colors, Gems)","Monthly Predictions 2026-2027","Life Purpose & Spiritual Path","Direct Answer to Your Question","12-Month Personal Guidance Pack"].map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-purple-400 text-xs">✓</span><span>{s}</span></div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <p className="text-xs text-amber-400 uppercase tracking-wider font-semibold mb-2">Master — ₹999 <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded-full ml-1">Most Complete</span></p>
-              <p className="text-xs text-muted mb-2">Everything in Premium, plus:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {["Specialized Deep-Dive (7 sections on your concern)","— Why your situation feels the way it does","— Your strongest traits & natural talents","— Turning-point timing & action windows","— Biggest growth opportunities","— Recurring challenges & how to overcome","— Caution periods & personalized remedies","24-Month Personalized Roadmap"].map((s, i) => (
-                  <div key={i} className={`flex items-center gap-2 text-sm ${s.startsWith("—") ? "text-muted/70 pl-3" : "text-muted"}`}><span className="text-amber-400 text-xs">{s.startsWith("—") ? "·" : "★"}</span><span>{s}</span></div>
-                ))}
+            {selectedPlan === "master" && (
+              <div>
+                <p className="text-xs text-amber-400 uppercase tracking-wider font-semibold mb-2">Master — ₹999 <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded-full ml-1">Most Complete</span></p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-3">
+                  {["Rashi (Moon Sign) & Personality","Lagna (Ascendant) & Physical Traits","Sun Sign & Core Identity","Nakshatra (Birth Star) Analysis","Planetary Positions & Strengths","Career & Professional Life","Wealth & Financial Prospects","Marriage & Love Life","Family & Relationships","Health & Physical Wellbeing","Education & Intellectual Growth","Current Mahadasha Analysis","Upcoming Dasha Predictions (5 Years)","Manglik Dosha Analysis","Kaal Sarp & Other Yogas","Favorable & Unfavorable Periods","Remedies & Spiritual Guidance","Lucky Factors (Numbers, Colors, Gems)","Monthly Predictions 2026-2027","Life Purpose & Spiritual Path","Direct Answer to Your Question","12-Month Personal Guidance Pack"].map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted"><span className="text-amber-400 text-xs">✓</span><span>{s}</span></div>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-300 uppercase tracking-wider font-semibold mb-2 mt-4">+ Exclusive Deep-Dive & Roadmap</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {["Specialized Deep-Dive (7 sections on your concern)","— Why your situation feels the way it does","— Your strongest traits & natural talents","— Turning-point timing & action windows","— Biggest growth opportunities","— Recurring challenges & how to overcome","— Caution periods & personalized remedies","24-Month Personalized Roadmap"].map((s, i) => (
+                    <div key={i} className={`flex items-center gap-2 text-sm ${s.startsWith("—") ? "text-muted/70 pl-3" : "text-muted"}`}><span className="text-amber-400 text-xs">{s.startsWith("—") ? "·" : "★"}</span><span>{s}</span></div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </main>
