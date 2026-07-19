@@ -835,6 +835,7 @@ export default function ReportPreview() {
                   Secure Razorpay payment · Instant access · Sent to your email
                 </p>
               </div>
+            </div>
           </div>
 
           {/* Why BhavishAI — Trust Section */}
