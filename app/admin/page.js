@@ -72,8 +72,22 @@ export default function AdminDashboard() {
     setActionLoading(key);
     try {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${password}` } });
-      const json = await res.json();
-      setActionResult({ key, ...json });
+      // Read as text first — a timed-out/crashed serverless function returns a
+      // non-JSON error page (e.g. "An error occurred..."), and calling
+      // res.json() directly on that throws a cryptic "Unexpected token" error.
+      const raw = await res.text();
+      let json;
+      try {
+        json = raw ? JSON.parse(raw) : {};
+      } catch {
+        json = {
+          error:
+            res.status === 504 || /error occurred/i.test(raw)
+              ? `The action timed out on the server (HTTP ${res.status}). It likely ran past the free-tier limit — some work may have completed; click again to continue the rest.`
+              : `Server returned a non-JSON response (HTTP ${res.status}): ${raw.slice(0, 160)}`,
+        };
+      }
+      setActionResult({ key, ok: res.ok, status: res.status, ...json });
     } catch (err) {
       setActionResult({ key, error: err.message });
     }

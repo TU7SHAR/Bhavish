@@ -2,35 +2,23 @@
 
 ## BhavishAI — Structured Issue Tracker
 
-**Last Updated:** July 2026 (regenerate-tiers + markdown pass)
+**Last Updated:** July 2026 (admin actions pass)
 
 ---
 
-## Fixed Bugs (This Session — regenerate tiers + markdown rendering)
+## Fixed Bugs (Admin Actions)
 
-### BUG-016: Vercel deploy failing — unclosed `<div>` in preview paywall
+### BUG-019: Admin Actions showed "Unexpected token 'A'... is not valid JSON"
 **Status:** Fixed
-**Severity:** Critical (blocked all deploys)
+**Severity:** Medium (admin ops — confusing failure + silent timeout)
 
-**Symptom:** `next build` failed with `./app/report/preview/page.js:894 Expected '</', got 'jsx text'`. Every Vercel deployment failed.
-**Root Cause:** The blurred-background paywall refactor left the `<div className="relative">` wrapper (the locked-sections background + CTA overlay container) unclosed — 56 opening `<div>` vs 55 `</div>`.
-**Fix:** Added the missing `</div>` after the CTA wrapper closes (below the "Secure Razorpay payment" trust line). Build is green again.
-
-### BUG-017: Raw `**markdown**` asterisks shown to customers
-**Status:** Fixed
-**Severity:** Medium (visible quality issue)
-
-**Symptom:** Reports, guidance packs, PDF and emails showed literal `**bold**`, `##` and `*` characters because Gemini emits light Markdown and the frontend rendered it raw via `whitespace-pre-line`.
-**Root Cause:** No Markdown rendering layer; content was dropped straight into the DOM / email HTML / PDF text.
-**Fix:** New `lib/markdown.js` (`mdToHtml` for HTML contexts, `mdToPlain` for PDF) plus a shared `app/components/RichText.js`. Converts `**bold**`/`__bold__` → `<strong>`, `#` headings → bold, `- `/`* ` → bullets, preserves line breaks, escapes HTML, and strips any stray asterisks. Wired into every report/guidance render surface: report full/preview/view-token, dashboard report, admin report view, GuidancePack, MonthlyGuidanceSection, and the report/resend/guidance email HTML + the PDF.
-
-### BUG-018: "Regenerate" always produced a 30+ section report regardless of tier
-**Status:** Fixed
-**Severity:** Medium (admin ops / wrong deliverable)
-
-**Symptom:** The single admin "Regenerate Full Report" button always generated the full 20-section report even for ₹299 Essential customers, so admins couldn't rebuild the exact package a customer paid for.
-**Root Cause:** `regenerate-report` hard-coded a 20-section prompt and ignored the plan.
-**Fix:** `regenerate-report` is now tier-aware — it reuses the shared `generateFullReport` + `generateDeepDive` + `resolvePlan`, accepts `{ reportId, tier, includeGuidance }`, and Master does a two-phase save (main report persisted first, then the deep-dive appended; partial failures are recoverable). Admin UI now has explicit **Regen Essential ₹299 / Essential+Guidance ₹448 / Premium ₹499 / Master ₹999** buttons.
+**Symptom:** Clicking an Actions button (e.g. "Send First Email to New Leads Only") showed `{"error":"Unexpected token 'A', \"An error o\"... is not valid JSON"}` in the Result box.
+**Root Cause:** Two issues combined:
+1. `runAction()` called `res.json()` directly. When `/api/manual-send-emails` **timed out**, Vercel returned a non-JSON error page ("An error occurred…"), so `res.json()` threw the cryptic parse error.
+2. `/api/manual-send-emails` had **no time budget** (unlike the cron route). On Vercel's free/Hobby tier functions are killed at ~10s, and with a 600ms/lead pace even ~10 leads exceed that → timeout.
+**Fix:**
+- `runAction()` now reads the response as text and parses defensively, surfacing a clear "action timed out / non-JSON" message with the HTTP status instead of a parse error.
+- `/api/manual-send-emails` now stops at an ~8.5s budget (overridable via `?budget=<ms>`), returns valid JSON, and reports `deferredToNextRun` so the admin can click again to continue. No leads are lost.
 
 ---
 
