@@ -62,9 +62,9 @@ export default function ReportPreview() {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [retryMessage, setRetryMessage] = useState(null);
-  // Three-tier selector. Premium (₹499) is the DEFAULT selection — it's the
-  // "Most Popular" plan and anchors AOV higher; users can downgrade to Essential.
-  const [selectedPlan, setSelectedPlan] = useState("premium");
+  // Three-tier selector. Essential (₹299) is the default — matches ad copy.
+  // Premium is visually highlighted as "Most Popular" but NOT auto-selected.
+  const [selectedPlan, setSelectedPlan] = useState("essential");
   const [includeGuidance, setIncludeGuidance] = useState(false); // ₹149 add-on (Essential only)
   const [paymentError, setPaymentError] = useState(null);
 
