@@ -1945,6 +1945,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
     try {
       const urlMap = {
         "resend-report": "/api/admin/resend-report",
+        "send-report-link": "/api/admin/reply-email",
         "thankyou": "/api/admin/send-thankyou",
         "guidance-email": "/api/admin/send-guidance-email",
         "howto-email": "/api/admin/send-howto-email",
@@ -1955,6 +1956,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
       };
       const successMap = {
         "resend-report": (e) => `✅ Report re-sent to ${e}`,
+        "send-report-link": (e) => `✅ Report link sent to ${e}`,
         "thankyou": (e) => `✅ Thank you email sent to ${e}`,
         "guidance-email": (e) => `✅ 12-Month Guidance confirmation sent to ${e}`,
         "howto-email": (e) => `✅ "How to use BhavishAI" email sent to ${e}`,
@@ -1964,7 +1966,14 @@ function DetailCard({ person, expanded, onToggle, password }) {
         "gift-master": (e) => `★ Upgraded to Master for ${e} + email sent + deep-dive triggered`,
       };
       const url = urlMap[action] || "/api/admin/send-thankyou";
-      const bodyPayload = action === "gift-guidance"
+      const bodyPayload = action === "send-report-link"
+        ? {
+            to: person.email,
+            subject: `Your BhavishAI Report — View Anytime`,
+            body: `Hi ${(person.name || "there").split(" ")[0]},\n\nHere's your personal report link — bookmark it so you can come back anytime:\n\nhttps://www.bhavishai.in/report/full\n\nJust sign in with your Google account (${person.email}) and your full report will be right there.\n\nIf you have any questions about your report, just reply to this email!\n\nWarm regards,\nTushar\nBhavishAI`,
+            reportId: person.report_id,
+          }
+        : action === "gift-guidance"
         ? { reportId: person.report_id, type: "guidance" }
         : action === "gift-founder"
           ? { reportId: person.report_id, type: "founder" }
@@ -2081,6 +2090,13 @@ function DetailCard({ person, expanded, onToggle, password }) {
                       className="px-3 py-2 rounded-xl text-xs font-medium bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white transition-colors"
                     >
                       {emailLoading === "resend-report" ? "Sending..." : "📄 Resend Report"}
+                    </button>
+                    <button
+                      onClick={() => sendAdminAction("send-report-link")}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "send-report-link" ? "Sending..." : "🔗 Send Report Link"}
                     </button>
                     <button
                       onClick={() => sendAdminAction("thankyou")}
