@@ -155,7 +155,12 @@ function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl
     <p style="margin: 0 0 12px; font-size: 14px; color: #4c1d95;">Access your report anytime — no login needed:</p>
     <a href="${viewUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; padding: 12px 28px; border-radius: 25px; text-decoration: none; font-size: 14px; font-weight: 600;">View My Report Online</a>
     <p style="margin: 12px 0 0; font-size: 11px; color: #6b7280;">Bookmark this link to return to your report whenever you like.</p>
-  </div>` : ""}
+  </div>` : `
+  <div style="margin: 20px 0; padding: 18px; background: #f5f0ff; border: 1px solid #ddd6fe; border-radius: 10px; text-align: center;">
+    <p style="margin: 0 0 12px; font-size: 14px; color: #4c1d95;">Access your full report anytime:</p>
+    <a href="https://www.bhavishai.in/report/full" style="display: inline-block; background: #7c3aed; color: #ffffff; padding: 12px 28px; border-radius: 25px; text-decoration: none; font-size: 14px; font-weight: 600;">View My Report Online</a>
+    <p style="margin: 12px 0 0; font-size: 11px; color: #6b7280;">Sign in with your Google account (${email}) to access your report.</p>
+  </div>`}
   <p><em>${summary || ""}</em></p>
 
   ${nakshatraHtml}
