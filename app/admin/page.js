@@ -1628,6 +1628,30 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
   // Data export state
   const [exporting, setExporting] = useState("");
   const [exportError, setExportError] = useState(null);
+  // Diagnose-report state
+  const [diagInput, setDiagInput] = useState("");
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagResult, setDiagResult] = useState(null);
+
+  // Ask the server WHY a specific report is / isn't in the Overview. Accepts a
+  // reportId (RPT-...) or an email. Read-only — never modifies data.
+  const diagnoseReport = async () => {
+    const val = diagInput.trim();
+    if (!val) return;
+    setDiagLoading(true);
+    setDiagResult(null);
+    try {
+      const param = val.toLowerCase().startsWith("rpt-") ? "reportId" : "email";
+      const res = await fetch(`/api/admin/diagnose-report?${param}=${encodeURIComponent(val)}`, {
+        headers: { Authorization: `Bearer ${password}` },
+      });
+      const json = await res.json();
+      setDiagResult(res.ok ? json : { error: json.error || `HTTP ${res.status}` });
+    } catch (err) {
+      setDiagResult({ error: err.message });
+    }
+    setDiagLoading(false);
+  };
 
   // Download an export file. The endpoint requires the admin Bearer token, so
   // we can't use a plain <a href> — we fetch with the header, turn the response
@@ -1810,6 +1834,53 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
           <p className={`text-sm px-3 py-2 rounded-lg ${replyResult.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
             {replyResult.message}
           </p>
+        )}
+      </div>
+
+      <SectionTitle>Diagnose Missing Payment</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5 space-y-4">
+        <p className="text-gray-400 text-sm">
+          Paid in Razorpay but not showing in Overview? Enter the <span className="text-purple-400">report ID</span> (RPT-…)
+          or the customer&apos;s <span className="text-purple-400">email</span> to see exactly why. Read-only — it doesn&apos;t change anything.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            value={diagInput}
+            onChange={(e) => setDiagInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") diagnoseReport(); }}
+            placeholder="RPT-1787777020202-0SYZP1  or  venkatasriteja@gmail.com"
+            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          <button
+            onClick={diagnoseReport}
+            disabled={diagLoading || !diagInput.trim()}
+            className="shrink-0 bg-gradient-to-r from-amber-600 to-orange-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-amber-600/30"
+          >
+            {diagLoading ? "Checking..." : "🔍 Diagnose"}
+          </button>
+        </div>
+        {diagResult && (
+          <div className="space-y-3">
+            {diagResult.error ? (
+              <p className="text-sm px-3 py-2 rounded-lg bg-red-500/10 text-red-400">❌ {diagResult.error}</p>
+            ) : diagResult.found === false ? (
+              <p className="text-sm px-3 py-2 rounded-lg bg-red-500/10 text-red-400">❌ {diagResult.reason}</p>
+            ) : (
+              <>
+                <div className={`px-3 py-2 rounded-lg text-sm font-medium ${diagResult.countedInOverview ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                  {diagResult.countedInOverview
+                    ? `✅ This row IS counted in Overview (contributes ₹${diagResult.revenueContribution}).`
+                    : "❌ This row is NOT counted in Overview."}
+                </div>
+                {Array.isArray(diagResult.verdict) && diagResult.verdict.map((v, i) => (
+                  <p key={i} className="text-[13px] text-gray-300 leading-relaxed px-3 py-2 rounded-lg bg-black/30">{v}</p>
+                ))}
+                <pre className="text-[11px] text-gray-400 overflow-x-auto whitespace-pre-wrap max-h-72 overflow-y-auto bg-black/30 rounded-lg p-3">
+                  {JSON.stringify(diagResult.row, null, 2)}
+                </pre>
+              </>
+            )}
+          </div>
         )}
       </div>
 
