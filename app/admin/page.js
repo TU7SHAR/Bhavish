@@ -1625,6 +1625,46 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
   const [customerName, setCustomerName] = useState("");
   const [draftType, setDraftType] = useState("customer_response");
   const [generating, setGenerating] = useState(false);
+  // Data export state
+  const [exporting, setExporting] = useState("");
+  const [exportError, setExportError] = useState(null);
+
+  // Download an export file. The endpoint requires the admin Bearer token, so
+  // we can't use a plain <a href> — we fetch with the header, turn the response
+  // into a Blob, and trigger a download client-side.
+  const downloadExport = async (query, key) => {
+    setExporting(key);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/admin/export?${query}`, {
+        headers: { Authorization: `Bearer ${password}` },
+      });
+      if (!res.ok) {
+        let msg = `Export failed (HTTP ${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      // Prefer the server-provided filename from Content-Disposition.
+      const disp = res.headers.get("Content-Disposition") || "";
+      const match = disp.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `bhavishai-export-${new Date().toISOString().slice(0, 10)}.dat`;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err.message);
+    }
+    setExporting("");
+  };
 
   const generateDraft = async () => {
     if (!customerMsg.trim()) return;
@@ -1770,6 +1810,48 @@ function ActionsTab({ runAction, actionResult, actionLoading, password }) {
           <p className={`text-sm px-3 py-2 rounded-lg ${replyResult.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
             {replyResult.message}
           </p>
+        )}
+      </div>
+
+      <SectionTitle>Export Data</SectionTitle>
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5 space-y-4">
+        <p className="text-gray-400 text-sm">
+          Download everything in the super admin as a file. The full JSON backup includes all leads/customers,
+          monthly guidance reports, and blog posts. CSV exports open directly in Excel/Google Sheets (one sheet each).
+          <span className="text-gray-500"> Test/QA accounts are included in exports (it&apos;s a backup, not a metrics view).</span>
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            onClick={() => downloadExport("format=json&table=all", "json-all")}
+            disabled={!!exporting}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-600/30"
+          >
+            {exporting === "json-all" ? "Preparing..." : "⬇️ Full Backup (JSON)"}
+          </button>
+          <button
+            onClick={() => downloadExport("format=csv&table=reports", "csv-reports")}
+            disabled={!!exporting}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-green-600/30"
+          >
+            {exporting === "csv-reports" ? "Preparing..." : "📊 Leads/Customers (CSV)"}
+          </button>
+          <button
+            onClick={() => downloadExport("format=csv&table=guidance", "csv-guidance")}
+            disabled={!!exporting}
+            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-600/30"
+          >
+            {exporting === "csv-guidance" ? "Preparing..." : "📅 Monthly Guidance (CSV)"}
+          </button>
+          <button
+            onClick={() => downloadExport("format=csv&table=blog", "csv-blog")}
+            disabled={!!exporting}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-600/30"
+          >
+            {exporting === "csv-blog" ? "Preparing..." : "📝 Blog Posts (CSV)"}
+          </button>
+        </div>
+        {exportError && (
+          <p className="text-sm px-3 py-2 rounded-lg bg-red-500/10 text-red-400">❌ {exportError}</p>
         )}
       </div>
 
@@ -2848,6 +2930,8 @@ function MonthlyGuidanceAdmin({ person, password }) {
   const [generating, setGenerating] = useState(null);
   const [genResult, setGenResult] = useState(null);
   const [expandedReport, setExpandedReport] = useState(null); // month_number of the report being viewed
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null); // { done, total, current }
 
   const startDate = person.guidance_start_date ? new Date(person.guidance_start_date) : new Date(person.created_at);
   const now = new Date();
@@ -2896,9 +2980,102 @@ function MonthlyGuidanceAdmin({ person, password }) {
     setGenerating(null);
   };
 
+  // Generate + email EVERY due month that hasn't been generated yet, ONE AT A
+  // TIME with a pause between each call. Doing them sequentially (never in
+  // parallel) keeps us within the Gemini free-tier rate limits — same reason
+  // the nurture emails are pre-generated one call at a time.
+  const GENERATE_DELAY_MS = 4000; // gap between Gemini calls to respect free-tier RPM
+  const generateAllDue = async () => {
+    const existing = new Set((monthlyReports || []).map((r) => r.month_number));
+    const dueMonths = [];
+    for (let m = 1; m <= currentMonth; m++) {
+      if (!existing.has(m)) dueMonths.push(m);
+    }
+    if (dueMonths.length === 0) {
+      setGenResult({ status: "success", message: "✅ All due months are already generated." });
+      return;
+    }
+    if (!confirm(`Generate & send ${dueMonths.length} due month(s) [${dueMonths.map((m) => "M" + m).join(", ")}] for ${person.name}?\n\nThey are generated ONE AT A TIME (with a short pause between each) to stay within the Gemini free-tier limits, so this may take a little while. Each month is emailed to the customer as it completes.`)) return;
+
+    setBulkRunning(true);
+    setGenResult(null);
+    let success = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (let i = 0; i < dueMonths.length; i++) {
+      const monthNum = dueMonths[i];
+      setBulkProgress({ done: i, total: dueMonths.length, current: monthNum });
+      try {
+        const res = await fetch("/api/admin/generate-guidance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+          body: JSON.stringify({ reportId: person.report_id, monthNumber: monthNum }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          success++;
+        } else {
+          failed++;
+          errors.push(`M${monthNum}: ${json.error || "failed"}`);
+        }
+      } catch (e) {
+        failed++;
+        errors.push(`M${monthNum}: ${e.message}`);
+      }
+      // Refresh the grid as we go so progress is visible.
+      await loadMonthlyReports();
+      // Pause before the next Gemini call (skip the wait after the last one).
+      if (i < dueMonths.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, GENERATE_DELAY_MS));
+      }
+    }
+
+    setBulkProgress(null);
+    setBulkRunning(false);
+    setGenResult({
+      status: failed === 0 ? "success" : "error",
+      message:
+        failed === 0
+          ? `✅ Generated & emailed ${success} month(s) successfully.`
+          : `Generated ${success}, failed ${failed}. ${errors.join(" · ")}`,
+    });
+    loadMonthlyReports();
+  };
+
+  const dueNotGenerated = (() => {
+    const existing = new Set((monthlyReports || []).map((r) => r.month_number));
+    let count = 0;
+    for (let m = 1; m <= currentMonth; m++) if (!existing.has(m)) count++;
+    return count;
+  })();
+
+  const busy = generating !== null || bulkRunning;
+
   return (
     <div>
       <SectionTitle>12-Month Guidance Reports (Month {currentMonth}/12)</SectionTitle>
+
+      {/* Bulk: generate + send every due month, one at a time (free-tier safe) */}
+      <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <p className="text-[12px] text-blue-200 font-medium">Generate &amp; send all due months</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {dueNotGenerated > 0
+              ? `${dueNotGenerated} due month(s) not yet generated. Runs one at a time (paused between each) to respect the Gemini free tier, and emails each as it finishes.`
+              : "All due months are already generated."}
+          </p>
+        </div>
+        <button
+          onClick={generateAllDue}
+          disabled={busy || dueNotGenerated === 0}
+          className="shrink-0 px-4 py-2 rounded-lg text-[12px] font-semibold transition-all border bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-90 border-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-600/30"
+        >
+          {bulkRunning
+            ? `Generating M${bulkProgress?.current} (${(bulkProgress?.done || 0) + 1}/${bulkProgress?.total})...`
+            : `📅 Generate & Send ${dueNotGenerated > 0 ? dueNotGenerated + " Due" : "All Due"}`}
+        </button>
+      </div>
 
       {/* Monthly report grid */}
       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1.5 mb-3">
@@ -2927,7 +3104,7 @@ function MonthlyGuidanceAdmin({ person, password }) {
           if (report) return null;
           const isAvailable = monthNum <= currentMonth;
           return (
-            <button key={monthNum} onClick={() => generateMonth(monthNum)} disabled={generating !== null}
+            <button key={monthNum} onClick={() => generateMonth(monthNum)} disabled={busy}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all border ${isAvailable ? "bg-blue-600 hover:bg-blue-500 border-blue-500 text-white disabled:opacity-50" : "bg-white/5 border-white/10 text-gray-500 hover:text-gray-300"}`}>
               {generating === monthNum ? "..." : `M${monthNum} (${FULL_MONTHS[moIdx]})`}
             </button>
@@ -2950,7 +3127,7 @@ function MonthlyGuidanceAdmin({ person, password }) {
                 <div className="flex items-center gap-2">
                   {r.email_sent_at && <span className="text-[10px] text-green-400">✉️ Sent</span>}
                   {!r.email_sent_at && <span className="text-[10px] text-gray-500">Not emailed</span>}
-                  <button onClick={(e) => { e.stopPropagation(); generateMonth(r.month_number, true); }} disabled={generating !== null}
+                  <button onClick={(e) => { e.stopPropagation(); generateMonth(r.month_number, true); }} disabled={busy}
                     className="text-[10px] px-2 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/20 disabled:opacity-50 transition-colors">
                     🔄 Regenerate
                   </button>
