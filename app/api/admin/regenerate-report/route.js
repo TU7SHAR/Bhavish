@@ -4,7 +4,6 @@ import { calculateBirthChart } from "../../../../lib/vedic-calculator.js";
 import { geocodePlace } from "../../../../lib/geocode.js";
 import { verifyAdmin } from "../../../../lib/auth.js";
 import { generateFullReport } from "../../../../lib/report-generation.js";
-import { generateDeepDive } from "../../../../lib/deep-dive.js";
 import { resolvePlan } from "../../../../lib/plans.js";
 
 // Admin endpoint: regenerate a customer's report from scratch, TIER-AWARE.
@@ -89,7 +88,8 @@ export async function POST(request) {
       guidance_months: plan.guidanceMonths,
     };
     if (plan.deepDive) {
-      baseUpdate.deep_dive_status = "generating";
+      baseUpdate.deep_dive_status = "pending";
+      baseUpdate.report_status = "completed";
     }
 
     let updateErr = (await saveReport(supabase, reportId, baseUpdate)).error;
@@ -97,44 +97,50 @@ export async function POST(request) {
       return NextResponse.json({ error: "Report generated but DB save failed: " + updateErr.message }, { status: 500 });
     }
 
-    // Master: append the concern-specific deep-dive + 24-month roadmap.
+    // Master: trigger the deep-dive as a SEPARATE async call (same pattern as
+    // the live purchase flow). This avoids blowing the 60s timeout when both
+    // the main report and deep-dive each need retries (~15s+ each).
     let deepDiveFocus = null;
     let deepDiveSectionCount = 0;
     if (plan.deepDive) {
       try {
-        const dd = await generateDeepDive({
-          name: report.name,
-          chartData,
-          personalQuestion: report.personal_question,
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+        const deepDiveRes = await fetch(`${baseUrl}/api/generate-master-deep-dive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportId }),
         });
-        deepDiveFocus = dd.focus;
-        deepDiveSectionCount = dd.sections.length;
-        const finalSections = [...sections, ...dd.sections];
-        const ddErr = (
-          await saveReport(supabase, reportId, {
-            sections: finalSections,
-            deep_dive_status: "completed",
-            deep_dive_focus: deepDiveFocus,
-          })
-        ).error;
-        if (ddErr) {
-          return NextResponse.json({ error: "Deep-dive generated but DB save failed: " + ddErr.message }, { status: 500 });
-        }
-      } catch (ddError) {
-        // Main report is already saved; report the partial failure so the
-        // admin can retry just the Master regen.
-        await saveReport(supabase, reportId, { deep_dive_status: "failed" });
-        return NextResponse.json(
-          {
-            success: false,
+        const ddJson = await deepDiveRes.json();
+        if (deepDiveRes.ok && ddJson.status === "completed") {
+          deepDiveFocus = ddJson.focus;
+          deepDiveSectionCount = (ddJson.deepDiveSections || []).length;
+        } else if (deepDiveRes.ok && (ddJson.status === "already_done" || ddJson.status === "generating")) {
+          // Deep-dive was already completed or is in progress
+          deepDiveFocus = ddJson.focus || "in_progress";
+        } else {
+          // Deep-dive call failed but main report is saved — return partial success
+          return NextResponse.json({
+            success: true,
             partial: true,
             reportId,
             tier: plan.tier,
+            price: plan.price,
             sectionCount: sections.length,
-            error: "Main report regenerated, but deep-dive failed: " + ddError.message + ". Click Regen Master again to retry.",
-          },
-          { status: 500 }
-        );
+            note: "Main report regenerated successfully. Deep-dive generation started but may still be processing. Check back in ~30s or click Regen Master again.",
+            deepDiveError: ddJson.error || ddJson.message,
+          });
+        }
+      } catch (ddError) {
+        // Main report is already saved; report partial success
+        return NextResponse.json({
+          success: true,
+          partial: true,
+          reportId,
+          tier: plan.tier,
+          price: plan.price,
+          sectionCount: sections.length,
+          note: "Main report regenerated. Deep-dive call failed: " + ddError.message + ". Click Regen Master again to retry deep-dive.",
+        });
       }
     }
 
