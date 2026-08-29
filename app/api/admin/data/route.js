@@ -53,10 +53,41 @@ export async function GET(request) {
     );
 
     if (tab === "overview") {
-      // Aggregated stats
-      const { data: allReports } = await supabase
-        .from("reports")
-        .select("*", { count: "exact" });
+      // Aggregated stats.
+      //
+      // IMPORTANT: Supabase caps a single .select() at 1000 rows. The old code
+      // used `.select("*")` with no ordering, which silently returned only the
+      // FIRST 1000 rows (default primary-key order = oldest first). Once the
+      // table grew past 1000 rows, recent paid customers were dropped from every
+      // Overview metric even though they were perfectly valid — the exact bug
+      // where a real, correctly-paid report never appeared in the dashboard.
+      //
+      // Fix: fetch ALL rows via explicit pagination, and select ONLY the
+      // lightweight columns the aggregation actually needs (never the heavy
+      // JSONB like sections/chart_data/full_text). This both counts every row
+      // and makes the Overview far faster.
+      const OVERVIEW_COLUMNS =
+        "email,payment_status,is_founder_free,is_founder_member,is_founder_gifted," +
+        "founder_upgrade_payment_id,has_12_month_guidance,is_guidance_gifted," +
+        "plan_tier,plan_price,paid_at,created_at,email_sequence_status," +
+        "emails_sent_count,email_opens,email_drafts,thankyou_sent_at";
+
+      const allReports = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error: pageErr } = await supabase
+          .from("reports")
+          .select(OVERVIEW_COLUMNS)
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (pageErr) {
+          console.error("[admin/overview] page fetch error:", pageErr.message);
+          break;
+        }
+        if (!page || page.length === 0) break;
+        allReports.push(...page);
+        if (page.length < PAGE) break; // last page
+      }
 
       // Exclude test/QA accounts from every metric
       const reports = excludeTest(allReports, getTestEmails());
