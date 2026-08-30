@@ -2,8 +2,8 @@
 
 ## BhavishAI — System Architecture
 
-**Version:** 1.0
-**Last Updated:** July 2026
+**Version:** 1.1
+**Last Updated:** August 2026
 
 ---
 
@@ -99,9 +99,9 @@ app/
 | **Payment** | `/api/create-order`, `/api/verify-payment`, `/api/razorpay-webhook`, `/api/create-upgrade-order`, `/api/verify-upgrade` | 10-60s | Razorpay SDK |
 | **Report** | `/api/generate-full-report`, `/api/save-report`, `/api/generate-pdf` | 30-60s | Gemini, Supabase, jsPDF |
 | **Email** | `/api/send-report-email`, `/api/generate-email-sequence`, `/api/notify-sale` | 30s | Resend, Nodemailer, Gemini |
-| **Cron** | `/api/cron/send-nurture-emails`, `/api/backfill-email-drafts`, `/api/manual-send-emails` | 60s | Resend, Supabase |
+| **Cron** | `/api/cron/send-nurture-emails`, `/api/cron/reconcile-payments`, `/api/backfill-email-drafts`, `/api/manual-send-emails` | 60s | Resend, Razorpay, Supabase |
 | **Tracking** | `/api/track/open`, `/api/track/visit` | 10s | Supabase |
-| **Admin** | `/api/admin/*` (12 endpoints) | 10-60s | Various |
+| **Admin** | `/api/admin/*` (incl. `data`, `send-email`, `generate-guidance`, `generate-article`, `export`, `diagnose-report`, `reconcile-payments`, `analytics`, `blog-debug`, …) | 10-60s | Various |
 | **Auth** | `/auth/callback` | 10s | Supabase Auth |
 
 ### 2.3 Library Layer (`lib/`)
@@ -304,13 +304,21 @@ User submits form
 // vercel.json
 {
   "crons": [
-    { "path": "/api/cron/send-nurture-emails", "schedule": "30 3 * * *" },
-    { "path": "/api/cron/send-nurture-emails", "schedule": "30 15 * * *" }
+    { "path": "/api/cron/send-nurture-emails", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/send-nurture-emails", "schedule": "30 15 * * *" },
+    { "path": "/api/cron/reconcile-payments", "schedule": "0 * * * *" }
   ]
 }
 ```
 
-Both hit the same endpoint at 9:00 AM and 9:00 PM IST. Protected by `CRON_SECRET` header.
+- **Nurture emails:** twice daily (IST). Protected by `CRON_SECRET` header.
+- **Reconcile payments:** hourly safety net that fulfils any Razorpay-captured
+  payment missed by the browser callback / webhook. Idempotent.
+
+> **Vercel Hobby caveat:** free-tier cron jobs fire only **once per day**, so the
+> hourly reconcile won't actually run hourly on Hobby. Use an external trigger
+> (cron-job.org — supports custom `Authorization` headers and sub-hourly
+> schedules). See `docs/cron-setup.md` for the full setup.
 
 ---
 
@@ -332,8 +340,9 @@ Both hit the same endpoint at 9:00 AM and 9:00 PM IST. Protected by `CRON_SECRET
 │    send-report-email, notify-sale, generate-email-seq│
 │    → Protected by: verifyInternal() + timing-safe    │
 │                                                       │
-│  CRON (Vercel scheduler):                            │
-│    send-nurture-emails, backfill-email-drafts        │
+│  CRON (Vercel scheduler / external trigger):         │
+│    send-nurture-emails, reconcile-payments,          │
+│    backfill-email-drafts                             │
 │    → Protected by: verifyCron() + CRON_SECRET        │
 │                                                       │
 │  ADMIN (human operator):                             │
@@ -418,7 +427,9 @@ Vercel auto-deploys (CI/CD built-in)
 | Traffic | Vercel Analytics | Pageviews, unique visitors |
 | Conversion funnel | Meta Pixel + GA4 | Lead → Checkout → Purchase |
 | Email engagement | Custom (track/open pixel) | Open rates in admin panel |
-| Payment health | Admin panel (overview tab) | Revenue, conversion rate |
+| Payment health | Admin panel (overview tab) | Revenue, conversion rate (always live — `force-dynamic`, paginated) |
+| Missing payment triage | Admin → Actions → Diagnose Missing Payment | Explains why a row is/isn't counted (read-only) |
+| Missed payment recovery | Hourly `/api/cron/reconcile-payments` | `[cron-reconcile]` prefix; logs only on actual recovery |
 | Gemini failures | Console logs | `[webhook]`, `[fulfill]` prefixes |
 | Rate limit hits | Console logs | `[rate-limit]` prefix |
 

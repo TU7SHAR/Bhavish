@@ -1,50 +1,42 @@
 # Current Task
 
-## Session Goals — July 2026
+## Session Goals — August 2026
 
 > **Delete or clear this file after tasks are completed.**
 
 ---
 
-## Recently Completed
+## Recently Completed (August 2026)
 
-- [x] PR #150: Three-tier pricing (Essential/Premium/Master) — merged
-- [x] PR #151: Bug fixes (email undefined, footer overlay, deep-dive styling)
-- [x] PR #152: Admin panel tier refactor (revenue calc, tier badges, gift upgrades)
-- [x] PR #153: P0 payment & fulfillment hardening (security critical)
-- [x] PR #154: Admin gift upgrade buttons + howto email update + docs
-
----
-
-## Pending Merges (in order)
-
-1. **PR #153** — merge FIRST (security critical, fixes paywall bypass)
-2. **PR #151** — bug fixes (independent)
-3. **PR #152** — admin panel (depends on plan_tier columns)
-4. **PR #154** — admin gift buttons + howto (depends on #152's gift API types)
+- [x] PR #176: Auto-reconciliation cron (`/api/cron/reconcile-payments`) — self-heals missed UPI payments hourly. Idempotent.
+- [x] PR #177: Bulk monthly-guidance generation (free-tier-safe, one Gemini call at a time) + super admin data export (`/api/admin/export`, JSON + CSV).
+- [x] PR #178: `docs/cron-setup.md` — cron-job.org setup guide (external trigger for sub-hourly / header-authed crons).
+- [x] PR #179: "Diagnose Missing Payment" admin tool (`/api/admin/diagnose-report`, read-only).
+- [x] PR #180: Overview 1000-row Supabase cap fix (paginated fetch + lightweight columns). Fixes under-counted revenue and slow load.
+- [x] PR #181: Overview stale-cache fix (`force-dynamic` + client `no-store`). Fixes recent paid customer not appearing.
 
 ---
 
-## After Merging All PRs
+## After Merging / Deploying
 
-1. Run migration 002 + 004 in Supabase SQL Editor (if not already done)
-2. Deploy to Vercel
-3. Run migration 003 (RLS) — ONLY after deploy
-4. Test one complete real payment flow end-to-end
-5. Verify admin panel shows tier badges + gift buttons work
-6. Update live ad creatives (remove any "20-page ₹299" copy)
+1. **Deploy to Vercel** and confirm the Production deployment is **Ready** (merging ≠ deployed).
+2. **Set up cron-job.org** to hit `/api/cron/reconcile-payments` hourly with `Authorization: Bearer <CRON_SECRET>` (see `docs/cron-setup.md`). Needed because Vercel Hobby crons run only once/day.
+3. **Verify Overview**: hard-refresh, select "All Time", confirm recent paid customers appear. Use **Actions → Diagnose Missing Payment** if any row is still questioned.
+4. **Recover the specific stuck payment** if not already fulfilled: `/api/admin/reconcile-payments?reportId=RPT-...&paymentId=pay_...&planId=premium`.
+5. **Rotate `ADMIN_SECRET`/`CRON_SECRET`** (was shared in plaintext during debugging).
 
 ---
 
 ## Open Follow-ups (Future Sessions)
 
+- [ ] **BUG-022:** Apply the same 1000-row pagination + `force-dynamic` fix to `/api/admin/analytics` (same class of bug as Overview).
+- [ ] Configure `RAZORPAY_WEBHOOK_SECRET` in Razorpay + Vercel so the webhook safety net works alongside the reconcile cron.
+- [ ] Google Search Console: resolve "Blocked due to other 4xx" for `links.bhavishai.in` (cosmetic; likely the link-tracking subdomain — add robots rule / redirect).
 - [ ] Kundli SVG chart rendering in the PDF generator
 - [ ] Store generated PDFs in Supabase Storage for re-download
 - [ ] Resend bounce/complaint webhook handling
 - [ ] Sentry error monitoring integration
 - [ ] Uptime monitoring (external ping)
-- [ ] Make preview save synchronous (await before enabling payment)
-- [ ] A/B test tier selection defaults
 
 ---
 
