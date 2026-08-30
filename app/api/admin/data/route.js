@@ -37,6 +37,12 @@ function excludeFounderGen(rows) {
 //   ?tab=payments    → paid reports only
 //   ?tab=emails      → email delivery + open tracking
 export const maxDuration = 30;
+// Always compute fresh. Without this, Next.js 16 can cache/prerender this GET
+// handler and serve a STALE snapshot — e.g. an Overview count taken before a
+// recent payment, so a valid paid customer appears "missing" until the cache
+// happens to refresh. The dashboard must always reflect live DB state.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request) {
   // SECURITY FIX: Use timing-safe comparison for admin auth

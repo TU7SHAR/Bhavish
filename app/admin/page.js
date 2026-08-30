@@ -17,8 +17,12 @@ export default function AdminDashboard() {
   const fetchData = async (t, secret) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/data?tab=${t}`, {
+      // cache: "no-store" + a cache-busting query param guarantee we always get
+      // a fresh count from the server (never a stale browser/CDN copy), so a
+      // recent payment shows up immediately instead of waiting on a cache.
+      const res = await fetch(`/api/admin/data?tab=${t}&_ts=${Date.now()}`, {
         headers: { Authorization: `Bearer ${secret || password}` },
+        cache: "no-store",
       });
       const json = await res.json();
       if (res.ok) {
@@ -50,8 +54,9 @@ export default function AdminDashboard() {
     setLoading(true);
     // Validate against the API before entering
     try {
-      const res = await fetch(`/api/admin/data?tab=overview`, {
+      const res = await fetch(`/api/admin/data?tab=overview&_ts=${Date.now()}`, {
         headers: { Authorization: `Bearer ${password}` },
+        cache: "no-store",
       });
       if (res.ok) {
         const json = await res.json();
@@ -3625,8 +3630,8 @@ function EconomicsTab({ password }) {
       if (params.toString()) url += `?${params.toString()}`;
 
       const [expRes, revRes] = await Promise.all([
-        fetch(url, { headers: { Authorization: `Bearer ${password}` } }),
-        fetch(`/api/admin/data?tab=overview`, { headers: { Authorization: `Bearer ${password}` } }),
+        fetch(url, { headers: { Authorization: `Bearer ${password}` }, cache: "no-store" }),
+        fetch(`/api/admin/data?tab=overview&_ts=${Date.now()}`, { headers: { Authorization: `Bearer ${password}` }, cache: "no-store" }),
       ]);
       const expJson = await expRes.json();
       const revJson = await revRes.json();
