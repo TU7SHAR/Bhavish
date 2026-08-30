@@ -165,11 +165,16 @@ Both **Meta Pixel** and **GA4** fire at each funnel stage:
 | `/api/generate-email-sequence` | POST | None | ONE Gemini call → 10 email drafts stored as JSONB in reports.email_drafts. |
 | `/api/backfill-email-drafts` | GET | CRON_SECRET | Generates drafts for old leads missing them. Batch of 3. |
 | `/api/cron/send-nurture-emails` | GET | CRON_SECRET | Reads pre-generated drafts → sends next due email via Resend. 9s time budget. |
+| `/api/cron/reconcile-payments` | GET | CRON_SECRET | Auto-reconciliation safety net. Scans recent captured Razorpay payments and fulfils any that were missed (UPI callback / webhook). Idempotent. Runs hourly (see cron-setup.md). |
 | `/api/manual-send-emails` | GET | CRON_SECRET | Sends all due emails (no time budget). Supports ?force, ?fresh, ?email filters. |
 | `/api/track/open` | GET | None | Returns 1x1 pixel GIF. Logs email opens to reports.email_opens JSONB. |
-| `/api/admin/data` | GET | ADMIN/CRON_SECRET | Returns dashboard data by tab (overview/leads/payments/emails/blog/paid-details/all-details). |
+| `/api/admin/data` | GET | ADMIN/CRON_SECRET | Returns dashboard data by tab (overview/leads/payments/emails/blog/paid-details/all-details). `force-dynamic` + paginated (fetches ALL rows, not just first 1000). |
 | `/api/admin/send-email` | POST | ADMIN/CRON_SECRET | Send email to single lead (scheduled/force/custom modes). |
+| `/api/admin/generate-guidance` | POST | ADMIN/CRON_SECRET | Generates ONE month's guidance report via Gemini + emails the customer. Body: { reportId, monthNumber, force? }. Called one-at-a-time by the bulk "Generate all due months" button (free-tier safe). |
 | `/api/admin/generate-article` | POST | ADMIN/CRON_SECRET | Gemini writes SEO article → stores in blog_posts table. |
+| `/api/admin/export` | GET | ADMIN/CRON_SECRET | Data export. `?format=json` (full backup: reports + guidance + blog) or `?format=csv&table=reports\|guidance\|blog`. |
+| `/api/admin/diagnose-report` | GET | ADMIN/CRON_SECRET | Read-only diagnostic. `?reportId=` or `?email=` → explains exactly why a row is / isn't counted in Overview (test-exclusion, payment_status, is_founder_free) + raw gating fields. |
+| `/api/admin/reconcile-payments` | GET | ADMIN/CRON_SECRET | Manual reconciliation. `?reportId=` (single), `?paymentId=` (one payment), or `?count=` (scan recent). Recovers missed payments. |
 | `/api/admin/blog-debug` | GET | ADMIN/CRON_SECRET | Diagnostic: shows DB read results for blog troubleshooting. |
 | `/auth/callback` | GET | None | Handles Google OAuth redirect. Links reports by email. |
 
@@ -296,13 +301,22 @@ Both **Meta Pixel** and **GA4** fire at each funnel stage:
 | Everyone | Same expandable cards for ALL leads with per-lead email buttons |
 | Payments | Revenue breakdown (base/founder/guidance) + payment IDs |
 | Emails | Visual 10-bar progress per lead (green=opened, yellow=sent, grey=pending) |
+| 12-Mo Guidance | Guidance customers; expand a card for monthly generation controls (per-month + bulk "Generate & Send all due months") |
 | Blog | AI article generator + list of published DB articles |
-| Actions | Bulk send buttons (Send Due, Fresh Leads, Force, Cron, Backfill) |
+| Actions | AI reply composer, bulk send buttons (Send Due, Fresh Leads, Force, Cron, Backfill), **Diagnose Missing Payment**, and **Export Data** (JSON backup + per-table CSV) |
 
 ### Per-lead controls (in Everyone/Paid People):
 - 📬 Send Scheduled — next email if due per schedule
 - 🚀 Force Next — ignore schedule, send immediately
 - ✏️ Custom Email — type subject + body, one-off send
+
+### Monthly guidance controls (in 12-Mo Guidance → expand a customer):
+- Per-month **Generate** / **Regenerate** buttons (calls Gemini + emails the month)
+- **Generate & Send all due months** — generates every due-but-missing month sequentially, ONE Gemini call at a time with a pause between each, to stay within the Gemini free-tier rate limits
+
+### Actions-tab tools:
+- 🔍 **Diagnose Missing Payment** — enter a reportId or email to see exactly why it is / isn't in Overview (read-only)
+- ⬇️ **Export Data** — Full JSON backup (all reports + guidance + blog), or CSV per table (opens in Excel/Sheets)
 
 ---
 
@@ -395,6 +409,7 @@ Revenue per customer: ₹299 (base) to ₹1,447 (base + guidance + founder).
 - **Report data in browser storage** — full report content lives in sessionStorage/localStorage (accessible to browser extensions)
 - ~~**No webhook verification for Razorpay**~~ → **FIXED** (Razorpay webhook with HMAC verification + fulfillPayment safety net)
 - ~~**Email endpoints (send-report-email, notify-sale) have no auth**~~ → **FIXED** (verifyInternal for send-report-email, notify-sale uses internal auth headers)
+- ~~**Missed UPI payments only recoverable manually**~~ → **FIXED** (hourly `/api/cron/reconcile-payments` auto-reconciliation cron; see docs/cron-setup.md for the cron-job.org trigger)
 
 ---
 

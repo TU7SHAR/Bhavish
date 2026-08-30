@@ -2,7 +2,7 @@
 
 ## BhavishAI — Manual & Automated Test Cases
 
-**Last Updated:** July 2026
+**Last Updated:** August 2026
 **Type:** Manual (no automated test framework yet)
 
 ---
@@ -88,6 +88,9 @@ Before merging any significant change:
 | 2.4.1 | Reconcile specific report | `?reportId=RPT-xxx` | Fulfills that report | — |
 | 2.4.2 | Scan mode | No params (scans last 30) | Returns summary of fulfilled/skipped | — |
 | 2.4.3 | Unauthorized | Call without admin secret | 401 | — |
+| 2.4.4 | Auto-reconcile cron | GET `/api/cron/reconcile-payments` with CRON_SECRET | `{ ok: true, summary }`; `fulfilled > 0` only if a real payment was missed | — |
+| 2.4.5 | Reconcile cron idempotent | Run cron twice in a row | Second run reports `alreadyDone`, no duplicate emails | — |
+| 2.4.6 | Reconcile cron unauthorized | Call without CRON_SECRET | 401 | — |
 
 ---
 
@@ -211,6 +214,8 @@ Before merging any significant change:
 | 7.2.1 | Overview tab | Open admin | Revenue, stats, conversion rate shown | — |
 | 7.2.2 | Leads tab | Switch to leads | Table with search/filter works | — |
 | 7.2.3 | Email tab | Switch to emails | 10-bar progress for each lead | — |
+| 7.2.4 | Overview counts >1000 rows | With `reports` table > 1000 rows, check a recent paid customer | Recent paid row IS included in totals (pagination — BUG-020) | — |
+| 7.2.5 | Overview is always fresh | Make a payment, refresh Overview | New payment appears immediately (no stale cache — BUG-021) | — |
 
 ### 7.3 Actions
 | # | Test Case | Steps | Expected Result | Last Tested |
@@ -218,6 +223,17 @@ Before merging any significant change:
 | 7.3.1 | Send due emails | Click "Send Due" | Due emails sent, count shown | — |
 | 7.3.2 | Force next | Click "Force" on a lead | Next email sent regardless of schedule | — |
 | 7.3.3 | Reconcile payments | Click reconcile | Summary of scanned/fulfilled shown | — |
+| 7.3.4 | Diagnose missing payment | Actions → enter reportId or email | Read-only verdict on why row is/isn't in Overview + raw fields | — |
+| 7.3.5 | Export full backup (JSON) | Actions → Full Backup (JSON) | Downloads JSON with reports + guidance + blog | — |
+| 7.3.6 | Export CSV per table | Actions → Leads/Guidance/Blog CSV | Downloads a CSV that opens in Excel/Sheets | — |
+
+### 7.4 Monthly Guidance (12-Mo Guidance tab)
+| # | Test Case | Steps | Expected Result | Last Tested |
+|---|-----------|-------|-----------------|-------------|
+| 7.4.1 | Generate one month | Expand a guidance customer → click a month | Month generated via Gemini + customer emailed | — |
+| 7.4.2 | Generate all due months | Click "Generate & Send all due months" | Each due month generated sequentially (paused between calls), all emailed | — |
+| 7.4.3 | Free-tier pacing | Watch a bulk run | Calls are one-at-a-time with a delay (never parallel) to respect Gemini limits | — |
+| 7.4.4 | No due months | Bulk button when all due months exist | Button disabled / "all due months generated" | — |
 
 ---
 

@@ -3,7 +3,7 @@
 ## BhavishAI — Phase-Based Roadmap
 
 **Version:** 1.0
-**Last Updated:** July 2026
+**Last Updated:** August 2026
 **Status:** Phase 1 complete, Phase 2 in progress
 
 ---
@@ -87,6 +87,9 @@
 - [x] Admin reconciliation endpoint (scan recent Razorpay payments)
 - [x] Triple-path delivery (browser + webhook + reconcile)
 - [x] Payment gate on generate-full-report (verify paid in DB)
+- [x] Auto-reconciliation cron (`/api/cron/reconcile-payments`, hourly) — self-heals missed UPI payments without manual action (PR #176)
+- [x] cron-job.org setup guide for sub-hourly / header-authed triggering (docs/cron-setup.md, PR #178)
+- [ ] Configure `RAZORPAY_WEBHOOK_SECRET` in Razorpay + Vercel (webhook safety net currently placeholder)
 
 ### 2.2 Rate Limiting
 - [x] In-memory burst guard (per-instance)
@@ -132,6 +135,15 @@
 - [x] Email open tracking (1x1 pixel)
 - [ ] Bounce handling (mark invalid emails)
 - [ ] Complaint handling (auto-unsubscribe on spam report)
+
+### 2.8 Admin Dashboard Reliability (August 2026)
+- [x] Overview counts ALL rows via pagination (fixes 1000-row Supabase cap — PR #180)
+- [x] Overview fetch is lightweight (only aggregation columns, not heavy JSONB — PR #180)
+- [x] Overview always live (`force-dynamic` + client `no-store` — PR #181)
+- [x] "Diagnose Missing Payment" tool (`/api/admin/diagnose-report`, read-only — PR #179)
+- [x] Data export — full JSON backup + per-table CSV (`/api/admin/export` — PR #177)
+- [x] Bulk monthly-guidance generation (free-tier-safe, sequential — PR #177)
+- [ ] Apply the same pagination + `force-dynamic` fix to `/api/admin/analytics` (BUG-022)
 
 ---
 

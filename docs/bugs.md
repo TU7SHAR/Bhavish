@@ -2,7 +2,51 @@
 
 ## BhavishAI — Structured Issue Tracker
 
-**Last Updated:** July 2026 (admin actions pass)
+**Last Updated:** August 2026 (admin Overview accuracy pass)
+
+---
+
+## Fixed Bugs (Admin Overview — August 2026)
+
+### BUG-021: Overview stale/cached data — recent paid customer still missing
+**Status:** Fixed
+**Severity:** High (a real paid customer appeared "missing" from the dashboard)
+**Fixed in:** PR #181
+
+**Symptom:** Even after BUG-020 was fixed, a genuine ₹499 Premium payment
+(`RPT-1787777020202-0SYZP1`) still didn't appear in the Overview totals, despite
+the DB row being perfect (`payment_status=paid`, `plan_tier=premium`, `plan_price=499`).
+**Root Cause:** Response caching on both ends:
+1. `/api/admin/data` had no dynamic marking, so Next.js 16 could cache/prerender
+   the GET handler and serve a STALE snapshot (a count taken before the payment).
+2. The client `fetch()` calls had no `cache: "no-store"`, so the browser/CDN
+   could also serve an old copy.
+**Fix:**
+- Added `export const dynamic = "force-dynamic"` + `revalidate = 0` to the admin
+  data route (matches the existing pattern in `admin/blog-debug`).
+- Added `cache: "no-store"` + a cache-busting `_ts` param to all three client
+  fetches of `/api/admin/data` (main `fetchData`, login validation, economics tab).
+
+### BUG-020: Overview dropped recent paid rows past the 1000-row Supabase cap
+**Status:** Fixed
+**Severity:** High (revenue + paid counts silently under-reported)
+**Fixed in:** PR #180
+
+**Symptom:** Recent paid customers were absent from Overview revenue/paid/tier
+counts, while still appearing correctly in the Leads/Payments/Paid tabs.
+**Root Cause:** The Overview branch used `.select("*")` with NO `.order()` and NO
+`.range()`. Supabase caps a single `select()` at **1000 rows** and, with no
+ordering, returns the FIRST 1000 in default primary-key order (oldest first).
+Once the `reports` table grew past 1000 rows, recent paid rows fell outside that
+page and vanished from every Overview metric. Other tabs order by `created_at desc`,
+so they still showed those rows — the tell for this bug.
+**Fix:** Paginate the fetch in 1000-row pages via `.range()` (order `created_at desc`)
+so ALL rows are counted, and select only the lightweight columns the aggregation
+needs (dropping heavy JSONB like `sections`/`chart_data`), which also fixed the
+slow Overview load.
+
+**Follow-up (open):** `/api/admin/analytics` has the same 1000-row cap + no
+`force-dynamic`; tracked below as BUG-022.
 
 ---
 
@@ -23,6 +67,17 @@
 ---
 
 ## Open Bugs
+
+### BUG-022: Analytics tab has the same 1000-row cap + no force-dynamic
+**Status:** Open (follow-up to BUG-020/BUG-021)
+**Severity:** Medium (Analytics tab under-counts once table > 1000 rows; can serve cached data)
+**Discovered:** August 2026
+
+**Symptom:** `/api/admin/analytics` fetches reports with `.select(...).order("created_at", desc)`
+but no `.range()` pagination, so it only sees the most recent 1000 rows. It also
+lacks `export const dynamic = "force-dynamic"`, so its response can be cached.
+**Fix (planned):** Apply the same paginated fetch + `force-dynamic` treatment as
+the Overview route (BUG-020/BUG-021). Kept as a separate focused PR.
 
 ### BUG-010: Analytics leak on private report links
 **Status:** Open (accepted risk)
