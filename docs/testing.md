@@ -2,7 +2,7 @@
 
 ## BhavishAI — Manual & Automated Test Cases
 
-**Last Updated:** August 2026
+**Last Updated:** September 2026
 **Type:** Manual (no automated test framework yet)
 
 ---

@@ -2,9 +2,9 @@
 
 ## BhavishAI — Phase-Based Roadmap
 
-**Version:** 1.0
-**Last Updated:** August 2026
-**Status:** Phase 1 complete, Phase 2 in progress
+**Version:** 1.1
+**Last Updated:** September 2026
+**Status:** Phase 1 complete, Phase 2 in progress (reliability/security largely done)
 
 ---
 
