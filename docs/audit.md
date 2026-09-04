@@ -17,7 +17,7 @@
 | Missed UPI payments self-heal | **PASS** | Hourly `/api/cron/reconcile-payments`, PR #176 |
 | Diagnose tool to explain a missing row | **PASS** | `/api/admin/diagnose-report`, read-only, PR #179 |
 | Data export (backup) available | **PASS** | `/api/admin/export` JSON + CSV, PR #177 |
-| Analytics tab counts ALL rows | **FAIL** | Same 1000-row cap; tracked as BUG-022 (follow-up PR) |
+| Analytics tab counts ALL rows | **PASS** | Paginated `.range()` fetch + `force-dynamic`, BUG-022 (fix/analytics-1000-row-cap) |
 
 ---
 
@@ -49,7 +49,7 @@
 | CSRF protection not implemented | Low | Razorpay popup + HMAC mitigates payment CSRF; other routes are read-only or auth-gated |
 | Supabase RLS unverified on production | Medium | Migration 003 written; must run after deploy |
 | Admin revenue calc for filtered dates uses plan_price (PR #152 needed) | Low | Only affects admin; merged separately |
-| Analytics tab 1000-row cap + no force-dynamic | Medium | BUG-022; same fix as Overview, follow-up PR |
+| ~~Analytics tab 1000-row cap + no force-dynamic~~ | ~~Medium~~ | **FIXED** — BUG-022 (paginated fetch + `force-dynamic`) |
 
 ## Architecture Correctness
 
