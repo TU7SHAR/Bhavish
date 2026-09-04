@@ -71,7 +71,8 @@ accurate route/lib/page reference and a clear, enforced rule to keep docs curren
 Docs-only change — no runtime code touched. Follow-up: BUG-022 (analytics
 1000-row cap) and `RAZORPAY_WEBHOOK_SECRET` remain open and are now clearly tracked.
 
-**Branch / PR:** `docs/sync-with-code-and-maintenance-system` — PR link added on open.
+**Branch / PR:** `docs/sync-with-code-and-maintenance-system` →
+[PR #184](https://github.com/TU7SHAR/Bhavish/pull/184).
 
 ---
 
