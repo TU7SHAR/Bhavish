@@ -108,7 +108,7 @@ const serviceSchema = {
   provider: { "@type": "Organization", name: "BhavishAI" },
   areaServed: "IN",
   description:
-    "Personalized Vedic astrology (Janam Kundli) reports generated from your exact birth details using Swiss Ephemeris calculations and classical Jyotish principles. Available in Essential, Premium and Master tiers.",
+    "Personalized Vedic astrology (Janam Kundli) reports generated from your exact birth details using high-precision astronomical calculations and classical Jyotish principles. Available in Essential, Premium and Master tiers.",
   offers: {
     "@type": "Offer",
     price: "299",
@@ -259,7 +259,7 @@ export default function Home() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
-                { icon: "🪐", title: "Swiss Ephemeris Calculations", desc: "Same astronomical engine used by NASA. Sub-arcminute planetary precision." },
+                { icon: "🪐", title: "High-Precision Astronomy", desc: "Planetary positions computed with a high-precision astronomical engine and Lahiri ayanamsa — real math, not tables." },
                 { icon: "📍", title: "Exact Birth Coordinates", desc: "We geocode your birthplace to exact latitude/longitude for accurate house calculations." },
                 { icon: "🕉️", title: "Vedic Astrology System", desc: "Lahiri Ayanamsa, Whole Sign houses, Vimshottari Dasha — classical Jyotish methodology." },
                 { icon: "🎯", title: "Personalized to YOUR Chart", desc: "Every prediction references your specific planets, houses, and degrees. Not sun-sign-level." },
