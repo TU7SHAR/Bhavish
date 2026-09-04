@@ -167,6 +167,13 @@
 - [ ] City-specific landing pages (e.g., "Kundli in Mumbai")
 - [ ] Hindi language blog articles
 - [ ] Video content embeds (YouTube shorts)
+- **Free SEO tools (moat) — built on the existing deterministic engine:**
+  - [x] `/tools/manglik-calculator` — free Manglik/Mangal Dosha calculator + FAQ/Breadcrumb schema + funnel CTA (the reusable **tool template**)
+  - [ ] `/tools/nakshatra-calculator`
+  - [ ] `/tools/rashi-calculator`
+  - [ ] `/tools/lagna-calculator`
+  - [ ] `/tools/dasha-calculator`
+  - See `docs/seo-audit.md` for the full tool + topic-cluster strategy.
 
 ### 3.3 Performance
 - [ ] Edge caching for blog pages (ISR with revalidation)
