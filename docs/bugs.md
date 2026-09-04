@@ -2,7 +2,7 @@
 
 ## BhavishAI — Structured Issue Tracker
 
-**Last Updated:** August 2026 (admin Overview accuracy pass)
+**Last Updated:** September 2026 (doc-sync pass; BUG-022 re-confirmed open)
 
 ---
 

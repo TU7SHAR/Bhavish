@@ -2,10 +2,10 @@
 
 ## BhavishAI — AI-Powered Vedic Astrology Reports
 
-**Version:** 1.0
-**Last Updated:** July 2026
+**Version:** 1.1
+**Last Updated:** September 2026
 **Owner:** TU7SHAR
-**Status:** Live (MVP shipped)
+**Status:** Live (MVP shipped; Phase 2 reliability/security largely complete)
 
 ---
 
@@ -168,7 +168,7 @@ These are **NOT** being built now. Do not implement unless explicitly requested:
 2. **Vercel serverless** — max 60s function timeout, no persistent processes
 3. **Supabase PostgreSQL** — single database, no Redis/external cache (unless added)
 4. **Razorpay only** — no Stripe/PayPal (India-focused, UPI-first)
-5. **No user data export** — GDPR-lite compliance via delete-on-request only
+5. **Data export available for the operator** (`/api/admin/export`, JSON + CSV); user-facing GDPR compliance is still delete-on-request only
 6. **All deterministic astrology rules computed in code** — never delegated to AI
 
 ---

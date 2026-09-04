@@ -4,6 +4,9 @@
 
 **Last Audited:** August 2026 (after admin Overview accuracy pass — PRs #180, #181)
 **Prior audit:** July 2026 (after PR #153 hardening pass)
+**Doc-sync re-verification:** September 2026 — re-confirmed all PASS rows against
+current source; BUG-022 (analytics 1000-row cap + no `force-dynamic`) remains open
+and unchanged; `RAZORPAY_WEBHOOK_SECRET` still pending configuration.
 
 ---
 
