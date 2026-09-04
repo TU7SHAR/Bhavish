@@ -528,6 +528,26 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Free Tools */}
+        <section id="tools" className="py-20">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Free Astrology Tools</h2>
+            <p className="text-muted mb-10 max-w-xl mx-auto">
+              Quick, accurate calculators built on the same astronomical engine as our full report — no sign-up needed.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Link
+                href="/tools/manglik-calculator"
+                className="bg-surface border border-border rounded-xl p-5 card-hover text-left block"
+              >
+                <div className="text-2xl mb-2">🔴</div>
+                <div className="font-semibold mb-1">Manglik Dosha Calculator</div>
+                <p className="text-muted text-sm">Check if you&apos;re Manglik by date, time &amp; place of birth.</p>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Final CTA */}
         <section className="py-20">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
