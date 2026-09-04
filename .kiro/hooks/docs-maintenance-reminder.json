@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Docs Maintenance Reminder",
+      "trigger": "SessionStart",
+      "description": "Reminds the agent, at the start of every session, to keep BhavishAI's living documentation in lockstep with code changes per docs/DOCS_MAINTENANCE.md.",
+      "action": {
+        "type": "agent",
+        "prompt": "LIVING DOCUMENTATION CONTRACT (BhavishAI): This project keeps docs in lockstep with code. For every change/iteration you make, before opening a PR you MUST also update the matching documentation in the SAME PR:\n1) docs/agent-activity-log.md — add a new top entry (Asked → Interpreted → Did → Files affected → Impact → Branch/PR).\n2) commands/ — correct the relevant reference file if you added/removed/changed any API route (api-routes.md), lib module (lib-modules.md), page/component (pages.md), command/script/migration (cli-commands.md), or cron/ops endpoint (cron-and-ops.md).\n3) docs/*.md and PROJECT.md — update architecture, prd, requirements, bugs, implementation_plan, testing, or audit whenever the change affects them, and bump the \"Last updated\" date on every doc you touch.\nCode is the source of truth: verify claims against the actual source, and separate resolved issues from genuinely open ones. See docs/DOCS_MAINTENANCE.md for the full checklist. Treat this as a standing instruction for the whole session."
+      }
+    }
+  ]
+}
