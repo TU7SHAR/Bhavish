@@ -167,6 +167,12 @@
 - [ ] City-specific landing pages (e.g., "Kundli in Mumbai")
 - [ ] Hindi language blog articles
 - [ ] Video content embeds (YouTube shorts)
+- **High-intent topic-cluster landing pages** (SEO "money pages" with FAQ + Breadcrumb schema, internal-linked into tools + `/get-report`), via the reusable `components/ClusterLanding.js`:
+  - [x] `/kundli/janam-kundli` (Kundli pillar)
+  - [x] `/kundli/kundli-by-date-of-birth`
+  - [x] `/marriage/manglik-dosha` (paired with the Manglik tool)
+  - [ ] `/kundli/free-kundli`, `/marriage/kundli-matching`, Dasha / Dosha / Career clusters
+  - See `docs/seo-audit.md` §7 for the full cluster map.
 
 ### 3.3 Performance
 - [ ] Edge caching for blog pages (ISR with revalidation)
