@@ -37,7 +37,10 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const count = Math.min(Math.max(parseInt(searchParams.get("count") || "30", 10) || 30, 1), 100);
+  // Default raised from 30 -> 100 because this now runs ONCE per day (Vercel
+  // Hobby cron limit), so a single run must cover a full day of payments.
+  // Still idempotent + capped at 100. Override with ?count= for manual runs.
+  const count = Math.min(Math.max(parseInt(searchParams.get("count") || "100", 10) || 100, 1), 100);
 
   const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
