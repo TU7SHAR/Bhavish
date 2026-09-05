@@ -113,6 +113,38 @@ a paid row = access. (A strong 192-bit `access_token` already existed for the
 
 ---
 
+## Fixed Bugs (Master Report Delivery — September 2026)
+
+### BUG-025: Master deep-dive generated but never shown on /report/full
+**Status:** Fixed
+**Severity:** High (₹999 Master customers saw only the ~22-section Premium-looking report)
+**Fixed in:** PR (fix/master-deepdive-rehydrate)
+
+**Symptom:** A ₹999 Master purchase whose deep-dive (7 sections + 24-month
+roadmap) generated successfully server-side (`deep_dive_status='completed'` in
+the DB, sections merged) still displayed only ~22 sections on `/report/full`.
+Confirmed on a real report: DB had `plan_tier=master`, `deep_dive_status=completed`,
+but the page showed the Premium-style report.
+**Root Cause:** `/report/full` rendered ONLY the `sessionStorage` snapshot saved
+at payment time (never re-fetched from the DB), and the deep-dive poll was gated
+by a fragile `sessionStorage["masterDeepDivePending"]` flag. If the deep-dive
+finished after the snapshot was saved, or the page was refreshed / opened on
+another device / the flag was missing or the poll hit its 8-attempt (~96s) cap
+before Gemini finished, the completed deep-dive in the DB was never loaded.
+**Fix:**
+- `/report/full` now **re-hydrates from the DB**: for any report that looks like
+  Master and lacks deep-dive sections, it calls the idempotent
+  `/api/generate-full-report` (authorized with the access token) to pull the
+  CURRENT merged sections — so a completed deep-dive appears even after refresh
+  or on another device.
+- Poll is **no longer gated solely by the sessionStorage flag** — it triggers for
+  any Master-looking report missing the deep-dive, raised to ~3 min, and also
+  pokes the deep-dive endpoint directly (idempotent, re-claims failed/stale).
+- `verify-payment`'s access token + tier are now persisted into `reportData` so
+  the re-hydration can authorize the fetch (works with the #194 token gate).
+
+---
+
 ## Open Bugs
 
 ### BUG-010: Analytics leak on private report links

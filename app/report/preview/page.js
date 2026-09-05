@@ -275,7 +275,17 @@ export default function ReportPreview() {
             const finalSections = isComplete ? fullData.sections : reportData.sections;
             const finalSummary = isComplete ? fullData.summary : reportData.summary;
 
-            sessionStorage.setItem("reportData", JSON.stringify({ ...reportData, sections: finalSections, summary: finalSummary }));
+            // Persist the access token + tier so /report/full can re-hydrate
+            // from the DB (and authorize that fetch post-#194) — this is how a
+            // late-arriving Master deep-dive is picked up even after a refresh
+            // or on another device.
+            sessionStorage.setItem("reportData", JSON.stringify({
+              ...reportData,
+              sections: finalSections,
+              summary: finalSummary,
+              accessToken: verifyData.accessToken || reportData.accessToken || null,
+              tier: (isComplete && fullData?.tier) || planId,
+            }));
             sessionStorage.setItem("paymentVerified", "true");
             localStorage.setItem("paymentVerified_backup", "true");
             sessionStorage.setItem("paymentId", response.razorpay_payment_id);
