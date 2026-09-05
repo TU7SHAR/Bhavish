@@ -20,12 +20,17 @@ export default async function sitemap() {
   const dbPosts = await getDbPosts();
   const allPosts = [...posts, ...dbPosts.filter((p) => !staticSlugs.has(p.slug))];
 
-  const blogRoutes = allPosts.map((post) => ({
-    url: `${baseUrl}/blog/${post.slug}`,
-    lastModified: new Date(post.date),
-    changeFrequency: "monthly",
-    priority: 0.7,
-  }));
+  // Only include posts that are actually live (published !== false and not
+  // future-dated) so we never submit a hidden/scheduled article to Google.
+  const now = Date.now();
+  const blogRoutes = allPosts
+    .filter((post) => post.published !== false && new Date(post.date).getTime() <= now)
+    .map((post) => ({
+      url: `${baseUrl}/blog/${post.slug}`,
+      lastModified: new Date(post.date),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    }));
 
   return [...staticRoutes, ...blogRoutes];
 }
