@@ -230,7 +230,8 @@ User submits form
                                ▼
                     ┌──────────────────────┐
                     │   fulfillPayment()    │
-                    │   (IDEMPOTENT)        │
+                    │  (IDEMPOTENT + single │
+                    │  delivery orchestrator)│
                     ├──────────────────────┤
                     │ 1. Load report row    │
                     │ 2. If done → skip     │
@@ -372,6 +373,12 @@ User submits form
 3. **Reconciliation:** Admin endpoint cross-checks Razorpay's records against DB
 4. **Price enforcement:** Server computes price; frontend cannot manipulate amount
 5. **Idempotency:** `fulfillPayment()` is safe to call multiple times
+6. **Single delivery orchestrator:** customer email + owner notification for a
+   completed (non-Master) report go through ONE shared `deliverReport()` helper,
+   called by both the browser route (`generate-full-report`) and `fulfillPayment`.
+   It uses an **atomic email claim** (conditional `UPDATE ... WHERE email_sent_at
+   IS NULL`) so that even if two paths finish simultaneously, exactly one emails
+   the customer — eliminating the previous read-then-write (TOCTOU) double-email race.
 
 ### 5.3 AI Security
 
