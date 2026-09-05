@@ -22,7 +22,7 @@ const TIERS = [
       "Direct answer to your question",
       "Career, love, money, health & timing",
       "Remedies & lucky factors",
-      "Swiss Ephemeris precision + Vedic analysis",
+      "High-precision astronomy + Vedic analysis",
       "PDF download & lifetime access",
     ],
     note: "Add 12-month guidance for ₹149 at checkout.",
