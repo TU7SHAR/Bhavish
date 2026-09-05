@@ -188,6 +188,11 @@ export default function ReportPreview() {
                 content_type: "product",
                 content_ids: [reportData.reportId],
                 content_name: planId,
+              }, {
+                // Shared event_id → Meta de-duplicates this browser Pixel event
+                // against the server-side Conversions API Purchase fired in
+                // fulfillPayment() (lib/meta-capi.js). Same id = counted once.
+                eventID: `purchase_${reportData.reportId}`,
               });
             }
             if (typeof window !== "undefined" && window.gtag) {
