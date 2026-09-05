@@ -2,7 +2,7 @@
 
 ## BhavishAI — Structured Issue Tracker
 
-**Last Updated:** August 2026 (admin Overview accuracy pass)
+**Last Updated:** September 2026 (BUG-022 analytics 1000-row cap fixed)
 
 ---
 
@@ -45,8 +45,8 @@ so ALL rows are counted, and select only the lightweight columns the aggregation
 needs (dropping heavy JSONB like `sections`/`chart_data`), which also fixed the
 slow Overview load.
 
-**Follow-up (open):** `/api/admin/analytics` has the same 1000-row cap + no
-`force-dynamic`; tracked below as BUG-022.
+**Follow-up (RESOLVED):** `/api/admin/analytics` had the same 1000-row cap + no
+`force-dynamic`; fixed in BUG-022 (see above).
 
 ---
 
@@ -66,18 +66,27 @@ slow Overview load.
 
 ---
 
+## Fixed Bugs (Analytics — September 2026)
+
+### BUG-022: Analytics tab had the same 1000-row cap + no force-dynamic
+**Status:** Fixed
+**Severity:** Medium (Analytics tab under-counted once table > 1000 rows; could serve cached data)
+**Fixed in:** PR (fix/analytics-1000-row-cap)
+
+**Symptom:** `/api/admin/analytics` fetched reports with `.select(...).order("created_at", desc)`
+but no `.range()` pagination, so it only saw the most recent 1000 rows — under-counting
+leads, revenue, question categories, sources, and geography once the table grew past
+1000 rows. It also lacked `force-dynamic`, so its response could be served stale.
+**Root Cause:** Same class of bug as the Overview (BUG-020/BUG-021): Supabase caps a
+single `select()` at 1000 rows.
+**Fix:** Paginate the fetch in 1000-row pages via `.range()` (order `created_at desc`)
+so ALL rows are counted, and add `export const dynamic = "force-dynamic"` +
+`revalidate = 0` (matching the Overview route). Verified: the analytics route now
+builds as a Dynamic (ƒ) function, same as `/api/admin/data`.
+
+---
+
 ## Open Bugs
-
-### BUG-022: Analytics tab has the same 1000-row cap + no force-dynamic
-**Status:** Open (follow-up to BUG-020/BUG-021)
-**Severity:** Medium (Analytics tab under-counts once table > 1000 rows; can serve cached data)
-**Discovered:** August 2026
-
-**Symptom:** `/api/admin/analytics` fetches reports with `.select(...).order("created_at", desc)`
-but no `.range()` pagination, so it only sees the most recent 1000 rows. It also
-lacks `export const dynamic = "force-dynamic"`, so its response can be cached.
-**Fix (planned):** Apply the same paginated fetch + `force-dynamic` treatment as
-the Overview route (BUG-020/BUG-021). Kept as a separate focused PR.
 
 ### BUG-010: Analytics leak on private report links
 **Status:** Open (accepted risk)

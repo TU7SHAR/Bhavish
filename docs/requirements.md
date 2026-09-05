@@ -2,8 +2,8 @@
 
 ## BhavishAI — Non-Functional Specifications
 
-**Version:** 1.0
-**Last Updated:** July 2026
+**Version:** 1.1
+**Last Updated:** September 2026
 
 ---
 

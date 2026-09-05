@@ -2,8 +2,8 @@
 
 ## BhavishAI — System Architecture
 
-**Version:** 1.1
-**Last Updated:** August 2026
+**Version:** 1.2
+**Last Updated:** September 2026 (component + lib inventory synced with code)
 
 ---
 
@@ -79,6 +79,8 @@ app/
 │   ├── Footer.js
 │   ├── KundliCharts.js
 │   ├── GuidancePack.js
+│   ├── MonthlyGuidanceSection.js  ← 12-month guidance UI (per-month cards)
+│   ├── RichText.js                ← Renders AI markdown/HTML report content safely
 │   ├── AttributionCapture.js
 │   ├── VisitorTracker.js
 │   └── ConstellationBackground.js
@@ -115,19 +117,24 @@ lib/
 │   ├── computeDashaTimeline()  — real dates for Maha/Antar dasha
 │   └── generateKundliSVG()     — North Indian chart visualization
 │
-├── report-generation.js    ← AI prompt construction + quality gate
+├── report-generation.js    ← AI prompt construction + quality gate (batched sections)
+├── deep-dive.js            ← Master-tier deep-dive sections + 24-month roadmap generation
 ├── fulfill-payment.js      ← Idempotent server-side payment fulfillment
 ├── email-sequence.js       ← 10-email nurture draft generator
 ├── gemini-retry.js         ← Exponential backoff for Gemini 503s
-├── geocode.js              ← Nominatim + Indian city fallbacks
+├── geocode.js              ← Nominatim (OpenStreetMap) + Indian city fallbacks + tz offset
 ├── rate-limit.js           ← Supabase-backed persistent rate limiting
-├── auth.js                 ← Timing-safe auth verification utilities
+├── auth.js                 ← Timing-safe auth verification (verifyAdmin/Cron/Internal)
+├── plans.js                ← Server-side plan/tier/price definitions (source of truth)
+├── report-access.js        ← Report access/token helpers
 ├── sanitize.js             ← Prompt injection + XSS prevention
+├── markdown.js             ← Markdown → safe HTML for report/email rendering
 ├── schema.js               ← Schema.org JSON-LD builders
 ├── blog-posts.js           ← Static blog content library
 ├── blog-db.js              ← Dynamic blog from Supabase
 ├── supabase-browser.js     ← Client-side Supabase (auth)
-└── supabase-server.js      ← Server-side Supabase (cookies/SSR)
+├── supabase-server.js      ← Server-side Supabase (cookies/SSR)
+└── supabase-service.js     ← Service-role Supabase client (bypasses RLS; cron/admin)
 ```
 
 ---

@@ -9,6 +9,12 @@ import { verifyAdmin } from "../../../../lib/auth.js";
 // Header: Authorization: Bearer <ADMIN_SECRET>
 export const maxDuration = 60;
 
+// BUG-022 FIX: Always compute fresh. Without this, Next.js 16 can cache/prerender
+// this GET handler and serve a STALE analytics snapshot. Matches the Overview
+// route (`admin/data`) which was fixed the same way in PR #181.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // ===== AI CATEGORIZATION =====
 async function categorizeWithAI(questions) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -100,10 +106,30 @@ export async function GET(request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
-    const { data: reports } = await supabase
-      .from("reports")
-      .select("email, created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, is_guidance_gifted, is_founder_gifted, founder_upgrade_payment_id, sections")
-      .order("created_at", { ascending: false });
+    // BUG-022 FIX: Supabase caps a single .select() at 1000 rows. The old code
+    // used a single select with no .range(), so once the reports table grew past
+    // 1000 rows the Analytics tab silently dropped everything beyond the most
+    // recent 1000 — under-counting leads, revenue, questions, sources, etc.
+    // Paginate in 1000-row pages (order created_at desc) so ALL rows are counted.
+    // Same proven pattern as the Overview route (BUG-020).
+    const ANALYTICS_COLUMNS =
+      "email, created_at, payment_status, gender, device_type, city, personal_question, attribution, paid_at, is_founder_member, has_12_month_guidance, is_guidance_gifted, is_founder_gifted, founder_upgrade_payment_id, sections";
+    const reports = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data: page, error: pageErr } = await supabase
+        .from("reports")
+        .select(ANALYTICS_COLUMNS)
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (pageErr) {
+        console.error("[admin/analytics] page fetch error:", pageErr.message);
+        break;
+      }
+      if (!page || page.length === 0) break;
+      reports.push(...page);
+      if (page.length < PAGE) break; // last page reached
+    }
 
     // Exclude test/QA accounts (TEST_ACCOUNT_EMAILS) from all analytics
     const testEmails = (process.env.TEST_ACCOUNT_EMAILS || "")

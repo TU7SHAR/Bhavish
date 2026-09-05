@@ -21,8 +21,13 @@ import { fulfillPayment } from "../../../../lib/fulfill-payment.js";
 //   reconcile uses. Anything already fulfilled is a no-op; anything missed is
 //   marked paid, generated, and emailed automatically.
 //
-// SCHEDULE: wired in vercel.json (hourly). Nothing is lost between runs.
-// AUTH: CRON_SECRET (Vercel Cron sends Authorization: Bearer <CRON_SECRET>).
+// SCHEDULE: vercel.json runs this ONCE DAILY (Vercel Hobby only permits daily
+//   crons — an hourly "0 * * * *" is rejected at deploy time). For faster
+//   recovery, trigger this endpoint HOURLY from an external scheduler such as
+//   cron-job.org (which supports sub-hourly schedules + the Authorization
+//   header). See docs/cron-setup.md. The endpoint is idempotent, so any number
+//   of triggers is safe — nothing is lost between runs.
+// AUTH: CRON_SECRET (caller sends Authorization: Bearer <CRON_SECRET>).
 //
 // GET /api/cron/reconcile-payments
 //   ?count=50   how many recent captured payments to scan (default 30, max 100)

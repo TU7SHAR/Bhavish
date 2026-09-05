@@ -2,9 +2,9 @@
 
 ## BhavishAI — Phase-Based Roadmap
 
-**Version:** 1.0
-**Last Updated:** August 2026
-**Status:** Phase 1 complete, Phase 2 in progress
+**Version:** 1.1
+**Last Updated:** September 2026
+**Status:** Phase 1 complete, Phase 2 in progress (reliability/security largely done)
 
 ---
 
@@ -167,6 +167,12 @@
 - [ ] City-specific landing pages (e.g., "Kundli in Mumbai")
 - [ ] Hindi language blog articles
 - [ ] Video content embeds (YouTube shorts)
+- **High-intent topic-cluster landing pages** (SEO "money pages" with FAQ + Breadcrumb schema, internal-linked into tools + `/get-report`), via the reusable `components/ClusterLanding.js`:
+  - [x] `/kundli/janam-kundli` (Kundli pillar)
+  - [x] `/kundli/kundli-by-date-of-birth`
+  - [x] `/marriage/manglik-dosha` (paired with the Manglik tool)
+  - [ ] `/kundli/free-kundli`, `/marriage/kundli-matching`, Dasha / Dosha / Career clusters
+  - See `docs/seo-audit.md` §7 for the full cluster map.
 
 ### 3.3 Performance
 - [ ] Edge caching for blog pages (ISR with revalidation)
@@ -176,6 +182,7 @@
 - [ ] Preconnect to Gemini/Supabase/Razorpay domains
 
 ### 3.4 Infrastructure Upgrades
+- [x] **Meta Conversions API — server-side Purchase tracking** (`lib/meta-capi.js`, fired from `fulfillPayment`). Fixes the browser-only Purchase event that missed UPI/closed-tab sales (why Purchase showed "inactive" in Meta). Deduped with the browser Pixel via shared `event_id`. Requires `META_CAPI_ACCESS_TOKEN` env + running migration `006_meta_purchase_flag.sql`.
 - [ ] Upgrade to Gemini paid tier (when 500 RPD limit hit)
 - [ ] Upgrade Resend to paid plan (when 100/day limit hit)
 - [ ] Supabase Pro (connection pooling, backups)

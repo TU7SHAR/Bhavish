@@ -62,7 +62,7 @@
      │  - blog_posts    │       │  - Razorpay        │
      │  - auth.users    │       │  - Resend          │
      └─────────────────┘       │  - Gmail (fallback)│
-                                │  - Google Maps     │
+                                │  - Nominatim (OSM) │
                                 └────────────────────┘
 ```
 
@@ -153,7 +153,7 @@ Both **Meta Pixel** and **GA4** fire at each funnel stage:
 | Route | Method | Auth | Purpose |
 |-------|--------|------|---------|
 | `/api/generate-preview` | POST | None | Geocodes place, calculates chart (astronomy-engine), calls Gemini for 2 preview sections. Returns chartData + preview. |
-| `/api/generate-full-report` | POST | None* | After payment: sends full chart to Gemini, gets 20 sections. (*should have payment check) |
+| `/api/generate-full-report` | POST | Payment-gated | Accepts ONLY `{ reportId }`, loads all data from DB. Verifies `payment_status='paid'` before generating. Uses an atomic RPC claim (`claim_report_generation`) so browser + webhook never double-generate; returns 202 if another process owns it. Idempotent. |
 | `/api/create-order` | POST | None | Creates Razorpay order. Server-side pricing (₹299 or ₹448 with bump). |
 | `/api/verify-payment` | POST | None | Verifies Razorpay HMAC signature. Upserts report as "paid" in DB. |
 | `/api/create-upgrade-order` | POST | None | Creates ₹999 Razorpay order for founder upgrade. |
@@ -186,7 +186,7 @@ Both **Meta Pixel** and **GA4** fire at each funnel stage:
 | File | Purpose |
 |------|---------|
 | `lib/vedic-calculator.js` | Core astronomical engine. Uses `astronomy-engine` (Swiss Ephemeris equivalent) + Lahiri ayanamsa. Calculates: planetary positions (7 planets + Rahu/Ketu), Lagna/Ascendant, Nakshatra + Pada, Vimshottari Dasha sequence, house placements, planet dignities. Also generates North Indian Kundli SVG chart. |
-| `lib/geocode.js` | Geocodes birth place string → lat/lng using Google Maps Geocoding API. |
+| `lib/geocode.js` | Geocodes birth place string → lat/lng using **OpenStreetMap Nominatim** (free, no API key). Includes Indian-city fallbacks and returns a timezone offset used by the calculator. |
 | `lib/gemini-retry.js` | Retry wrapper for Gemini API. Handles 503 "model overloaded" with exponential backoff (2s, 4s, 8s). Max 3 retries. |
 | `lib/email-sequence.js` | Shared `generateEmailDrafts()` function. ONE Gemini call → 10 personalized nurture emails as JSON array. Psychology-based sequence. |
 | `lib/schema.js` | Centralized schema.org JSON-LD: Organization, WebSite, Service, Product+AggregateRating, breadcrumbSchema(), articleSchema(), JsonLd component. |
@@ -416,74 +416,62 @@ Revenue per customer: ₹299 (base) to ₹1,447 (base + guidance + founder).
 
 ## Technical Weak Points & Pain Points
 
-### Critical Issues:
+> **Reality check (this pass):** Several items historically listed here as
+> "critical" have since been fixed in code. This section now separates what is
+> genuinely still open from what has been resolved, verified against the current
+> source. See `docs/audit.md`, `docs/bugs.md`, and `docs/implementation_plan.md`
+> for the per-PR detail.
 
-1. **Full report generated without payment verification**
-   - `/api/generate-full-report` doesn't check if payment was actually made
-   - Anyone who intercepts the chartData from the preview response can call this endpoint directly
-   - **Fix:** Check payment_status=paid in DB before generating full report
+### ✅ Resolved (previously listed as weak points)
 
-2. **No server-side paywall**
-   - The "paid" state is stored in sessionStorage (`paymentVerified`). If you set it manually, `/report/full` shows content.
-   - **Fix:** Full report page should fetch from DB server-side, checking payment_status
+| Former issue | Resolution | Evidence |
+|--------------|-----------|----------|
+| Full report generated without payment verification | `generate-full-report` accepts only `{ reportId }`, loads from DB, and returns 403 unless `payment_status='paid'` | `app/api/generate-full-report/route.js`; BUG-013 |
+| No server-side paywall / double-generation race | Atomic RPC claim (`claim_report_generation`) + `report_status` lock; 202 if another process owns it | BUG-014 |
+| No rate limiting | Supabase-backed persistent limiter + in-memory burst guard, per-route tiers | `lib/rate-limit.js`; BUG-005 |
+| IST timezone hardcoded | Calculator accepts `timezoneOffsetMinutes`; LMT fallback from longitude; India bounding-box auto-IST | BUG-003 |
+| Email send endpoints have no auth | `verifyInternal()` on `send-report-email`/`notify-sale`; recipient-match enforced | Phase 2.4 |
+| No unsubscribe functionality | Both the page (`app/unsubscribe/page.js`) and API (`app/api/unsubscribe/route.js`) exist; marks rows `unsubscribed`, supports resubscribe | Phase 2.7 |
+| No backup/export for report data | `/api/admin/export` — full JSON backup + per-table CSV | PR #177 |
+| PDF client-side only | Server-side `/api/generate-pdf` with client-side jsPDF fallback | BUG-006 |
+| Tier spoofing via client planId | Plan derived from Razorpay `order.notes`, never from client body | BUG-012 |
+| Paywall bypass via save-report | Public save endpoint forces `payment_status='unpaid'`, strips payment/plan fields | BUG-011 |
 
-3. **No rate limiting**
-   - `/api/generate-preview` calls Gemini AI (costs tokens). Anyone can spam it.
-   - Could burn through Gemini's 500 RPD limit or generate fake leads
-   - **Fix:** Add rate limiting (by IP or fingerprint) on public API routes
+### ⚠️ Genuinely open
 
-4. **Gemini 503 under load**
-   - Using gemini-3.1-flash-lite with 15 RPM / 500 RPD limit
-   - Under heavy traffic, retries help but 3 failures = user error
-   - **Risk level:** Medium (current traffic is low)
+1. **Gemini 503 under load** — `gemini-3.1-flash-lite` at 15 RPM / 500 RPD (free tier).
+   Retry-with-backoff covers transient overload, but 3 failures surface an error to
+   the user. **Risk: Medium**, will bite during ad-driven traffic spikes. Fix: paid
+   Gemini/Vertex tier before scaling ad spend.
 
-5. **IST timezone assumption in vedic-calculator**
-   - `calculateBirthChart` hardcodes UTC-5:30 (IST) offset
-   - Users born outside India get incorrect chart calculations
-   - **Fix:** Detect timezone from the geocoded location or allow user to select
+2. **Analytics tab 1000-row cap (BUG-022)** — `/api/admin/analytics` still lacks
+   `.range()` pagination and `force-dynamic`, so it under-counts once `reports`
+   exceeds 1000 rows and can serve cached data. Same class of bug as the (fixed)
+   Overview. Fix planned as a focused PR.
 
-### Medium Issues:
+3. **`RAZORPAY_WEBHOOK_SECRET` not configured** — the webhook safety net is a
+   placeholder until the secret is set on both Razorpay and Vercel. The hourly
+   reconcile cron currently covers missed payments in its place.
 
-6. **Email send endpoints have no auth**
-   - `/api/send-report-email` and `/api/notify-sale` accept any POST
-   - Could be used to send emails to arbitrary addresses
-   - **Fix:** Add request origin check or shared secret
+4. **Admin secret travels in request from the frontend** — the admin page sends the
+   secret typed into its password box on each call. Not a true vulnerability (the
+   secret is still required), but it is visible in the network tab.
 
-7. **No unsubscribe functionality**
-   - Emails link to `/unsubscribe?email=...` but that page doesn't exist
-   - Potential CAN-SPAM / GDPR issue
-   - **Fix:** Build unsubscribe page + mark email_sequence_status = "unsubscribed"
+5. **Blog `force-dynamic` = no edge caching** — blog pages render per request to
+   support DB articles. Trade-off accepted: correctness/instant-publish > speed.
 
-8. **Admin secret hardcoded in frontend**
-   - The admin page's button calls use the secret from the password input
-   - Not a real vulnerability (secret is still needed) but visible in network tab
+6. **Duplicate leads possible** — no dedup by email; each form submit is a new row.
 
-9. **Blog force-dynamic = no edge caching**
-   - Blog pages render per-request (to support DB articles)
-   - Static articles lose the performance benefit of pre-rendering
-   - **Trade-off accepted:** correctness > speed for now
+7. **No email validation beyond format** — typos silently lose leads.
 
-10. **No backup/export for report data**
-    - If Supabase goes down, customer reports are inaccessible
-    - Users only get the report via browser storage or email
+8. **Social proof numbers are static** — "2,000+ reports" / "4.8 stars" are
+   hardcoded, not derived from real DB counts.
 
-### Low Issues:
+9. **No error monitoring** — no Sentry/alerting; failures are only visible in
+   Vercel logs. Highest-ROI reliability gap as traffic grows.
 
-11. **Duplicate leads possible**
-    - Same person can submit the form multiple times with different report IDs
-    - Each submission creates a new row (no deduplication by email)
-
-12. **No email validation beyond format**
-    - Accepts any valid-looking email (no verification/confirm flow)
-    - Typos = lost leads
-
-13. **PDF generation is client-side only**
-    - Uses jsPDF in browser — no server-side PDF fallback
-    - If browser crashes during generation, no recovery
-
-14. **Social proof numbers are static**
-    - "2,000+ reports generated" and "4.8 stars" are hardcoded, not from real data
-    - Should eventually be dynamic from actual DB counts
+10. **Supabase RLS unverified in production** — migration written; must be applied
+    and confirmed after deploy.
 
 ---
 
@@ -495,8 +483,8 @@ Revenue per customer: ₹299 (base) to ₹1,447 (base + guidance + founder).
 | Vercel free tier: 10s function timeout | Cron can only send ~13 emails per run | Twice daily + manual sends cover all leads |
 | Gemini 3.1-flash-lite: 15 RPM, 500 RPD | Can't handle >500 report generations/day | Sufficient for current scale; upgrade model if needed |
 | Resend free tier: 2 req/sec | Bulk sends need 600ms delays | Automated with delay; 42 leads = ~25s |
-| No database backups configured | Data loss risk | Rely on Supabase's built-in backups (if on paid plan) |
-| IST-only timezone support | Incorrect charts for non-Indian users | 95%+ users are Indian (target market) |
+| DB backups rely on Supabase plan | Data loss risk | `/api/admin/export` provides on-demand JSON/CSV backup; enable Supabase paid backups |
+| Timezone: full support via geocoded offset + LMT fallback | Non-IST charts now computed correctly | India auto-detected; non-Indian places use longitude-based LMT |
 | Blog articles: DB read on every request | Slightly slower than static | Acceptable trade-off for instant publishing |
 | No A/B testing infrastructure | Can't test CTA/headline variants | Use manual deploys + watch conversion rate |
 | No error monitoring (Sentry etc.) | Silent failures in production | Check Vercel logs manually |
@@ -638,7 +626,22 @@ Detailed project docs live in the `/docs` directory:
 | [docs/audit.md](docs/audit.md) | Code audit against implementation plan |
 | [docs/bugs.md](docs/bugs.md) | Structured bug log with symptoms and hypotheses |
 | [docs/testing.md](docs/testing.md) | Test cases checklist for feature verification |
+| [docs/DOCS_MAINTENANCE.md](docs/DOCS_MAINTENANCE.md) | **The living-docs contract** — what to update on every iteration |
+| [docs/agent-activity-log.md](docs/agent-activity-log.md) | Chronological log of every agent change (goal, interpretation, changes, files, impact) |
+| [commands/](commands/) | Per-file/route reference — what each command, API route, and lib module does |
 
 ---
 
-*Last updated: July 2026*
+## Living Documentation Policy
+
+This project keeps documentation in lockstep with the code. **On every change/iteration**, update:
+1. The relevant `docs/*.md` (and this `PROJECT.md` if architecture/routes/facts change)
+2. The `commands/` reference if a command, route, or lib file was added/changed/removed
+3. `docs/agent-activity-log.md` with a new entry (goal → interpretation → changes → files → impact)
+
+See [docs/DOCS_MAINTENANCE.md](docs/DOCS_MAINTENANCE.md) for the full checklist. A Kiro hook
+(`.kiro/hooks/docs-maintenance-reminder.json`) reminds the agent of this on every session.
+
+---
+
+*Last updated: September 2026 (docs synced with code + living-docs system established)*
