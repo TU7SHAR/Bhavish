@@ -214,10 +214,12 @@ export default function ReportPreview() {
               const fullRes = await fetch("/api/generate-full-report", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                // SECURITY: Only send reportId. The server loads all birth data,
-                // chart data, and plan tier from the database (single source of
-                // truth). This prevents wrong reports from stale localStorage.
-                body: JSON.stringify({ reportId: reportData.reportId }),
+                // SECURITY: Send reportId + the access token minted by
+                // verify-payment. The server loads all birth/chart/plan data
+                // from the DB (single source of truth); the token proves
+                // ownership so already-generated report content can't be read
+                // by guessing a reportId.
+                body: JSON.stringify({ reportId: reportData.reportId, accessToken: verifyData.accessToken }),
               });
               if (!fullRes.ok) {
                 const errData = await fullRes.json().catch(() => ({}));

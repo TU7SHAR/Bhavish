@@ -86,6 +86,33 @@ builds as a Dynamic (ƒ) function, same as `/api/admin/data`.
 
 ---
 
+## Fixed Bugs (Security — September 2026)
+
+### BUG-024: reportId acted as a bearer credential for full report content
+**Status:** Fixed
+**Severity:** Medium (report content disclosure by guessing a paid reportId)
+**Fixed in:** PR (fix/harden-report-access)
+
+**Symptom:** `/api/generate-full-report` gated only on `payment_status='paid'`
+and, for an already-generated report, returned the full `summary` + `sections`
+keyed solely on `reportId`. Since `reportId` is `RPT-<timestamp>-<6 chars>` (a
+weak identifier, not a secret), anyone who guessed/obtained a paid reportId could
+read that customer's full report.
+**Root Cause:** No ownership/authorization check — possession of a reportId +
+a paid row = access. (A strong 192-bit `access_token` already existed for the
+`/report/view/<token>` share links, but the generate endpoint didn't use it.)
+**Fix:**
+- `verify-payment` now mints (via `ensureAccessToken`) and **returns** the
+  report `access_token` to the buyer's browser.
+- `generate-full-report` now **requires a matching `access_token`** to return
+  already-completed report content (enforced only once a row has a token, so
+  legacy rows and the fresh-purchase flow keep working). The buyer's browser
+  passes the token it received from `verify-payment`.
+- Preserves the no-login product model; the token is the credential, not the
+  guessable reportId.
+
+---
+
 ## Open Bugs
 
 ### BUG-010: Analytics leak on private report links
