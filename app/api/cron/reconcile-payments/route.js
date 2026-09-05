@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifyCron } from "../../../../lib/auth.js";
 import { fulfillPayment } from "../../../../lib/fulfill-payment.js";
@@ -75,6 +76,18 @@ export async function GET(request) {
       results.push({ paymentId: payment.id, ...result });
     }
 
+    // ── DB SWEEP (the permanent-fallthrough safety net) ──────────────────
+    // The Razorpay-list scan above only covers the most recent `count`
+    // payments. A row can be marked payment_status='paid' but have its report
+    // generation FAIL or get STUCK ('failed', or 'generating' with a dead
+    // process) — and once that payment scrolls out of the recent window, the
+    // list scan never revisits it, so the customer paid but stays undelivered
+    // FOREVER. This sweep is independent of the Razorpay time window: it finds
+    // paid-but-undelivered rows directly in the DB and re-runs the SAME
+    // idempotent fulfillPayment() on them. claim_report_generation() re-claims
+    // 'failed' and stale-'generating' rows, so this genuinely recovers them.
+    const sweep = await sweepStuckPaidRows();
+
     const summary = {
       scanned: items.length,
       captured: captured.length,
@@ -85,17 +98,84 @@ export async function GET(request) {
       failed: results.filter((r) =>
         ["mark_paid_failed", "paid_no_chartdata", "no_report_id", "error"].includes(r.status)
       ).length,
+      sweep,
     };
 
-    // Only log the noteworthy case (an actual recovery) to keep cron logs quiet.
-    if (summary.fulfilled > 0) {
-      console.log(`[cron-reconcile] recovered ${summary.fulfilled} missed payment(s):`, summary);
+    // Only log the noteworthy cases (an actual recovery) to keep cron logs quiet.
+    if (summary.fulfilled > 0 || sweep.recovered > 0) {
+      console.log(
+        `[cron-reconcile] recovered ${summary.fulfilled} missed payment(s) + ${sweep.recovered} stuck paid row(s):`,
+        summary
+      );
     }
 
     return NextResponse.json({ ok: true, summary, results });
   } catch (error) {
     console.error("[cron-reconcile] error:", error.message);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+}
+
+// DB SWEEP: find rows that are PAID but not actually delivered, and re-run
+// fulfillPayment() on each. Independent of the Razorpay recent-payments window,
+// so a stuck row is recovered no matter how old it is. Idempotent + bounded.
+//
+// "Undelivered" = paid, but the report isn't a completed real report:
+//   report_status is 'failed', or NULL, or 'generating' but stale (>10 min),
+//   OR there are no/too-few sections.
+async function sweepStuckPaidRows() {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+    // Pull paid rows that are NOT cleanly completed. Cap the batch so a single
+    // daily cron run can never blow the function timeout (Gemini generation is
+    // slow). Oldest first so the longest-waiting customer is served first.
+    const staleGeneratingCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: rows, error } = await supabase
+      .from("reports")
+      .select("report_id, plan_tier, guidance_months, has_12_month_guidance, report_status, generation_started_at, sections")
+      .eq("payment_status", "paid")
+      .or(`report_status.is.null,report_status.eq.failed,report_status.eq.generating`)
+      .order("paid_at", { ascending: true })
+      .limit(50);
+
+    if (error) {
+      // Column/query issue — never fail the whole cron over the sweep.
+      return { attempted: 0, recovered: 0, skipped: 0, note: error.message };
+    }
+
+    // Filter in code: a 'generating' row only counts as stuck if it's been that
+    // way for >10 min (a live generation in progress must be left alone).
+    const candidates = (rows || []).filter((r) => {
+      const completedEnough = r.report_status === "completed" && Array.isArray(r.sections) && r.sections.length > 5;
+      if (completedEnough) return false;
+      if (r.report_status === "generating") {
+        return r.generation_started_at && r.generation_started_at < staleGeneratingCutoff;
+      }
+      return true; // null or 'failed'
+    });
+
+    let recovered = 0;
+    let skipped = 0;
+    for (const r of candidates) {
+      const includeGuidance = (r.guidance_months || 0) > 0 || r.has_12_month_guidance === true;
+      const result = await fulfillPayment({
+        reportId: r.report_id,
+        planId: r.plan_tier || null,
+        includeGuidance,
+        includeBump: r.has_12_month_guidance === true,
+        source: "cron-sweep",
+      });
+      if (result.status === "fulfilled" && result.delivered) recovered++;
+      else skipped++;
+    }
+
+    return { attempted: candidates.length, recovered, skipped };
+  } catch (e) {
+    return { attempted: 0, recovered: 0, skipped: 0, note: e.message };
   }
 }
 

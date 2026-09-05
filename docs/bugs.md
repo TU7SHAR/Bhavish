@@ -86,6 +86,32 @@ builds as a Dynamic (ƒ) function, same as `/api/admin/data`.
 
 ---
 
+## Fixed Bugs (Payment Reliability — September 2026)
+
+### BUG-023: Paid-but-failed reports could fall through reconciliation permanently
+**Status:** Fixed
+**Severity:** High (customer paid, never received report; invisible after the scan window)
+**Fixed in:** PR (fix/reconcile-db-sweep)
+
+**Symptom:** A payment marked `payment_status='paid'` whose report generation
+then FAILED (`report_status='failed'`, or stuck `'generating'` from a dead
+process, or missing `sections`) was only retried by the reconcile cron *while
+that payment stayed within the recent-Razorpay-payments scan window*. Since the
+webhook returns HTTP 200 even on internal failure (so Razorpay won't retry) and
+the reconcile cron now runs **once daily** (Vercel Hobby limit), a stuck row that
+scrolled past the ~100-payment window was **never revisited** — the customer paid
+but stayed undelivered indefinitely.
+**Root Cause:** Reconciliation was driven ONLY by scanning recent Razorpay
+payments; there was no DB-driven recovery for paid-but-undelivered rows.
+**Fix:** Added a **DB sweep** to `/api/cron/reconcile-payments` that queries paid
+rows which are not cleanly completed (`report_status` null/`failed`, or
+`generating` stale >10 min, or <6 sections) and re-runs the same idempotent
+`fulfillPayment()` on each (bounded to 50 oldest-first per run to respect the
+timeout). `claim_report_generation()` already re-claims `failed`/stale rows, so
+this genuinely recovers them — independent of the Razorpay time window.
+
+---
+
 ## Open Bugs
 
 ### BUG-010: Analytics leak on private report links
