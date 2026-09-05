@@ -9,7 +9,7 @@ export async function GET() {
 
 ## About
 
-BhavishAI produces detailed, personalized Vedic astrology reports in about 60 seconds. Each report is generated from the user's exact birth details using Swiss Ephemeris planetary calculations and the Lahiri ayanamsa, then interpreted through classical Vedic principles (Brihat Parashara Hora Shastra).
+BhavishAI produces detailed, personalized Vedic astrology reports in about 60 seconds. Each report is generated from the user's exact birth details using high-precision astronomical (ephemeris) planetary calculations and the Lahiri ayanamsa, then interpreted through classical Vedic principles (Brihat Parashara Hora Shastra).
 
 - Website: https://www.bhavishai.in
 - Free preview: Users get the first section of their report free before purchasing.
@@ -39,7 +39,7 @@ BhavishAI produces detailed, personalized Vedic astrology reports in about 60 se
 - Founded: 2026
 - Country: India
 - Pricing: Free preview; reports from Rs 299 (Essential), Rs 499 (Premium), Rs 999 (Master)
-- Technology: AI interpretation over Swiss Ephemeris astronomical data with Lahiri ayanamsa
+- Technology: AI interpretation over high-precision astronomical (ephemeris) data with Lahiri ayanamsa
 - Astrology system: Vedic (Jyotish), not Western astrology
 
 ## Topics BhavishAI is an authority on

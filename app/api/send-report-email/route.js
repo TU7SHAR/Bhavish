@@ -46,7 +46,7 @@ function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl
 
     planetTableHtml = `
       <div style="margin: 30px 0; padding: 20px; background: #f0f0ff; border-radius: 8px;">
-        <h2 style="color: #8b5cf6; margin-top: 0;">Planetary Positions (Swiss Ephemeris)</h2>
+        <h2 style="color: #8b5cf6; margin-top: 0;">Planetary Positions</h2>
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <thead>
             <tr style="background: #e5e7eb;">
@@ -180,7 +180,7 @@ function buildReportHtml({ name, reportId, summary, sections, chartData, viewUrl
   
   <div class="footer">
     <p>&copy; ${new Date().getFullYear()} BhavishAI | bhavishai.in</p>
-    <p>This report is generated using AI-powered Vedic astrology analysis based on Swiss Ephemeris calculations.</p>
+    <p>This report is generated using AI-powered Vedic astrology analysis based on high-precision astronomical calculations.</p>
     <p>For major life decisions, consult with qualified professionals.</p>
   </div>
   <img src="https://www.bhavishai.in/api/track/open?rid=${encodeURIComponent(reportId)}&type=report" width="1" height="1" style="display:none;" alt="" />
