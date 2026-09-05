@@ -10,7 +10,7 @@ import { track } from "@vercel/analytics";
 import { resolvePlan } from "../../../lib/plans.js";
 
 const previewLoadingMessages = [
-  "Aligning Swiss Ephemeris data...",
+  "Aligning high-precision astronomical data...",
   "Calculating D1 and Navamsha charts...",
   "Mapping planetary house placements...",
   "Analyzing planetary transits for 2024-2026...",
@@ -847,7 +847,7 @@ export default function ReportPreview() {
             <h3 className="text-sm font-bold mb-4 text-primary-light text-center">Why BhavishAI is Different</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
-                { icon: "🪐", text: "Swiss Ephemeris precision" },
+                { icon: "🪐", text: "High-precision astronomy" },
                 { icon: "📍", text: "Exact birth coordinates" },
                 { icon: "🕉️", text: "Vedic astrology system" },
                 { icon: "🎯", text: "Personalized to YOUR chart" },

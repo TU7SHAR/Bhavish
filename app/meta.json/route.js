@@ -23,7 +23,7 @@ export async function GET() {
     name: "BhavishAI",
     short_name: "BhavishAI",
     description:
-      "AI-powered Vedic astrology platform. Get a personalized Janam Kundli report in 60 seconds, from ₹299, based on Swiss Ephemeris calculations.",
+      "AI-powered Vedic astrology platform. Get a personalized Janam Kundli report in 60 seconds, from ₹299, based on high-precision astronomical calculations.",
     url: baseUrl,
     start_url: "/",
     display: "standalone",
@@ -44,7 +44,7 @@ export async function GET() {
     og: {
       title: "BhavishAI - Your Future, Revealed by AI",
       description:
-        "Get a personalized Vedic astrology report in 60 seconds, from ₹299. Career, love, health & spiritual guidance based on Swiss Ephemeris calculations.",
+        "Get a personalized Vedic astrology report in 60 seconds, from ₹299. Career, love, health & spiritual guidance based on high-precision astronomical calculations.",
       type: "website",
       url: baseUrl,
       site_name: "BhavishAI",

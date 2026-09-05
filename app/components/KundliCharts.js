@@ -152,7 +152,7 @@ function PlanetTable({ planets, ascendant }) {
 
   return (
     <div className="bg-surface border border-border rounded-2xl p-6 mb-8">
-      <h3 className="text-lg font-bold mb-4 text-primary-light">🪐 Planetary Positions (Swiss Ephemeris)</h3>
+      <h3 className="text-lg font-bold mb-4 text-primary-light">🪐 Planetary Positions</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
