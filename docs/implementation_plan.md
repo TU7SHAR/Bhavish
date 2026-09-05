@@ -176,6 +176,7 @@
 - [ ] Preconnect to Gemini/Supabase/Razorpay domains
 
 ### 3.4 Infrastructure Upgrades
+- [x] **Meta Conversions API — server-side Purchase tracking** (`lib/meta-capi.js`, fired from `fulfillPayment`). Fixes the browser-only Purchase event that missed UPI/closed-tab sales (why Purchase showed "inactive" in Meta). Deduped with the browser Pixel via shared `event_id`. Requires `META_CAPI_ACCESS_TOKEN` env + running migration `006_meta_purchase_flag.sql`.
 - [ ] Upgrade to Gemini paid tier (when 500 RPD limit hit)
 - [ ] Upgrade Resend to paid plan (when 100/day limit hit)
 - [ ] Supabase Pro (connection pooling, backups)
