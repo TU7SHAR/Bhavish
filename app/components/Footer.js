@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer className="bg-surface border-t border-border py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
@@ -26,6 +26,16 @@ export default function Footer() {
               <li><Link href="/plans" className="text-muted hover:text-primary-light transition-colors">Plans &amp; Pricing</Link></li>
               <li><a href="#how-it-works" className="text-muted hover:text-primary-light transition-colors">How It Works</a></li>
               <li><a href="#features" className="text-muted hover:text-primary-light transition-colors">Features</a></li>
+            </ul>
+          </div>
+
+          {/* Free Astrology Tools — internal links for SEO + funnel entry */}
+          <div>
+            <h3 className="text-foreground font-semibold mb-4">Free Astrology Tools</h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/tools/manglik-calculator" className="text-muted hover:text-primary-light transition-colors">Manglik Dosha Calculator</Link></li>
+              <li><Link href="/kundli/janam-kundli" className="text-muted hover:text-primary-light transition-colors">Janam Kundli</Link></li>
+              <li><Link href="/kundli/kundli-by-date-of-birth" className="text-muted hover:text-primary-light transition-colors">Kundli by Date of Birth</Link></li>
             </ul>
           </div>
 
