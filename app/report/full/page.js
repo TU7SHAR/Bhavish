@@ -78,52 +78,95 @@ export default function FullReport() {
     setLoading(false);
   }, [router]);
 
-  // Master tier: the concern-specific deep-dive is generated as a separate job
-  // and appended server-side. If it's pending, poll the (idempotent) endpoint
-  // until the deep-dive sections appear, then hydrate them into the report.
+  // MASTER DEEP-DIVE HYDRATION (robust, DB-backed).
+  //
+  // The Master deep-dive (7 sections + 24-month roadmap) is generated as a
+  // SEPARATE server-side job and merged into reports.sections AFTER the main
+  // report. Previously this page only rendered the sessionStorage snapshot and
+  // only polled if a fragile "masterDeepDivePending" flag was set — so if the
+  // deep-dive finished after the snapshot was saved, or the page was refreshed
+  // / opened on another device / the flag was missing, the customer paid ₹999
+  // but saw only the ~22-section (Premium-looking) report forever.
+  //
+  // Fix: for any report that looks like Master and is missing its deep-dive
+  // sections, re-fetch the CURRENT merged sections from the DB via the
+  // idempotent /api/generate-full-report (authorized with the access token),
+  // and poll it until the deep-dive appears. This is independent of the
+  // sessionStorage flag and recovers correctly on refresh / other devices.
   useEffect(() => {
     if (!reportData?.reportId) return;
-    const flag = sessionStorage.getItem("masterDeepDivePending") === "true";
+
     const hasDeep = (reportData.sections || []).some((s) => isDeepDiveSectionTitle(s.title));
-    if (!flag || hasDeep) {
-      if (hasDeep) sessionStorage.removeItem("masterDeepDivePending");
-      return;
+    if (hasDeep) {
+      sessionStorage.removeItem("masterDeepDivePending");
+      return; // already have it — nothing to do
     }
+
+    // Should we expect a deep-dive? True Master signals: the stored tier, the
+    // deepDive flag, or the legacy pending flag. If none apply and this clearly
+    // isn't Master, don't poll (Essential/Premium have no deep-dive).
+    const looksMaster =
+      reportData.tier === "master" ||
+      reportData.deepDive === true ||
+      sessionStorage.getItem("masterDeepDivePending") === "true";
+    if (!looksMaster) return;
 
     setDeepDivePending(true);
     let cancelled = false;
     let attempts = 0;
+    const MAX_ATTEMPTS = 15; // ~3 min at 12s spacing — covers slow Gemini
+
+    const mergeIfComplete = (data) => {
+      if (!Array.isArray(data?.sections)) return false;
+      if (!data.sections.some((s) => isDeepDiveSectionTitle(s.title))) return false;
+      setReportData((prev) => {
+        const updated = { ...prev, sections: data.sections, summary: data.summary || prev.summary };
+        try { sessionStorage.setItem("reportData", JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+      sessionStorage.removeItem("masterDeepDivePending");
+      setDeepDivePending(false);
+      return true;
+    };
 
     const poll = async () => {
       attempts++;
       try {
-        const res = await fetch("/api/generate-master-deep-dive", {
+        // Idempotent: returns the CURRENT DB sections (incl. a completed
+        // deep-dive) if done; otherwise nudges/awaits generation. accessToken
+        // authorizes reading completed content (post-#194).
+        const res = await fetch("/api/generate-full-report", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reportId: reportData.reportId }),
+          body: JSON.stringify({ reportId: reportData.reportId, accessToken: reportData.accessToken || null }),
         });
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data.sections) && data.sections.some((s) => isDeepDiveSectionTitle(s.title))) {
-          setReportData((prev) => {
-            const updated = { ...prev, sections: data.sections };
-            try { sessionStorage.setItem("reportData", JSON.stringify(updated)); } catch {}
-            return updated;
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && mergeIfComplete(data)) return;
+
+        // Belt-and-suspenders: also poke the deep-dive endpoint directly, in
+        // case generation stalled (it's idempotent + re-claims failed/stale).
+        if (!cancelled && attempts % 2 === 0) {
+          const dd = await fetch("/api/generate-master-deep-dive", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reportId: reportData.reportId }),
           });
-          sessionStorage.removeItem("masterDeepDivePending");
-          setDeepDivePending(false);
-          return;
+          const ddData = await dd.json().catch(() => ({}));
+          if (!cancelled && mergeIfComplete(ddData)) return;
         }
       } catch {
-        /* ignore, will retry */
+        /* transient — will retry */
       }
-      if (!cancelled && attempts < 8) {
+      if (!cancelled && attempts < MAX_ATTEMPTS) {
         setTimeout(poll, 12000);
       } else {
         setDeepDivePending(false);
       }
     };
 
-    const t = setTimeout(poll, 4000);
+    // Fetch once quickly (handles the "already completed in DB" case on load /
+    // refresh), then continue polling if still pending.
+    const t = setTimeout(poll, 1500);
     return () => {
       cancelled = true;
       clearTimeout(t);
