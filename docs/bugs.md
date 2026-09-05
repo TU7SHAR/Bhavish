@@ -86,29 +86,30 @@ builds as a Dynamic (ƒ) function, same as `/api/admin/data`.
 
 ---
 
-## Fixed Bugs (Payment Reliability — September 2026)
+## Fixed Bugs (Security — September 2026)
 
-### BUG-023: Paid-but-failed reports could fall through reconciliation permanently
+### BUG-024: reportId acted as a bearer credential for full report content
 **Status:** Fixed
-**Severity:** High (customer paid, never received report; invisible after the scan window)
-**Fixed in:** PR (fix/reconcile-db-sweep)
+**Severity:** Medium (report content disclosure by guessing a paid reportId)
+**Fixed in:** PR (fix/harden-report-access)
 
-**Symptom:** A payment marked `payment_status='paid'` whose report generation
-then FAILED (`report_status='failed'`, or stuck `'generating'` from a dead
-process, or missing `sections`) was only retried by the reconcile cron *while
-that payment stayed within the recent-Razorpay-payments scan window*. Since the
-webhook returns HTTP 200 even on internal failure (so Razorpay won't retry) and
-the reconcile cron now runs **once daily** (Vercel Hobby limit), a stuck row that
-scrolled past the ~100-payment window was **never revisited** — the customer paid
-but stayed undelivered indefinitely.
-**Root Cause:** Reconciliation was driven ONLY by scanning recent Razorpay
-payments; there was no DB-driven recovery for paid-but-undelivered rows.
-**Fix:** Added a **DB sweep** to `/api/cron/reconcile-payments` that queries paid
-rows which are not cleanly completed (`report_status` null/`failed`, or
-`generating` stale >10 min, or <6 sections) and re-runs the same idempotent
-`fulfillPayment()` on each (bounded to 50 oldest-first per run to respect the
-timeout). `claim_report_generation()` already re-claims `failed`/stale rows, so
-this genuinely recovers them — independent of the Razorpay time window.
+**Symptom:** `/api/generate-full-report` gated only on `payment_status='paid'`
+and, for an already-generated report, returned the full `summary` + `sections`
+keyed solely on `reportId`. Since `reportId` is `RPT-<timestamp>-<6 chars>` (a
+weak identifier, not a secret), anyone who guessed/obtained a paid reportId could
+read that customer's full report.
+**Root Cause:** No ownership/authorization check — possession of a reportId +
+a paid row = access. (A strong 192-bit `access_token` already existed for the
+`/report/view/<token>` share links, but the generate endpoint didn't use it.)
+**Fix:**
+- `verify-payment` now mints (via `ensureAccessToken`) and **returns** the
+  report `access_token` to the buyer's browser.
+- `generate-full-report` now **requires a matching `access_token`** to return
+  already-completed report content (enforced only once a row has a token, so
+  legacy rows and the fresh-purchase flow keep working). The buyer's browser
+  passes the token it received from `verify-payment`.
+- Preserves the no-login product model; the token is the credential, not the
+  guessable reportId.
 
 ---
 

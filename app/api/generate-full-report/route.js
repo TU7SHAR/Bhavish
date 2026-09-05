@@ -15,7 +15,7 @@ export async function POST(request) {
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
-    const { reportId } = await request.json();
+    const { reportId, accessToken } = await request.json();
     if (!reportId) return NextResponse.json({ error: "reportId is required" }, { status: 400 });
 
     const supabase = createClient(
@@ -29,8 +29,22 @@ export async function POST(request) {
     if (dbError || !report) return NextResponse.json({ error: "Report not found." }, { status: 404 });
     if (report.payment_status !== "paid") return NextResponse.json({ error: "Payment required." }, { status: 403 });
 
-    // Already complete → return existing (idempotent).
+    // ACCESS CONTROL — closes the "guess a paid reportId to read someone's
+    // report" hole. reportId (RPT-<timestamp>-<6 chars>) is a weak identifier,
+    // not a credential. Returning already-completed report CONTENT therefore
+    // requires proving ownership via the strong 192-bit access_token minted at
+    // payment time (returned by /api/verify-payment). If the row has an
+    // access_token, the caller MUST present a matching one to read the content.
+    // (Fresh generation right after payment still works: the buyer's browser
+    // received the token from verify-payment and passes it here.)
+    const tokenMatches = !!report.access_token && accessToken === report.access_token;
+    const tokenRequired = !!report.access_token; // only enforce once a token exists
+
+    // Already complete → return existing (idempotent) — but gated by the token.
     if (report.report_status === "completed" && Array.isArray(report.sections) && report.sections.length > 5) {
+      if (tokenRequired && !tokenMatches) {
+        return NextResponse.json({ error: "Not authorized to view this report." }, { status: 403 });
+      }
       return NextResponse.json({
         reportId, summary: report.summary, sections: report.sections,
         tier: report.plan_tier || "premium",

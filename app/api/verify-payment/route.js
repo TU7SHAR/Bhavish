@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { createServiceClient } from "../../../lib/supabase-service.js";
 import { resolvePlan, resolveLegacyBump } from "../../../lib/plans.js";
 import { classifyFocus } from "../../../lib/deep-dive.js";
+import { ensureAccessToken } from "../../../lib/report-access.js";
 
 // Verifies the Razorpay payment signature, then derives ALL plan metadata from
 // the Razorpay ORDER (server-to-server fetch), NOT from client-supplied values.
@@ -73,6 +74,7 @@ export async function POST(request) {
 
     const notes = order.notes || {};
     const reportId = notes.reportId || order.receipt;
+    let accessToken = null; // minted below; returned so the browser can prove ownership
     const orderPlanId = notes.planId || null;
     const orderGuidanceMonths = notes.guidanceMonths ? parseInt(notes.guidanceMonths, 10) : 0;
     const orderIncludeGuidance = orderGuidanceMonths > 0 || notes.has_12_month_guidance === "true";
@@ -166,6 +168,16 @@ export async function POST(request) {
           await supabase.from("reports").update(legacyOnly).eq("report_id", reportId);
         }
       }
+
+      // Mint the report access token (192-bit, unguessable). Returned to the
+      // buyer's browser so it can prove ownership when calling
+      // /api/generate-full-report — closing the "guess a paid reportId to read
+      // someone's report" hole without requiring login.
+      try {
+        accessToken = await ensureAccessToken(supabase, reportId);
+      } catch (tokErr) {
+        console.error("access token mint failed (non-critical):", tokErr.message);
+      }
     } catch (dbError) {
       console.error("DB save error (non-critical):", dbError.message);
     }
@@ -174,6 +186,7 @@ export async function POST(request) {
       success: true,
       paymentId: razorpay_payment_id,
       reportId,
+      accessToken,
       message: "Payment verified successfully",
       tier: resolvedPlan?.tier || "premium",
       guidanceMonths: resolvedPlan?.guidanceMonths || 0,
