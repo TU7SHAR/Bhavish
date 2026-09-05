@@ -254,7 +254,7 @@ User submits form
     │
     ... time passes ...
     │
-    ▼ (Vercel cron, 2x daily)
+    ▼ (Vercel cron, daily on Hobby; 2x/day on Pro)
 [send-nurture-emails]
     │── Query: unpaid + has email + has drafts + not completed/unsubscribed
     │── For each lead:
@@ -280,7 +280,7 @@ User submits form
 | Region | Auto (edge for static, function for API) |
 | Functions | Node.js serverless |
 | Max duration | 60s (Pro plan) or 10s (Hobby) |
-| Cron | 2 jobs: 9AM + 9PM IST |
+| Cron | 2 daily jobs (Hobby limit): nurture ~8:30 AM IST, reconcile ~9 AM IST |
 | Analytics | Vercel Analytics + Speed Insights |
 | Domain | www.bhavishai.in (custom) |
 
@@ -312,20 +312,22 @@ User submits form
 {
   "crons": [
     { "path": "/api/cron/send-nurture-emails", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/send-nurture-emails", "schedule": "30 15 * * *" },
-    { "path": "/api/cron/reconcile-payments", "schedule": "0 * * * *" }
+    { "path": "/api/cron/reconcile-payments",  "schedule": "30 3 * * *" }
   ]
 }
 ```
 
-- **Nurture emails:** twice daily (IST). Protected by `CRON_SECRET` header.
-- **Reconcile payments:** hourly safety net that fulfils any Razorpay-captured
-  payment missed by the browser callback / webhook. Idempotent.
+- **Nurture emails:** once daily (~8:30 AM IST). Protected by `CRON_SECRET`.
+- **Reconcile payments:** once daily (~9:00 AM IST) safety net that fulfils any
+  Razorpay-captured payment missed by the browser callback / webhook. Idempotent;
+  scans up to 100 recent payments per run to cover a full day.
 
-> **Vercel Hobby caveat:** free-tier cron jobs fire only **once per day**, so the
-> hourly reconcile won't actually run hourly on Hobby. Use an external trigger
-> (cron-job.org — supports custom `Authorization` headers and sub-hourly
-> schedules). See `docs/cron-setup.md` for the full setup.
+> **Vercel Hobby constraint (why both are daily):** the Hobby plan allows at most
+> **2 cron jobs, each once per day**. A more-frequent schedule (e.g. hourly
+> `0 * * * *`) makes Vercel **reject the deployment**. On **Pro**, restore the
+> second nurture send (`30 15 * * *` for a 9 PM IST pass) and an hourly reconcile
+> (`0 * * * *`). Reconcile being daily means a missed UPI payment can take up to
+> ~24h to self-heal instead of ~1h.
 
 ---
 

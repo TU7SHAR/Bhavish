@@ -251,7 +251,7 @@ Both **Meta Pixel** and **GA4** fire at each funnel stage:
 ### How it works (Option B — pre-generated):
 
 1. User generates preview → `generate-email-sequence` makes ONE Gemini call → 10 drafts stored in `email_drafts` JSONB
-2. Vercel cron runs 2x daily (9AM + 9PM IST) → reads next due draft → sends via Resend
+2. Vercel cron runs daily (~9AM IST on Hobby; can be 2x/day on Pro) → reads next due draft → sends via Resend
 3. No AI call at send time = fits Vercel free tier (10s timeout)
 
 ### The 10-email sequence:
@@ -494,21 +494,21 @@ Revenue per customer: ₹299 (base) to ₹1,447 (base + guidance + founder).
 ## Vercel Cron Configuration
 
 ```json
-// vercel.json (current)
+// vercel.json — Vercel HOBBY plan limits: max 2 cron jobs, each at most
+// once per day. So both jobs are daily; upgrade to Pro to restore the
+// twice-daily nurture send + hourly reconcile.
 {
   "crons": [
-    { "path": "/api/cron/send-nurture-emails", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/send-nurture-emails", "schedule": "30 15 * * *" },
-    { "path": "/api/cron/reconcile-payments", "schedule": "0 * * * *" }
+    { "path": "/api/cron/send-nurture-emails",  "schedule": "0 3 * * *" },
+    { "path": "/api/cron/reconcile-payments",   "schedule": "30 3 * * *" }
   ]
 }
 ```
-- Nurture emails: 2x daily (~8:30 AM & 9:00 PM IST, UTC+5:30).
-- Reconcile payments: hourly safety net (idempotent).
+= nurture at ~8:30 AM IST daily; reconcile at ~9:00 AM IST daily (UTC+5:30).
 
-> **Vercel Hobby caveat:** free-tier crons fire only once/day, so the hourly
-> reconcile won't truly run hourly on Hobby. Use an external trigger
-> (cron-job.org, custom `Authorization` header). See `docs/cron-setup.md`.
+> **Hobby-plan constraint:** a cron more frequent than daily (e.g. hourly
+> `0 * * * *`) makes Vercel **reject the deployment** on Hobby. If you upgrade
+> to Pro, restore the second nurture send (`30 15 * * *`) and hourly reconcile.
 
 ---
 

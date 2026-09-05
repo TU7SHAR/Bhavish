@@ -5,12 +5,8 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/send-nurture-emails",
-      "schedule": "30 15 * * *"
-    },
-    {
       "path": "/api/cron/reconcile-payments",
-      "schedule": "0 4 * * *"
+      "schedule": "30 3 * * *"
     }
   ]
 }
