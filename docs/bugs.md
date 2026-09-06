@@ -145,6 +145,37 @@ before Gemini finished, the completed deep-dive in the DB was never loaded.
 
 ---
 
+## Fixed Bugs (Notifications — September 2026)
+
+### BUG-026: Owner "New Sale" email re-sent for OLD sales on every reconcile
+**Status:** Fixed
+**Severity:** Medium (owner spammed with duplicate "New Sale!" emails; looks like phantom new sales)
+**Fixed in:** PR (fix/owner-notify-idempotent)
+
+**Symptom:** The owner received a batch of "New Sale!" emails (e.g. ₹299/₹448/₹999)
+for customers who had already paid long ago — while Razorpay showed ₹0 captured
+that day and the admin Overview totals were unchanged. The emails were not new
+sales; they were duplicate notifications for existing, already-counted sales.
+**Root Cause:** `notifyOwner()` in `lib/fulfill-payment.js` had **no idempotency
+guard** and fired on EVERY `fulfillPayment()` call. The `reconcile-payments`
+cron scans recent captured Razorpay payments and calls `fulfillPayment()` for
+each; for already-completed reports it hits the `already_done` branch which
+still called `notifyOwner()` → re-sending the owner email. (Customer email and
+Meta CAPI were already deduped; the owner notification was not.)
+**Fix:**
+- Added an atomic claim inside `notifyOwner()`:
+  `UPDATE reports SET owner_notified_at = now() WHERE report_id = ? AND
+  owner_notified_at IS NULL RETURNING report_id`. The email is sent only if the
+  claim wins — so it fires at most ONCE per report, ever. Reconcile/sweep/retry
+  re-runs claim 0 rows and skip.
+- Migration `007_owner_notified_flag.sql` adds `owner_notified_at` and
+  **backfills all existing paid reports** as already-notified, so the owner is
+  never re-emailed about old sales.
+- Fail-safe: if the column is missing (migration not yet run), `notifyOwner`
+  suppresses sending rather than risk re-spamming.
+
+---
+
 ## Open Bugs
 
 ### BUG-010: Analytics leak on private report links
