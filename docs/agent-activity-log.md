@@ -24,6 +24,30 @@
 
 ---
 
+## 2026-09-07 — Add repository README.md
+
+**Asked:** "Add a README.md on Bhavish."
+
+**Interpreted as:** Create a top-level `README.md` (none existed) that serves as
+the repo's front door — concise overview, stack, quick-start, structure — linking
+out to the deeper docs rather than duplicating them.
+
+**Did:** Created `README.md` with: product overview + live link, features,
+tech-stack table, getting-started (install/dev/build + env-var highlights + DB
+setup), project structure, and a documentation index linking `PROJECT.md`,
+`docs/*`, and `commands/`. Used the accurate "high-precision astronomical
+calculations" positioning (consistent with the #187/#192 trust fixes), not
+"Swiss Ephemeris". Verified all referenced doc paths exist (no broken links).
+
+**Files affected:** `README.md` (new), `docs/agent-activity-log.md` (this entry).
+
+**Impact:** New contributors/visitors get an accurate front door to the repo.
+Docs-only change — no runtime code touched.
+
+**Branch / PR:** `docs/add-readme` — PR link added on open.
+
+---
+
 ## 2026-09-01 — Sync all docs with code + establish living-docs system
 
 **Asked:** "Update all the docs and all md files for the project, and each
