@@ -7,6 +7,7 @@ import { createServiceClient } from "../../../lib/supabase-service.js";
 import { resolvePlan, resolveLegacyBump } from "../../../lib/plans.js";
 import { classifyFocus } from "../../../lib/deep-dive.js";
 import { ensureAccessToken } from "../../../lib/report-access.js";
+import { sendPurchaseEvent } from "../../../lib/meta-capi.js";
 
 // Verifies the Razorpay payment signature, then derives ALL plan metadata from
 // the Razorpay ORDER (server-to-server fetch), NOT from client-supplied values.
@@ -119,15 +120,21 @@ export async function POST(request) {
       const guidanceEnd = new Date(now);
       guidanceEnd.setMonth(guidanceEnd.getMonth() + 12);
 
-      // Read the report row to get the personal_question for deep-dive focus.
+      // Read the report row to get the personal_question for deep-dive focus,
+      // plus the email + prior Meta-purchase stamp so we can fire the
+      // server-side CAPI Purchase from THIS browser flow (see below).
       let personalQuestion = "";
+      let customerEmail = "";
+      let metaAlreadySent = false;
       try {
         const { data: existingReport } = await supabase
           .from("reports")
-          .select("personal_question")
+          .select("personal_question, email, meta_purchase_sent_at")
           .eq("report_id", reportId)
           .single();
         personalQuestion = existingReport?.personal_question || "";
+        customerEmail = existingReport?.email || "";
+        metaAlreadySent = !!existingReport?.meta_purchase_sent_at;
       } catch {}
 
       const updateData = {
@@ -182,6 +189,56 @@ export async function POST(request) {
         accessToken = await ensureAccessToken(supabase, reportId);
       } catch (tokErr) {
         console.error("access token mint failed (non-critical):", tokErr.message);
+      }
+
+      // Fire the SERVER-SIDE Meta CAPI Purchase from the normal browser flow.
+      //
+      // WHY HERE: previously the CAPI Purchase only fired from fulfillPayment()
+      // (razorpay-webhook / reconcile-payments). On a healthy browser purchase
+      // the webhook may arrive late or the reconcile cron only runs daily, so
+      // Meta saw a BROWSER-only Purchase and could not deduplicate against a
+      // server event. Firing it here — with the SAME event_id (purchase_<id>)
+      // and the browser's fbp/fbc — means Meta receives matched Browser+Server
+      // events and merges them. (BUG-029)
+      //
+      // Idempotent: guarded by meta_purchase_sent_at. If the webhook/reconcile
+      // path already sent it, metaAlreadySent is true and we skip. We stamp the
+      // column via an atomic conditional update so concurrent paths can't
+      // double-send.
+      if (!metaAlreadySent) {
+        try {
+          // Atomically claim the send: only stamp if not already stamped.
+          const { data: claimed } = await supabase
+            .from("reports")
+            .update({ meta_purchase_sent_at: now.toISOString() })
+            .eq("report_id", reportId)
+            .is("meta_purchase_sent_at", null)
+            .select("report_id");
+
+          if (claimed && claimed.length > 0) {
+            const eventSourceUrl = request.headers.get("referer") || undefined;
+            const result = await sendPurchaseEvent({
+              reportId,
+              value: plan?.price || order.amount / 100,
+              currency: "INR",
+              email: customerEmail,
+              planTier: plan?.tier,
+              eventSourceUrl,
+              fbp,
+              fbc,
+            });
+            // If the send did not actually go through, release the stamp so a
+            // later fulfillPayment path can retry (avoids a permanent miss).
+            if (!result?.sent) {
+              await supabase
+                .from("reports")
+                .update({ meta_purchase_sent_at: null })
+                .eq("report_id", reportId);
+            }
+          }
+        } catch (capiErr) {
+          console.error("Meta CAPI Purchase (verify-payment) error (non-critical):", capiErr.message);
+        }
       }
     } catch (dbError) {
       console.error("DB save error (non-critical):", dbError.message);
