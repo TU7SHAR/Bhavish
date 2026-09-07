@@ -93,3 +93,30 @@ curl -H "Authorization: Bearer $SECRET" "$BASE/api/admin/export?format=json" -o 
 ```
 
 *Last updated: September 2026*
+
+
+---
+
+## Blog post scheduler
+
+Staggers the SEO article clusters to publish **one per day** instead of all at
+once (works with the `/blog` + sitemap "future date = hidden" gate). Run it
+**after** the cluster PRs (#200–#204) are merged so all posts exist in
+`lib/blog-posts.js`.
+
+```bash
+# Preview the schedule without writing (recommended first)
+node scripts/schedule-blog-posts.mjs --dry-run
+
+# Schedule 1/day starting tomorrow
+npm run schedule-blog
+
+# Start on a specific date / change cadence
+node scripts/schedule-blog-posts.mjs --start 2026-10-01
+node scripts/schedule-blog-posts.mjs --per-day 2
+```
+
+- Only rewrites the `date:` of the 68 new cluster articles (by slug). The
+  original 9 posts are left untouched and stay live.
+- Never touches content/titles/keywords — only dates.
+- After running: review the diff, commit, open a PR, merge → posts roll out 1/day.
