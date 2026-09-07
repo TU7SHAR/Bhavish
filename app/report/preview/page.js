@@ -194,31 +194,49 @@ export default function ReportPreview() {
           const verifyData = await verifyRes.json();
 
           if (verifyData.success || verifyData.paymentConfirmed) {
-            // Fire Meta Pixel Purchase event
-            if (typeof window !== "undefined" && window.fbq) {
-              window.fbq("track", "Purchase", {
-                value: price,
-                currency: "INR",
-                content_type: "product",
-                content_ids: [reportData.reportId],
-                content_name: planId,
-              }, {
-                // Shared event_id → Meta de-duplicates this browser Pixel event
-                // against the server-side Conversions API Purchase fired in
-                // fulfillPayment() (lib/meta-capi.js). Same id = counted once.
-                eventID: `purchase_${reportData.reportId}`,
-              });
+            // FIRE-ONCE GUARD: emit the Purchase analytics events at most ONCE
+            // per report. Without this, a payment-handler re-invocation or a
+            // refresh of this page could fire the browser Pixel Purchase twice —
+            // and if the server-side CAPI event isn't active to dedupe against
+            // (shared event_id), Meta counts a duplicate/"fake" purchase.
+            // localStorage persists across refreshes, so the guard holds even if
+            // the page reloads. (This is belt-and-suspenders alongside the
+            // event_id dedup; it protects reporting even when CAPI is misconfigured.)
+            const purchaseFiredKey = `purchaseTracked_${reportData.reportId}`;
+            let alreadyTrackedPurchase = false;
+            try {
+              alreadyTrackedPurchase = localStorage.getItem(purchaseFiredKey) === "1";
+            } catch { /* storage unavailable — proceed */ }
+
+            if (!alreadyTrackedPurchase) {
+              try { localStorage.setItem(purchaseFiredKey, "1"); } catch { /* ignore */ }
+
+              // Fire Meta Pixel Purchase event
+              if (typeof window !== "undefined" && window.fbq) {
+                window.fbq("track", "Purchase", {
+                  value: price,
+                  currency: "INR",
+                  content_type: "product",
+                  content_ids: [reportData.reportId],
+                  content_name: planId,
+                }, {
+                  // Shared event_id → Meta de-duplicates this browser Pixel event
+                  // against the server-side Conversions API Purchase fired in
+                  // fulfillPayment() (lib/meta-capi.js). Same id = counted once.
+                  eventID: `purchase_${reportData.reportId}`,
+                });
+              }
+              if (typeof window !== "undefined" && window.gtag) {
+                window.gtag("event", "purchase", {
+                  value: price,
+                  currency: "INR",
+                  transaction_id: response.razorpay_payment_id,
+                  items: [{ item_name: `vedic_report_${planId}`, price }],
+                });
+              }
+              // Vercel Analytics funnel event — payment successful
+              track("purchase", { value: price, plan: planId });
             }
-            if (typeof window !== "undefined" && window.gtag) {
-              window.gtag("event", "purchase", {
-                value: price,
-                currency: "INR",
-                transaction_id: response.razorpay_payment_id,
-                items: [{ item_name: `vedic_report_${planId}`, price }],
-              });
-            }
-            // Vercel Analytics funnel event — payment successful
-            track("purchase", { value: price, plan: planId });
 
             // PHASE 2: Now generate the FULL 20-section report (only after payment)
             // Includes retry on timeout — Gemini can sometimes take >60s
