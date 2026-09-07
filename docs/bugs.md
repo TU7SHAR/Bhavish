@@ -172,6 +172,35 @@ unreliable, so both get counted.
 **Owner action:** run migration `008_meta_identifiers.sql`; ensure
 `META_CAPI_ACCESS_TOKEN` is set (live CAPI) and `META_TEST_EVENT_CODE` removed.
 
+### BUG-029: Server CAPI Purchase never fired on the normal browser purchase flow
+**Status:** Fixed
+**Severity:** High (Meta Test Events showed Browser-only Purchase; no Server event → no dedup, unreliable optimisation)
+**Fixed in:** PR (fix/capi-purchase-in-verify-payment)
+
+**Symptom:** In Meta Events Manager → Test Events, a real purchase produced a
+`Purchase` event `Received from: Browser` ONLY — there was no matching Server
+(CAPI) event, so Meta could not deduplicate and server-side conversion signal
+was effectively missing on healthy purchases.
+**Root Cause:** The server-side CAPI Purchase was only ever sent from
+`fulfillPayment()`, which is invoked by `razorpay-webhook` and the
+`reconcile-payments` cron. On a normal browser purchase, the webhook can arrive
+late and the reconcile cron only runs daily — so at the moment the customer
+completes payment, `/api/verify-payment` marked the report paid but never sent
+the CAPI event. The browser Pixel fired, the server did not.
+**Fix:**
+- `verify-payment/route.js` now imports `sendPurchaseEvent` and fires the
+  server-side Purchase immediately after the payment is verified + persisted,
+  using the SAME `event_id` (`purchase_<reportId>`) as the browser Pixel and the
+  persisted `fbp`/`fbc` → Meta receives matched Browser+Server events and merges
+  them.
+- Idempotent + concurrency-safe: an atomic conditional update claims
+  `meta_purchase_sent_at` (only if NULL) before sending, so the webhook/reconcile
+  path cannot double-send. If the send fails, the stamp is released so a later
+  fulfillPayment path can retry.
+**Owner action:** none beyond BUG-028 (same env + migration `008`). Redeploy,
+then make one test purchase → Test Events should show Purchase from BOTH Browser
+and Server, merged into a single event.
+
 ---
 
 ## Open Bugs
