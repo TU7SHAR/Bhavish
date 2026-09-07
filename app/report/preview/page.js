@@ -159,6 +159,18 @@ export default function ReportPreview() {
         description: `Vedic Astrology Report — ${planId.charAt(0).toUpperCase() + planId.slice(1)}`,
         order_id: orderData.orderId,
         handler: async function (response) {
+          // Read Meta's browser cookies so the SERVER-side CAPI Purchase can
+          // carry the same fbp/fbc as the browser Pixel. Matching event_id +
+          // fbp/fbc is what lets Meta reliably DEDUPLICATE the browser and
+          // server Purchase into ONE (fixing the duplicate/"fake" purchases).
+          const readCookie = (name) => {
+            if (typeof document === "undefined") return null;
+            const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+            return m ? decodeURIComponent(m[1]) : null;
+          };
+          const fbp = readCookie("_fbp");
+          const fbc = readCookie("_fbc");
+
           // Verify payment
           const verifyRes = await fetch("/api/verify-payment", {
             method: "POST",
@@ -174,6 +186,8 @@ export default function ReportPreview() {
               summary: reportData.summary,
               planId,
               includeGuidance,
+              fbp,
+              fbc,
             }),
           });
 

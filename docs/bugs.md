@@ -145,6 +145,35 @@ before Gemini finished, the completed deep-dive in the DB was never loaded.
 
 ---
 
+## Fixed Bugs (Tracking — September 2026)
+
+### BUG-028: CAPI server Purchase lacked fbp/fbc → browser↔server events not deduped
+**Status:** Fixed
+**Severity:** Medium (duplicate/"fake" purchases in Meta even with CAPI integrated)
+**Fixed in:** PR (fix/capi-fbp-fbc-dedup)
+
+**Symptom:** Even with CAPI integrated, Meta kept reporting duplicate purchases
+(e.g. 3 for 1 real sale). Meta's guidance: reliable dedup needs a matching
+`event_id` PLUS consistent user identifiers on both events.
+**Root Cause:** The server-side CAPI Purchase (`lib/meta-capi.js`) sent only a
+hashed email in `user_data` — it did **not** send `fbp`/`fbc` (the `_fbp`/`_fbc`
+Meta browser cookies). The `event_id` matched, but without matching fbp/fbc,
+Meta's dedup between the browser Pixel event and the server CAPI event is
+unreliable, so both get counted.
+**Fix:**
+- Browser (`report/preview/page.js`) reads `_fbp`/`_fbc` cookies at payment time
+  and sends them to `verify-payment`.
+- `verify-payment` persists them on the report row as `meta_fbp`/`meta_fbc`
+  (migration `008`).
+- `fulfillPayment` → `sendPurchaseEvent` includes `fbp`/`fbc` in the CAPI
+  `user_data`, so the server event matches the browser event → reliable dedup.
+- Works across ALL fulfillment paths (browser/webhook/reconcile) because the
+  identifiers are read off the persisted row, not the live request context.
+**Owner action:** run migration `008_meta_identifiers.sql`; ensure
+`META_CAPI_ACCESS_TOKEN` is set (live CAPI) and `META_TEST_EVENT_CODE` removed.
+
+---
+
 ## Open Bugs
 
 ### BUG-010: Analytics leak on private report links
