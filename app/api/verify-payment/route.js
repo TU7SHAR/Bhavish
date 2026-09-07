@@ -19,7 +19,7 @@ import { ensureAccessToken } from "../../../lib/report-access.js";
 
 export async function POST(request) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, fbp, fbc } =
       await request.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -136,6 +136,11 @@ export async function POST(request) {
         has_12_month_guidance: guidanceOn,
         guidance_start_date: guidanceOn ? now.toISOString() : null,
         guidance_end_date: guidanceOn ? guidanceEnd.toISOString() : null,
+        // Persist Meta browser identifiers so the server-side CAPI Purchase
+        // (fired from fulfillPayment, possibly via webhook/reconcile) can send
+        // matching fbp/fbc — required for reliable browser↔server dedup.
+        ...(fbp ? { meta_fbp: fbp } : {}),
+        ...(fbc ? { meta_fbc: fbc } : {}),
       };
 
       if (plan) {
@@ -159,7 +164,7 @@ export async function POST(request) {
         .eq("report_id", reportId);
 
       if (updateErr) {
-        const { plan_tier, plan_price, guidance_months, deep_dive_status, deep_dive_focus, ...legacyOnly } = updateData;
+        const { plan_tier, plan_price, guidance_months, deep_dive_status, deep_dive_focus, meta_fbp, meta_fbc, ...legacyOnly } = updateData;
         let retry = await supabase
           .from("reports")
           .update({ ...legacyOnly, paid_at: now.toISOString() })
