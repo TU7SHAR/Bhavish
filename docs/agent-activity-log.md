@@ -24,6 +24,36 @@
 
 ---
 
+## 2026-09-07 — Blog post scheduler (1-per-day staggered release)
+
+**Asked:** "Build me the scheduler so the blogs in #200–#204 won't show up at
+once but are scheduled 1 per day."
+
+**Interpreted as:** Provide a repeatable way to assign consecutive future
+`date`s to the 68 new cluster articles so they auto-publish one/day via the
+existing future-date hide gate (#199) — built as a script (not hand-edited
+dates) so it works cleanly once the cluster PRs are merged, regardless of order.
+
+**Did:** Added `scripts/schedule-blog-posts.mjs` — rewrites the `date` of the 68
+cluster articles (targeted by slug, in a deliberate order: Manglik → Kundli →
+Marriage → Career → Wealth → General) to consecutive days from a start date
+(default: tomorrow). Options: `--start`, `--per-day`, `--dry-run`. Leaves the
+original 9 posts untouched; only edits dates. Added `npm run schedule-blog`
+alias and documented usage in `commands/cli-commands.md`. Tested by simulating
+the merged state (injected sample posts) — confirmed correct consecutive dates,
+originals untouched, and clean restore.
+
+**Files affected:** `scripts/schedule-blog-posts.mjs` (new), `package.json`
+(script alias), `commands/cli-commands.md`, `docs/agent-activity-log.md`.
+
+**Impact:** Once #199–#204 are merged, running the script schedules all 68
+articles to roll out 1/day — avoiding the "big dump on a young domain" SEO risk.
+No runtime code changed; the script only edits blog dates when run.
+
+**Branch / PR:** `feat/blog-post-scheduler` — PR link added on open.
+
+---
+
 ## 2026-09-07 — Add repository README.md
 
 **Asked:** "Add a README.md on Bhavish."
