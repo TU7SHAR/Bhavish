@@ -145,6 +145,35 @@ before Gemini finished, the completed deep-dive in the DB was never loaded.
 
 ---
 
+## Fixed Bugs (Tracking — September 2026)
+
+### BUG-027: Duplicate Meta Purchase (browser Pixel double-fire, no CAPI dedup)
+**Status:** Fixed (code); requires owner action for full resolution
+**Severity:** Medium (inflated/"fake" purchases in Meta Ads reporting)
+**Fixed in:** PR (fix/pixel-purchase-once-guard)
+
+**Symptom:** Meta Ads Manager reported 3 Purchases for the campaign when only 2
+real sales occurred (an extra Purchase on the "01 | Too Many Questions" ad).
+**Root Cause (two compounding factors):**
+1. The browser Pixel `Purchase` (in `report/preview/page.js`) had **no
+   fire-once guard**, so a payment-handler re-invocation or a refresh of the
+   report page could fire it twice.
+2. Meta confirmed the **server-side Conversions API was NOT active in
+   production** (no live CAPI events) — so there was no server event sharing the
+   same `event_id` to dedupe the duplicate browser fire against. (CAPI code
+   exists but `META_CAPI_ACCESS_TOKEN` is unset/invalid in production, and it
+   had only ever been verified in Test-Events mode.)
+   Together: unguarded browser Pixel + no live CAPI dedup = duplicate purchase.
+**Fix (code):** Added a persistent fire-once guard keyed on
+`purchaseTracked_<reportId>` in `localStorage`, wrapping the Pixel + GA4 +
+Vercel Purchase events so they fire at most once per report — surviving refreshes
+and handler re-invocations. Report generation is unaffected (only analytics is guarded).
+**Owner action required for full fix:** set a valid `META_CAPI_ACCESS_TOKEN` in
+Vercel production (and remove `META_TEST_EVENT_CODE`) so live CAPI runs and
+Meta's browser↔server dedup (shared `event_id`) works as designed.
+
+---
+
 ## Open Bugs
 
 ### BUG-010: Analytics leak on private report links
