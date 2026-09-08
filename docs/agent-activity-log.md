@@ -10,6 +10,50 @@
 
 ---
 
+## 2026-09-08 — Stop the reconcile sweep reporting old sales to Meta (BUG-030)
+
+**Asked:** "another fake purchase ... in meta account it is showing new sale
+today when money is not even being spent, direct purchase when there is no
+fucking purchase???" — then approval to ship the code fix.
+
+**Interpreted as:** Find the actual mechanism producing Meta Purchase events on
+days with zero ad spend and no new payment, and stop it at the source. My first
+hypothesis (the user's own test purchase) was WRONG — the pasted Vercel logs
+showed a 09:49 `reconcile-payments` 504 alongside a burst of
+`send-report-email`/`generate-pdf` calls, which redirected the investigation to
+the cron sweep.
+
+**Did:**
+- Traced `cron/reconcile-payments` → `sweepStuckPaidRows()` → `fulfillPayment()`
+  → step 3b `maybeSendMetaPurchase()` and confirmed the only guard was
+  `meta_purchase_sent_at`, which is `NULL` on all pre-CAPI sales.
+- Added `PURCHASE_EVENT_MAX_AGE_MS` (24h) and a freshness guard to
+  `maybeSendMetaPurchase()`; `fulfillPayment` now passes
+  `{ justPaid: !alreadyPaid }` so brand-new sales always report while
+  already-paid rows must have a recent `paid_at`.
+- Stale rows are stamped so subsequent sweeps short-circuit instead of
+  re-evaluating them every run.
+- Provided a one-time SQL backfill for existing historical rows.
+
+**Files affected:**
+- `lib/fulfill-payment.js`
+- `docs/bugs.md` (BUG-030)
+- `commands/cron-and-ops.md`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Meta no longer receives fabricated Purchase conversions for sales
+that happened weeks earlier, so ad optimisation stops being trained on events
+that never occurred and reported purchase counts match reality. Genuine missed
+payments recovered by reconcile still report normally (well inside 24h).
+Fail-soft behaviour unchanged — nothing here can block fulfilment.
+Known follow-ups NOT in this PR: the `reconcile-payments` 60s timeout (it
+generates reports + PDFs for up to 50 rows in one invocation) and a 404 on
+`/blog/rashi-vs-lagna-chart`.
+
+**Branch / PR:** `fix/no-capi-purchase-for-stale-sales` → PR #212.
+
+---
+
 ## Entry template
 
 ```

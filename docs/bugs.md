@@ -201,6 +201,44 @@ the CAPI event. The browser Pixel fired, the server did not.
 then make one test purchase → Test Events should show Purchase from BOTH Browser
 and Server, merged into a single event.
 
+### BUG-030: Reconcile sweep reported WEEKS-OLD sales to Meta as new purchases
+**Status:** Fixed
+**Severity:** High (phantom conversions on zero-spend days; corrupts ad optimisation)
+**Fixed in:** PR (fix/no-capi-purchase-for-stale-sales)
+
+**Symptom:** Meta Ads Manager showed a **new Purchase on a day with no ad spend**,
+attributed as "direct", with no corresponding new payment in Razorpay or the DB.
+They appeared one at a time across days, which made it look random and made the
+tracking work look broken.
+**Root Cause:** `sweepStuckPaidRows()` in `cron/reconcile-payments` selects EVERY
+row with `payment_status='paid'` AND `report_status` null/failed/generating —
+which includes sales from weeks ago (rows with `paid_at: null`,
+`plan_price: null` that predate later migrations). For each it calls
+`fulfillPayment()`, whose step 3b runs `maybeSendMetaPurchase()` unconditionally.
+That helper's ONLY guard was `if (report.meta_purchase_sent_at) return`. Those
+historical rows predate the CAPI feature, so the column was `NULL` → the sweep
+fired a **brand-new server-side Purchase event for an ancient sale**. Because it
+stamps the column after sending, exactly one old row was "burned" per sweep,
+producing a trickle of phantom purchases rather than one obvious burst.
+**Fix:** Added a freshness guard to `maybeSendMetaPurchase()`:
+- `fulfillPayment` now passes `{ justPaid: !alreadyPaid }`. When this call is the
+  one that flipped the row to paid, it is a genuinely new sale → always report.
+- Otherwise the row was already paid before this call (sweep/reconcile
+  re-touching it), so `paid_at` must be within `PURCHASE_EVENT_MAX_AGE_MS`
+  (24h). A `NULL` `paid_at` means the payment time is unknowable → never report.
+- Rows that fail the check are **stamped** rather than left `NULL`, so later
+  sweeps short-circuit at the existing guard instead of re-evaluating forever.
+  Here the stamp means "do not report", not "successfully sent".
+- Real recoveries are preserved: a genuinely missed UPI/webhook payment is
+  reconciled well within 24h and still reports to Meta.
+**Owner action:** one-time backfill so already-existing old sales can never
+resurface (the code guard also handles them, but this makes it explicit):
+```sql
+update reports set meta_purchase_sent_at = now()
+where payment_status = 'paid' and meta_purchase_sent_at is null
+  and (paid_at is null or paid_at < now() - interval '12 hours');
+```
+
 ---
 
 ## Open Bugs
