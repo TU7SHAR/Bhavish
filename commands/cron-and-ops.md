@@ -29,6 +29,30 @@ Scheduled jobs and manual operational endpoints, and how to trigger them safely.
 
 All cron endpoints require `verifyCron()` (`CRON_SECRET`).
 
+### Reconcile sweep — Meta Purchase freshness rule (BUG-030)
+
+`reconcile-payments` runs `sweepStuckPaidRows()`, which picks up **every** paid
+row whose `report_status` is null/failed/generating — including sales from weeks
+ago. Each one goes through `fulfillPayment()`, which can fire the server-side
+Meta CAPI Purchase.
+
+`maybeSendMetaPurchase()` therefore enforces a **freshness rule** so the sweep
+can never report an old sale as a new conversion:
+
+| Situation | Reported to Meta? |
+|-----------|-------------------|
+| This call just marked the row paid (`justPaid`) | ✅ Yes — genuinely new sale |
+| Already paid, `paid_at` within 24h | ✅ Yes — real missed-payment recovery |
+| Already paid, `paid_at` older than 24h | ❌ No — stamped "do not report" |
+| Already paid, `paid_at` is `NULL` | ❌ No — payment time unknowable |
+
+Rows that fail the check get `meta_purchase_sent_at` stamped so later sweeps
+short-circuit immediately. In that case the stamp means *"do not report"*, not
+*"successfully sent"*.
+
+**Symptom this prevents:** a Purchase appearing in Meta Ads Manager on a day with
+zero ad spend, attributed as "direct", with no matching Razorpay payment.
+
 ---
 
 ## Manual operational endpoints
