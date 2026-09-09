@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logHttp } from "./lib/http-log.js";
 
 /**
  * Next.js 16 Proxy for BhavishAI
@@ -42,9 +43,38 @@ function getAllowedOrigins() {
   return origins;
 }
 
-export function proxy(request) {
+export function proxy(request, event) {
   const { pathname } = request.nextUrl;
   const method = request.method;
+
+  // ── REQUEST LOGGING ──────────────────────────────────────────────────────
+  // One row per real request (the matcher below already excludes static assets),
+  // so we get the "Vercel logs" view in our own DB and keep it as long as we like.
+  //
+  // NON-BLOCKING: handed to event.waitUntil() so the DB insert happens AFTER the
+  // response is sent. This must never add latency to time-to-first-byte.
+  //
+  // NOTE ON STATUS: the proxy runs BEFORE the response exists, so it cannot know
+  // the eventual status code — those rows store status NULL. Statuses we DO know
+  // are recorded: the 403s below, 404s from app/not-found.js, and any route
+  // wrapped in withHttpLog().
+  const logRequest = (status) =>
+    logHttp({
+      method,
+      path: pathname,
+      status,
+      source: "proxy",
+      userAgent: request.headers.get("user-agent") || undefined,
+      referrer: request.headers.get("referer") || undefined,
+      country: request.headers.get("x-vercel-ip-country") || undefined,
+    });
+
+  const track = (status) => {
+    const pending = logRequest(status);
+    // event may be absent in tests/older runtimes — degrade to fire-and-forget.
+    if (event && typeof event.waitUntil === "function") event.waitUntil(pending);
+    else void pending;
+  };
 
   // --- CSRF Protection for mutating API requests ---
   if (
@@ -67,6 +97,7 @@ export function proxy(request) {
           // Check if request has a valid Bearer token (internal/admin calls)
           const authHeader = request.headers.get("authorization");
           if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            track(403); // status IS known here
             return NextResponse.json(
               { error: "Forbidden: invalid origin" },
               { status: 403 }
@@ -86,6 +117,7 @@ export function proxy(request) {
         if (!isAllowedReferer) {
           const authHeader = request.headers.get("authorization");
           if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            track(403); // status IS known here
             return NextResponse.json(
               { error: "Forbidden: invalid referer" },
               { status: 403 }
@@ -95,6 +127,10 @@ export function proxy(request) {
       }
     }
   }
+
+  // Request allowed through. Status is not knowable here (see note above), so
+  // it is recorded as NULL; 404s arrive separately from app/not-found.js.
+  track(undefined);
 
   // --- Response with security headers ---
   const response = NextResponse.next();
