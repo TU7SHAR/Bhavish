@@ -117,11 +117,59 @@ Read them via `GET /api/admin/logs` with `Authorization: Bearer <ADMIN_SECRET>`:
 | `since` | `24h` | `5m`/`3h`/`24h`/`7d`/`30d` (default `7d`) |
 | `limit` | `200` | 1-500, default 100 |
 
-Events currently emitted: `payment.verified`, `payment.signature_invalid`,
-`payment.order_fetch_failed`, `payment.db_update_failed`, `meta.purchase_sent`,
-`meta.purchase_not_sent`, `meta.purchase_failed`.
+### Event catalogue
 
-Retention is manual for now:
+| Event | Level | Meaning |
+|-------|-------|---------|
+| `funnel.preview_generated` | info | Someone completed the form and got a preview — **funnel step 1** |
+| `funnel.preview_rejected` | warn | Form submitted but validation failed |
+| `funnel.preview_rate_limited` | warn | Hit the 3/min preview cap |
+| `funnel.preview_failed` | error | Gemini failed — lead lost at step 1 |
+| `funnel.order_created` | info | Clicked Pay, Razorpay order exists — **funnel step 2** |
+| `funnel.order_rate_limited` | warn | Hit the 5/min order cap |
+| `funnel.order_failed` | error | Wanted to pay and we failed them |
+| `payment.verified` | info | Signature valid, marked paid — **funnel step 3** |
+| `payment.signature_invalid` | warn | Rejected callback |
+| `payment.order_fetch_failed` | error | Paid but report unidentifiable |
+| `payment.db_update_failed` | error | Paid but DB not updated (customer still saw success) |
+| `webhook.processed` | info | Razorpay webhook handled |
+| `webhook.not_configured` | error | `RAZORPAY_WEBHOOK_SECRET` missing — safety net OFF |
+| `webhook.unresolved` | error | Real payment, no `reportId` resolved |
+| `webhook.error` | error | Webhook threw |
+| `report.delivered` | info | Customer received their report |
+| `report.delivery_failed` | error | Email send failed, claim released |
+| `report.delivery_blocked` | warn | Refused — row not paid (BUG-032 guard) |
+| `fulfill.legacy_settled` | info | Historical sale settled, not re-sent (BUG-031 guard) |
+| `meta.purchase_sent` | info | Meta accepted the server Purchase |
+| `meta.purchase_not_sent` | warn | Skipped/failed, with reason |
+| `meta.purchase_suppressed_stale` | info | Old sale not reported as new (BUG-030 guard) |
+| `cron.reconcile_run` | info | **Daily heartbeat** — counts, timings, budget |
+| `cron.nurture_run` | info | **Daily heartbeat** — sent, unique people, dupes retired |
+| `cron.*_failed` | error | A cron threw |
+
+### The funnel query
+
+This is the one that answers "why is nobody paying" with data instead of guesses:
+
+```sql
+select
+  count(*) filter (where event = 'funnel.preview_generated') as previews,
+  count(*) filter (where event = 'funnel.order_created')     as clicked_pay,
+  count(*) filter (where event = 'payment.verified')         as paid
+from ops_logs
+where created_at >= (date_trunc('day', now() at time zone 'Asia/Kolkata')
+                     at time zone 'Asia/Kolkata');
+```
+
+`previews → clicked_pay` is the paywall drop-off. `clicked_pay → paid` is
+checkout abandonment. They need opposite fixes, and until now we could not tell
+them apart.
+
+### Retention
+
+Handled automatically: the reconcile cron calls `pruneOpsLogs()` daily and deletes
+rows older than 90 days. No extra cron needed (Vercel Hobby caps them). Manual
+equivalent:
 
 ```sql
 delete from ops_logs where created_at < now() - interval '90 days';

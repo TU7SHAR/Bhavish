@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { verifyCron } from "../../../../lib/auth.js";
+import { logEvent, logError } from "../../../../lib/ops-log.js";
 
 export const maxDuration = 60;
 
@@ -294,6 +295,23 @@ export async function GET(request) {
       } catch {}
     }
 
+    // Daily heartbeat for the nurture engine. duplicatesRetired proves the
+    // BUG-033 dedup is working; a big gap between rowsFetched and uniquePeople
+    // means people are still resubmitting the form instead of resuming.
+    await logEvent({
+      event: "cron.nurture_run",
+      source: "cron-nurture",
+      message: `sent ${totalSent} to ${uniqueLeads.length} unique people (${leads.length} rows, ${duplicatesRetired} dupes retired)`,
+      meta: {
+        rowsFetched: leads.length,
+        uniquePeople: uniqueLeads.length,
+        duplicatesRetired,
+        sent: totalSent,
+        deferredToNextRun: skippedForTime,
+        elapsedMs: Date.now() - startTime,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       rowsFetched: leads.length,
@@ -305,6 +323,12 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Cron error:", error);
+    await logError({
+      event: "cron.nurture_failed",
+      source: "cron-nurture",
+      message: "nurture cron threw",
+      error,
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
