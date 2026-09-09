@@ -127,7 +127,7 @@ export async function GET(request) {
       .not("email", "is", null)
       .neq("email", "")
       .not("email_drafts", "is", null)
-      .or("email_sequence_status.is.null,email_sequence_status.not.in.(completed,unsubscribed)")
+      .or("email_sequence_status.is.null,email_sequence_status.not.in.(completed,unsubscribed,duplicate)")
       .order("created_at", { ascending: true });
 
     if (fetchError) {
@@ -144,10 +144,68 @@ export async function GET(request) {
     let skippedForTime = 0;
     const results = [];
 
+    // ── ONE SEQUENCE PER PERSON (BUG-033) ────────────────────────────────
+    // This loop iterates report ROWS, and nothing deduplicated by email
+    // address. Every /get-report submission creates a NEW row, so one person
+    // who filled the form 30+ times had 30+ INDEPENDENT nurture sequences.
+    // The cooldown below is also per-row (`lead.last_email_sent_at`), so it
+    // could not stop them either: all 30 rows were created minutes apart, all
+    // crossed the 12h mark together, and she received a burst of near-identical
+    // emails. That burns the Resend quota and wrecks sending reputation, which
+    // pushes real paid report emails into spam.
+    //
+    // Fix: group by normalised email and keep ONE primary row per person — the
+    // OLDEST, so the sequence timing matches their first visit. The extra rows
+    // are marked 'duplicate' so the query above stops returning them on future
+    // runs (cheaper every run, and permanent).
+    const byEmail = new Map();
     for (const lead of leads) {
+      const key = (lead.email || "").trim().toLowerCase();
+      if (!key) continue;
+      const existing = byEmail.get(key);
+      if (!existing) {
+        byEmail.set(key, { primary: lead, dupes: [] });
+      } else {
+        // `leads` is ordered created_at ASC, so the first one seen is the oldest.
+        existing.dupes.push(lead);
+      }
+    }
+
+    // Retire duplicate rows so they never re-enter the sequence.
+    const duplicateRows = [...byEmail.values()].flatMap((g) => g.dupes);
+    let duplicatesRetired = 0;
+    if (duplicateRows.length > 0) {
+      const dupeIds = duplicateRows.map((r) => r.report_id);
+      const { error: dupeErr } = await supabase
+        .from("reports")
+        .update({ email_sequence_status: "duplicate" })
+        .in("report_id", dupeIds);
+      if (dupeErr) {
+        console.warn("[nurture] failed to retire duplicate rows:", dupeErr.message);
+      } else {
+        duplicatesRetired = dupeIds.length;
+      }
+    }
+
+    // A person's cooldown must consider EVERY row they own, not just the
+    // primary — otherwise retiring the dupes could still let one more email
+    // out immediately after they were just emailed from another row.
+    const lastSentByEmail = new Map();
+    for (const lead of leads) {
+      const key = (lead.email || "").trim().toLowerCase();
+      if (!key || !lead.last_email_sent_at) continue;
+      const ts = new Date(lead.last_email_sent_at).getTime();
+      if (!lastSentByEmail.has(key) || ts > lastSentByEmail.get(key)) {
+        lastSentByEmail.set(key, ts);
+      }
+    }
+
+    const uniqueLeads = [...byEmail.values()].map((g) => g.primary);
+
+    for (const lead of uniqueLeads) {
       // Time guard — stop before the function is killed; rest waits for next run.
       if (Date.now() - startTime > TIME_BUDGET_MS) {
-        skippedForTime = leads.length - leads.indexOf(lead);
+        skippedForTime = uniqueLeads.length - uniqueLeads.indexOf(lead);
         break;
       }
 
@@ -172,8 +230,12 @@ export async function GET(request) {
         if (hoursSinceCreation < dueAfterHours) continue;
 
         // Cooldown so a backlog doesn't fire several emails at once.
-        if (lead.last_email_sent_at) {
-          const hoursSinceLast = (now - new Date(lead.last_email_sent_at)) / 3.6e6;
+        // Uses the latest send across ALL rows owned by this email address, so
+        // duplicate submissions can never bypass it. (BUG-033)
+        const emailKey = (lead.email || "").trim().toLowerCase();
+        const lastSentForPerson = lastSentByEmail.get(emailKey) || null;
+        if (lastSentForPerson) {
+          const hoursSinceLast = (now.getTime() - lastSentForPerson) / 3.6e6;
           if (hoursSinceLast < COOLDOWN_HOURS) continue;
         }
 
@@ -210,6 +272,7 @@ export async function GET(request) {
           .eq("report_id", lead.report_id);
 
         totalSent++;
+        lastSentByEmail.set(emailKey, now.getTime()); // keep the per-person cooldown honest
         results.push({ email: lead.email, emailNum: newCount, subject });
 
         // Respect Resend rate limit (2 req/sec)
@@ -233,7 +296,9 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      processed: leads.length,
+      rowsFetched: leads.length,
+      uniquePeople: uniqueLeads.length,
+      duplicatesRetired,
       sent: totalSent,
       deferredToNextRun: skippedForTime,
       results,
