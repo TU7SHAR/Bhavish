@@ -2,12 +2,18 @@ import Razorpay from "razorpay";
 import { NextResponse } from "next/server";
 import { paymentLimiter } from "../../../lib/rate-limit.js";
 import { resolvePlan, resolveLegacyBump } from "../../../lib/plans.js";
+import { logEvent, logWarn, logError } from "../../../lib/ops-log.js";
 
 export async function POST(request) {
   try {
     // Rate limiting — prevent order creation spam
     const rateCheck = await paymentLimiter(request);
     if (!rateCheck.allowed) {
+      await logWarn({
+        event: "funnel.order_rate_limited",
+        source: "create-order",
+        message: "IP hit the 5/min order limit",
+      });
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
@@ -59,6 +65,24 @@ export async function POST(request) {
       },
     });
 
+    // FUNNEL STEP 2: the user clicked Pay and a Razorpay order exists. The gap
+    // between funnel.preview_generated and this event IS the paywall drop-off —
+    // the single most important number for diagnosing "why is nobody paying".
+    await logEvent({
+      event: "funnel.order_created",
+      source: "create-order",
+      reportId,
+      message: `clicked Pay — ${plan.tier} ₹${plan.price}`,
+      meta: {
+        orderId: order.id,
+        tier: plan.tier,
+        planId: plan.planId,
+        price: plan.price,
+        guidanceMonths: plan.guidanceMonths,
+        deepDive: !!plan.deepDive,
+      },
+    });
+
     return NextResponse.json({
       orderId: order.id,
       amount: order.amount,
@@ -72,6 +96,13 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Order creation error:", error);
+    // The user WANTED to pay and we failed them. Highest-severity funnel event.
+    await logError({
+      event: "funnel.order_failed",
+      source: "create-order",
+      message: "Razorpay order creation failed — user could not pay",
+      error,
+    });
     return NextResponse.json(
       { error: "Failed to create payment order. Please try again." },
       { status: 500 }

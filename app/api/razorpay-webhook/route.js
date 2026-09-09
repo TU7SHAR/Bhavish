@@ -3,6 +3,7 @@ import Razorpay from "razorpay";
 import { NextResponse } from "next/server";
 import { fulfillPayment } from "../../../lib/fulfill-payment.js";
 import { safeCompare } from "../../../lib/auth.js";
+import { logEvent, logError } from "../../../lib/ops-log.js";
 
 // Razorpay Webhook — the server-to-server safety net.
 //
@@ -27,6 +28,13 @@ export async function POST(request) {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     if (!secret) {
       console.error("[webhook] RAZORPAY_WEBHOOK_SECRET not configured");
+      // This silently disables the entire webhook safety net. It returns 200, so
+      // Razorpay thinks all is well and nothing ever surfaces. Log it loudly.
+      await logError({
+        event: "webhook.not_configured",
+        source: "razorpay-webhook",
+        message: "RAZORPAY_WEBHOOK_SECRET missing — webhook safety net is DISABLED",
+      });
       // 200 so Razorpay doesn't hammer retries while the env is being set up.
       return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 200 });
     }
@@ -59,6 +67,12 @@ export async function POST(request) {
     const details = await resolveOrderDetails(event, type);
     if (!details?.reportId) {
       console.error("[webhook] could not resolve reportId for event", type);
+      await logError({
+        event: "webhook.unresolved",
+        source: "razorpay-webhook",
+        message: `real payment but no reportId could be resolved (${type})`,
+        meta: { razorpayEvent: type },
+      });
       // 200 — nothing actionable, don't trigger endless retries.
       return NextResponse.json({ ok: false, reason: "no_report_id" }, { status: 200 });
     }
@@ -73,9 +87,28 @@ export async function POST(request) {
     });
 
     console.log(`[webhook] ${type} -> ${details.reportId}:`, result.status, result.delivered ? "(delivered)" : "");
+    await logEvent({
+      event: "webhook.processed",
+      source: "razorpay-webhook",
+      reportId: details.reportId,
+      message: `${type} → ${result.status}`,
+      meta: {
+        razorpayEvent: type,
+        paymentId: details.paymentId,
+        status: result.status,
+        delivered: !!result.delivered,
+        tier: result.tier ?? null,
+      },
+    });
     return NextResponse.json({ ok: true, ...result }, { status: 200 });
   } catch (error) {
     console.error("[webhook] error:", error.message);
+    await logError({
+      event: "webhook.error",
+      source: "razorpay-webhook",
+      message: "webhook threw — returning 200, reconcile is the backstop",
+      error,
+    });
     // Return 200 to avoid infinite Razorpay retries on our internal errors —
     // the reconciliation endpoint is the backstop for anything missed.
     return NextResponse.json({ ok: false, error: error.message }, { status: 200 });

@@ -3,6 +3,24 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifyCron } from "../../../../lib/auth.js";
 import { fulfillPayment } from "../../../../lib/fulfill-payment.js";
+import { logEvent, logError } from "../../../../lib/ops-log.js";
+
+// Ops-log retention. Runs here (daily) so no extra cron is needed — Vercel Hobby
+// only allows a limited number. 90 days of ops events is a few thousand rows.
+const OPS_LOG_RETENTION_DAYS = 90;
+
+async function pruneOpsLogs() {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+    const cutoff = new Date(Date.now() - OPS_LOG_RETENTION_DAYS * 86400000).toISOString();
+    await supabase.from("ops_logs").delete().lt("created_at", cutoff);
+  } catch {
+    // Never let log housekeeping affect reconciliation.
+  }
+}
 
 // AUTO-RECONCILIATION CRON — the self-healing safety net for missed payments.
 //
@@ -127,9 +145,43 @@ export async function GET(request) {
       );
     }
 
+    // ALWAYS record the run — a daily heartbeat. This is what proves the cron
+    // ran at all, whether it finished inside the budget, and whether the
+    // BUG-031 fix is holding (legacySettled > 0, recovered == 0).
+    await logEvent({
+      event: "cron.reconcile_run",
+      level: summary.failed > 0 ? "warn" : "info",
+      source: "cron-reconcile",
+      message: `scanned ${summary.captured} captured, fulfilled ${summary.fulfilled}, legacy settled ${summary.legacySettled}, sweep recovered ${sweep.recovered}`,
+      meta: {
+        scanned: summary.scanned,
+        captured: summary.captured,
+        fulfilled: summary.fulfilled,
+        alreadyDone: summary.alreadyDone,
+        legacySettled: summary.legacySettled,
+        failed: summary.failed,
+        sweepAttempted: sweep.attempted,
+        sweepRecovered: sweep.recovered,
+        sweepDeferred: sweep.deferred ?? 0,
+        deferredNoTime: results.filter((r) => r.status === "deferred_no_time").length,
+        elapsedMs: summary.elapsedMs,
+        hitBudget: Date.now() > deadline,
+      },
+    });
+
+    // Retention: keep the ops log bounded without needing another cron.
+    await pruneOpsLogs();
+
     return NextResponse.json({ ok: true, summary, results });
   } catch (error) {
     console.error("[cron-reconcile] error:", error.message);
+    await logError({
+      event: "cron.reconcile_failed",
+      source: "cron-reconcile",
+      message: "reconcile cron threw",
+      error,
+      meta: { elapsedMs: Date.now() - startedAt },
+    });
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

@@ -6,6 +6,7 @@ import { calculateBirthChart, generateKundliSVG } from "../../../lib/vedic-calcu
 import { geocodePlace } from "../../../lib/geocode.js";
 import { previewLimiter } from "../../../lib/rate-limit.js";
 import { sanitizeForPrompt } from "../../../lib/sanitize.js";
+import { logEvent, logWarn, logError } from "../../../lib/ops-log.js";
 
 // Allow up to 30 seconds for preview generation on Vercel
 export const maxDuration = 30;
@@ -23,10 +24,16 @@ const inputSchema = z.object({
 });
 
 export async function POST(request) {
+  const startedAt = Date.now();
   try {
     // Rate limiting — prevent Gemini token abuse (3 req/min per IP)
     const rateCheck = await previewLimiter(request);
     if (!rateCheck.allowed) {
+      await logWarn({
+        event: "funnel.preview_rate_limited",
+        source: "generate-preview",
+        message: "IP hit the 3/min preview limit",
+      });
       return NextResponse.json({ error: rateCheck.error }, { status: 429 });
     }
 
@@ -38,6 +45,12 @@ export async function POST(request) {
       validated = inputSchema.parse(rawBody);
     } catch (zodErr) {
       const msg = zodErr.errors?.[0]?.message || "Invalid input data";
+      // Someone filled the form but it was rejected — a silent funnel leak.
+      await logWarn({
+        event: "funnel.preview_rejected",
+        source: "generate-preview",
+        message: `validation failed: ${msg}`,
+      });
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
@@ -110,6 +123,12 @@ Return ONLY valid JSON. No markdown.`;
       reportData = JSON.parse(match[0]);
     } catch (parseError) {
       console.error("Parse error:", parseError.message);
+      await logError({
+        event: "funnel.preview_failed",
+        source: "generate-preview",
+        message: "Gemini returned unparseable JSON",
+        error: parseError,
+      });
       return NextResponse.json(
         { error: "Failed to generate report. Please try again." },
         { status: 500 }
@@ -117,6 +136,11 @@ Return ONLY valid JSON. No markdown.`;
     }
 
     if (!reportData.sections || reportData.sections.length < 1) {
+      await logWarn({
+        event: "funnel.preview_failed",
+        source: "generate-preview",
+        message: "Gemini returned no sections",
+      });
       return NextResponse.json(
         { error: "Incomplete report. Please try again." },
         { status: 500 }
@@ -129,6 +153,22 @@ Return ONLY valid JSON. No markdown.`;
     const city = location.displayName
       ? location.displayName.split(",")[0].trim()
       : placeOfBirth.split(",")[0].trim();
+
+    // FUNNEL STEP 1: a real person completed the birth-details form and got a
+    // preview. Durable so "how many people actually started?" is answerable.
+    await logEvent({
+      event: "funnel.preview_generated",
+      source: "generate-preview",
+      reportId,
+      message: `preview for ${city}`,
+      meta: {
+        sections: reportData.sections?.length || 0,
+        hasPersonalQuestion: !!personalQuestion,
+        gender,
+        city,
+        durationMs: Date.now() - startedAt,
+      },
+    });
 
     return NextResponse.json({
       reportId,
@@ -146,6 +186,14 @@ Return ONLY valid JSON. No markdown.`;
     });
   } catch (error) {
     console.error("Preview generation error:", error);
+    // A failure here is a lead lost at the very first step — the most expensive
+    // possible drop-off, and previously invisible.
+    await logError({
+      event: "funnel.preview_failed",
+      source: "generate-preview",
+      message: "preview generation threw",
+      error,
+    });
     return NextResponse.json(
       { error: "Failed to generate report. Please check your details and try again." },
       { status: 500 }

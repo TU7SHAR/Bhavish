@@ -10,6 +10,58 @@
 
 ---
 
+## 2026-09-09 — Instrument the full server surface
+
+**Asked:** "i want all the full logs to lo be logged in table"
+
+**Interpreted as:** Extend #216 beyond `verify-payment` to cover the whole
+server-side event surface, so the table fills from normal activity rather than only
+when a sale happens. I also re-did the cost maths I had been over-cautious about
+earlier: at ~70 leads/day this is roughly 1MB/month, which is negligible against
+Supabase's 500MB free tier — so broad logging is genuinely affordable here.
+
+**Did:**
+- Funnel instrumentation (the gap that mattered most): `generate-preview` emits
+  `funnel.preview_generated` / `_rejected` / `_rate_limited` / `_failed`, and
+  `create-order` emits `funnel.order_created` / `_rate_limited` / `_failed`.
+  Together with `payment.verified` this gives a durable
+  preview → clicked-Pay → paid funnel, which is what was missing when trying to
+  explain zero revenue.
+- `razorpay-webhook`: `webhook.processed` / `webhook.error` /
+  `webhook.unresolved`, plus `webhook.not_configured` as an ERROR because a
+  missing secret silently disables the entire safety net while still returning 200.
+- `lib/fulfill-payment.js`: `report.delivered` / `report.delivery_failed` /
+  `report.delivery_blocked` (BUG-032 guard), `fulfill.legacy_settled` (BUG-031
+  guard), `meta.purchase_sent` / `_not_sent` / `_suppressed_stale` (BUG-030 guard).
+- Both crons emit a daily heartbeat — `cron.reconcile_run` and `cron.nurture_run`
+  with counts, timings and whether the time budget was hit — so the table fills
+  every day regardless of sales, and the BUG-031/033 fixes can be verified from
+  data.
+- Retention: `pruneOpsLogs()` runs inside the reconcile cron and deletes rows
+  older than 90 days, avoiding a second cron (Hobby caps them).
+- Documented the full event catalogue and the funnel query in
+  `commands/cron-and-ops.md`.
+
+**Files affected:**
+- `app/api/generate-preview/route.js`, `app/api/create-order/route.js`
+- `app/api/razorpay-webhook/route.js`
+- `lib/fulfill-payment.js`
+- `app/api/cron/reconcile-payments/route.js`, `app/api/cron/send-nurture-emails/route.js`
+- `commands/cron-and-ops.md`, `docs/agent-activity-log.md`
+
+**Impact:** The whole funnel and fulfilment path is now durably recorded, so the
+next incident is answered with a query instead of a screenshot. Every logging call
+is fail-soft, so none of this can break a payment or a delivery.
+
+**Open question left with the user:** whether "full" also means one row per HTTP
+request (method/path/status/duration, as the Vercel dashboard shows). That is a
+different mechanism — middleware-level — and their illustrating example did not
+come through, so it was not assumed.
+
+**Branch / PR:** `feat/log-everything` → PR #217.
+
+---
+
 ## 2026-09-09 — Persistent ops logs (Vercel Hobby loses them)
 
 **Asked:** "can we somehow make the logs stay? like vercel needs real pro plan for
