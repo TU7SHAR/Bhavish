@@ -239,6 +239,40 @@ where payment_status = 'paid' and meta_purchase_sent_at is null
   and (paid_at is null or paid_at < now() - interval '12 hours');
 ```
 
+### BUG-033: Nurture emails fired per report row, not per person
+**Status:** Fixed
+**Severity:** High (spam complaints + sender-reputation damage → paid report emails land in spam)
+**Fixed in:** PR (fix/nurture-emails-per-person)
+
+**Symptom:** One visitor submitted `/get-report` 30+ times in a day. She then
+received a burst of near-identical nurture emails. Reported lead counts were also
+inflated — "71 leads" was closer to ~11 real people.
+**Root Cause:** `cron/send-nurture-emails` iterates report ROWS with no dedup by
+email address. Every form submission creates a new row, so 30 rows = 30
+INDEPENDENT nurture sequences. The cooldown could not stop it either, because it
+was per-row (`lead.last_email_sent_at`): all 30 rows were created minutes apart,
+all crossed the 12h first-email mark together, and each had its own untouched
+cooldown.
+**Fix:**
+- Group fetched rows by normalised (`trim().toLowerCase()`) email and keep ONE
+  primary row per person — the OLDEST, so sequence timing matches their first
+  visit.
+- Extra rows are marked `email_sequence_status = 'duplicate'` and excluded from
+  the fetch query from then on, so they are retired permanently rather than
+  re-filtered every run.
+- Cooldown is now evaluated per PERSON using the latest `last_email_sent_at`
+  across every row that email owns, so duplicates can't bypass it.
+- Response reports `rowsFetched`, `uniquePeople`, `duplicatesRetired`.
+**Owner action:** none. Optional — inspect who was affected:
+```sql
+select email, count(*) as rows, sum(coalesce(emails_sent_count,0)) as emails_sent
+from reports where payment_status = 'unpaid'
+group by email having count(*) > 2 order by rows desc;
+```
+**Not covered here:** the lead-creation side still has no per-email cap, so one
+person can still create many rows (wasting a Gemini preview + email-sequence
+generation each time). Tracked as an open item.
+
 ---
 
 ## Open Bugs

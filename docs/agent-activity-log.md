@@ -54,6 +54,43 @@ generates reports + PDFs for up to 50 rows in one invocation) and a 404 on
 
 ---
 
+## 2026-09-09 — Nurture emails per person, not per row (BUG-033)
+
+**Asked:** Part of "fix whatever the issues are" — specifically the observation
+that "a stupid lady had made more then 30+ get report" and that many emails went
+out.
+
+**Interpreted as:** Stop one person with many duplicate lead rows from receiving
+many parallel nurture sequences, without changing the intended schedule for
+genuine single-row leads.
+
+**Did:**
+- Grouped the fetched rows by normalised email, keeping the oldest row per person
+  as the sequence owner.
+- Marked the surplus rows `email_sequence_status = 'duplicate'` and added
+  `duplicate` to the fetch query's exclusion list so they are retired for good.
+- Made the 6h cooldown per-person by taking the max `last_email_sent_at` across
+  all rows sharing that email.
+- Fixed the time-guard `skippedForTime` maths to use the deduplicated list.
+- Extended the JSON response with `rowsFetched` / `uniquePeople` /
+  `duplicatesRetired`.
+
+**Files affected:**
+- `app/api/cron/send-nurture-emails/route.js`
+- `docs/bugs.md` (BUG-033)
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** A person receives at most one nurture sequence regardless of how many
+times they submit the form. Protects the Resend quota and sender reputation, which
+directly protects deliverability of the PAID report emails. Build and targeted
+lint pass. Deliberately NOT included: a per-email cap on lead creation itself
+(still allows duplicate rows and wasted Gemini calls) — left as an open item so
+this PR stays reviewable.
+
+**Branch / PR:** `fix/nurture-emails-per-person` → PR #214.
+
+---
+
 ## Entry template
 
 ```
