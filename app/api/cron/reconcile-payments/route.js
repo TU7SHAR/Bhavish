@@ -2,7 +2,7 @@ import Razorpay from "razorpay";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifyCron } from "../../../../lib/auth.js";
-import { fulfillPayment } from "../../../../lib/fulfill-payment.js";
+import { fulfillPayment, deliverReport } from "../../../../lib/fulfill-payment.js";
 
 // AUTO-RECONCILIATION CRON — the self-healing safety net for missed payments.
 //
@@ -34,7 +34,19 @@ import { fulfillPayment } from "../../../../lib/fulfill-payment.js";
 //   ?count=50   how many recent captured payments to scan (default 30, max 100)
 export const maxDuration = 60;
 
+// Hard wall-clock budget. maxDuration is 60s, and a single Gemini report
+// generation can eat 20-40s of that. Without a budget the run is KILLED
+// mid-flight (the 504s seen in production), which meant the undelivered-paid
+// backlog only advanced a couple of rows per day and a customer could wait
+// TWO MONTHS for a report they paid for. We now stop cleanly at the deadline
+// and let the next run continue — every step is idempotent. (BUG-031)
+const RUN_BUDGET_MS = 45000;
+
 export async function GET(request) {
+  const startedAt = Date.now();
+  const deadline = startedAt + RUN_BUDGET_MS;
+  const outOfTime = () => Date.now() > deadline;
+
   const auth = verifyCron(request);
   if (!auth.authorized) return auth.error;
 
@@ -58,8 +70,20 @@ export async function GET(request) {
     const items = Array.isArray(list?.items) ? list.items : [];
     const captured = items.filter((p) => p.status === "captured");
 
+    // ── STEP 0: DRAIN THE UNDELIVERED-PAID BACKLOG (cheap, do it FIRST) ──
+    // These are customers who ALREADY PAID and whose report is ALREADY
+    // generated, but who never received the email (email_sent_at IS NULL).
+    // Emailing them costs ~2-4s; generating a report costs 20-40s. Running
+    // this before any Gemini work means the backlog actually drains instead of
+    // being starved by a timeout. (BUG-031)
+    const backlog = await drainUndeliveredPaidReports(deadline);
+
     const results = [];
     for (const payment of captured) {
+      if (outOfTime()) {
+        results.push({ paymentId: payment.id, status: "deferred_no_time" });
+        continue;
+      }
       const details = await orderDetailsFromPayment(razorpay, payment);
       if (!details.reportId) {
         results.push({ paymentId: payment.id, status: "no_report_id" });
@@ -86,11 +110,13 @@ export async function GET(request) {
     // paid-but-undelivered rows directly in the DB and re-runs the SAME
     // idempotent fulfillPayment() on them. claim_report_generation() re-claims
     // 'failed' and stale-'generating' rows, so this genuinely recovers them.
-    const sweep = await sweepStuckPaidRows();
+    const sweep = await sweepStuckPaidRows(deadline);
 
     const summary = {
       scanned: items.length,
       captured: captured.length,
+      backlog,
+      elapsedMs: Date.now() - startedAt,
       // "fulfilled" = a payment that was actually MISSED and just got recovered.
       fulfilled: results.filter((r) => r.status === "fulfilled").length,
       alreadyDone: results.filter((r) => r.status === "already_done").length,
@@ -102,9 +128,9 @@ export async function GET(request) {
     };
 
     // Only log the noteworthy cases (an actual recovery) to keep cron logs quiet.
-    if (summary.fulfilled > 0 || sweep.recovered > 0) {
+    if (summary.fulfilled > 0 || sweep.recovered > 0 || backlog.emailed > 0) {
       console.log(
-        `[cron-reconcile] recovered ${summary.fulfilled} missed payment(s) + ${sweep.recovered} stuck paid row(s):`,
+        `[cron-reconcile] recovered ${summary.fulfilled} missed payment(s) + ${sweep.recovered} stuck paid row(s) + delivered ${backlog.emailed} backlog report(s):`,
         summary
       );
     }
@@ -116,6 +142,85 @@ export async function GET(request) {
   }
 }
 
+// ── BACKLOG DRAIN ─────────────────────────────────────────────────────────
+// Deliver reports to customers who PAID and whose report is ALREADY GENERATED
+// but who never got the email. This is the gap that let paying customers wait
+// two months:
+//
+//   sweepStuckPaidRows() only selects rows whose report_status is
+//   null/failed/generating, and then explicitly DROPS any row that is
+//   completed-with-sections. So a paid row that is COMPLETED but has
+//   email_sent_at = NULL was matched by nothing and would never be delivered —
+//   not by the sweep, not by the Razorpay scan once the payment aged out of the
+//   recent window. It was a permanent dead end.
+//
+// This function targets exactly that state, and it does NO Gemini work: the
+// sections already exist, so it only renders + emails. That makes it cheap
+// enough to always run first, before the timeout-prone generation paths.
+//
+// Master is skipped: its final email is owned by the deep-dive endpoint.
+// Owner "New Sale" notification is suppressed — this is old money, not a new sale.
+async function drainUndeliveredPaidReports(deadline) {
+  const out = { candidates: 0, emailed: 0, deferred: 0, failed: 0, note: null };
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+    const { data: rows, error } = await supabase
+      .from("reports")
+      .select(
+        "report_id, name, email, summary, sections, chart_data, date_of_birth, time_of_birth, place_of_birth, plan_tier, plan_price, guidance_months, has_12_month_guidance, payment_status, payment_id, report_status"
+      )
+      .eq("payment_status", "paid")
+      .is("email_sent_at", null)
+      .not("email", "is", null)
+      .neq("email", "")
+      .order("paid_at", { ascending: true, nullsFirst: true })
+      .limit(30);
+
+    if (error) {
+      out.note = error.message;
+      return out;
+    }
+
+    // Only rows we can deliver RIGHT NOW without generating anything.
+    const ready = (rows || []).filter(
+      (r) =>
+        (r.plan_tier || "premium") !== "master" &&
+        Array.isArray(r.sections) &&
+        r.sections.length > 5
+    );
+    out.candidates = ready.length;
+
+    for (const row of ready) {
+      if (Date.now() > deadline) {
+        out.deferred += 1;
+        continue;
+      }
+      try {
+        const res = await deliverReport(
+          supabase,
+          row,
+          { summary: row.summary, sections: row.sections },
+          { notifyOwnerOfSale: false }
+        );
+        if (res?.emailed) out.emailed += 1;
+        else out.failed += 1;
+      } catch (e) {
+        out.failed += 1;
+        console.error(`[cron-reconcile] backlog delivery failed for ${row.report_id}:`, e.message);
+      }
+    }
+
+    return out;
+  } catch (e) {
+    out.note = e.message;
+    return out;
+  }
+}
+
 // DB SWEEP: find rows that are PAID but not actually delivered, and re-run
 // fulfillPayment() on each. Independent of the Razorpay recent-payments window,
 // so a stuck row is recovered no matter how old it is. Idempotent + bounded.
@@ -123,7 +228,7 @@ export async function GET(request) {
 // "Undelivered" = paid, but the report isn't a completed real report:
 //   report_status is 'failed', or NULL, or 'generating' but stale (>10 min),
 //   OR there are no/too-few sections.
-async function sweepStuckPaidRows() {
+async function sweepStuckPaidRows(deadline) {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -140,11 +245,11 @@ async function sweepStuckPaidRows() {
       .eq("payment_status", "paid")
       .or(`report_status.is.null,report_status.eq.failed,report_status.eq.generating`)
       .order("paid_at", { ascending: true })
-      .limit(50);
+      .limit(20);
 
     if (error) {
       // Column/query issue — never fail the whole cron over the sweep.
-      return { attempted: 0, recovered: 0, skipped: 0, note: error.message };
+      return { attempted: 0, recovered: 0, skipped: 0, deferred: 0, note: error.message };
     }
 
     // Filter in code: a 'generating' row only counts as stuck if it's been that
@@ -160,7 +265,15 @@ async function sweepStuckPaidRows() {
 
     let recovered = 0;
     let skipped = 0;
+    let deferred = 0;
     for (const r of candidates) {
+      // Each iteration can trigger a 20-40s Gemini generation. Stop cleanly at
+      // the deadline instead of being killed mid-generation (which left rows
+      // stuck in 'generating' and produced the 504s). (BUG-031)
+      if (deadline && Date.now() > deadline) {
+        deferred += 1;
+        continue;
+      }
       const includeGuidance = (r.guidance_months || 0) > 0 || r.has_12_month_guidance === true;
       const result = await fulfillPayment({
         reportId: r.report_id,
@@ -173,9 +286,9 @@ async function sweepStuckPaidRows() {
       else skipped++;
     }
 
-    return { attempted: candidates.length, recovered, skipped };
+    return { attempted: candidates.length, recovered, skipped, deferred };
   } catch (e) {
-    return { attempted: 0, recovered: 0, skipped: 0, note: e.message };
+    return { attempted: 0, recovered: 0, skipped: 0, deferred: 0, note: e.message };
   }
 }
 

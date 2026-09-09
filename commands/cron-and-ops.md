@@ -29,6 +29,35 @@ Scheduled jobs and manual operational endpoints, and how to trigger them safely.
 
 All cron endpoints require `verifyCron()` (`CRON_SECRET`).
 
+### Reconcile run order and time budget (BUG-031)
+
+`reconcile-payments` runs three phases, in this order, under a single **45s
+wall-clock budget** (`RUN_BUDGET_MS`, inside `maxDuration = 60`):
+
+| # | Phase | Cost | Purpose |
+|---|-------|------|---------|
+| 0 | `drainUndeliveredPaidReports()` | ~2-4s/row, **no Gemini** | Email paid customers whose report is already generated but `email_sent_at IS NULL` |
+| 1 | Razorpay recent-payments scan | 20-40s/row if generating | Recover payments never recorded as paid |
+| 2 | `sweepStuckPaidRows()` | 20-40s/row | Regenerate paid rows stuck null/failed/stale-generating |
+
+Phase 0 runs first **on purpose**. It is the cheap phase, and when it ran last it
+was starved by the expensive phases timing out — paid customers waited up to two
+months for a report. Every phase checks the deadline and defers the remainder to
+the next run; all phases are idempotent, so deferral loses nothing.
+
+**The dead end this closed:** phase 2 only selects rows whose `report_status` is
+null/failed/generating, then drops completed-with-sections rows. A paid row that
+was completed but never emailed matched nothing and could never be recovered.
+Phase 0 targets exactly that state.
+
+Backlog size:
+
+```sql
+select count(*) from reports
+where payment_status = 'paid' and email_sent_at is null
+  and coalesce(plan_tier,'') <> 'master';
+```
+
 ### Reconcile sweep — Meta Purchase freshness rule (BUG-030)
 
 `reconcile-payments` runs `sweepStuckPaidRows()`, which picks up **every** paid

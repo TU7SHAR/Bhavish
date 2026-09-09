@@ -201,6 +201,67 @@ the CAPI event. The browser Pixel fired, the server did not.
 then make one test purchase → Test Events should show Purchase from BOTH Browser
 and Server, merged into a single event.
 
+### BUG-031: Paying customers never received their reports (up to TWO MONTHS late)
+**Status:** Fixed
+**Severity:** CRITICAL (paid customers got nothing; refund/chargeback/reputation risk)
+**Fixed in:** PR (fix/paid-report-delivery-backlog)
+
+**Symptom:** A burst of "Your Personalized Vedic Astrology Report" emails went out
+on 2026-09-09 04:19-04:20 UTC. The recipients were real customers who had paid in
+**July 2026** (valid Razorpay `payment_id`s), whose `email_sent_at` had been `NULL`
+for two months. It looked like a mass "resend" but it was actually the FIRST
+delivery. At least one paid row (`RPT-1783354001592-KQH9PJ`, paid 2026-07-07) was
+still undelivered afterwards.
+**Root Cause:** Two compounding defects.
+1. **A permanent dead end.** `sweepStuckPaidRows()` only selects rows whose
+   `report_status` is null/failed/generating, and then explicitly filters OUT any
+   row that is completed-with-sections. A paid row that was COMPLETED but had
+   `email_sent_at IS NULL` therefore matched *nothing* — not the sweep, and not
+   the Razorpay recent-payments scan once the payment aged out of the latest-100
+   window. Those customers could never be recovered by any automated path.
+2. **The cron was being killed.** The route does Gemini generation + PDF + email
+   inline with `maxDuration = 60`, looping over up to 50 rows with no time
+   budget. One report can take 20-40s, so the run 504'd after clearing only a
+   row or two. The backlog drained at ~2 customers/day, which is why July
+   purchases surfaced in September.
+**Fix:**
+- New `drainUndeliveredPaidReports()` targets exactly the dead-end state (paid +
+  sections already generated + `email_sent_at IS NULL`) and does **no Gemini
+  work** — it only renders and emails, ~2-4s per customer. It runs FIRST, before
+  any generation, so the backlog is no longer starved by the timeout.
+- Added a hard `RUN_BUDGET_MS` (45s) wall-clock deadline honoured by the Razorpay
+  scan loop, the backlog drain and the generation sweep. The run now stops
+  cleanly and defers the rest to the next run instead of being killed
+  mid-generation (which also left rows stuck in `generating`).
+- Generation sweep batch lowered 50 → 20; every step remains idempotent.
+- Owner "New Sale" emails are suppressed for backlog deliveries via
+  `deliverReport(..., { notifyOwnerOfSale: false })` — old money must not
+  re-trigger new-sale alerts.
+**Owner action:** none. Count the remaining backlog with:
+```sql
+select count(*) from reports
+where payment_status = 'paid' and email_sent_at is null
+  and coalesce(plan_tier,'') <> 'master';
+```
+
+### BUG-032: deliverReport() never checked payment_status
+**Status:** Fixed
+**Severity:** High (the paid deliverable could be emailed for free)
+**Fixed in:** PR (fix/paid-report-delivery-backlog)
+
+**Symptom:** No confirmed incident, but there was no guard preventing the full
+report + PDF from being emailed to a row that was not paid.
+**Root Cause:** `/api/send-report-email` only verifies payment for EXTERNAL
+callers — `if (!isInternalCall) { ...verify payment_status === "paid"... }`. The
+internal path (`sendReportEmail()` → `getInternalAuthHeaders()`) skips that check
+entirely by design. `deliverReport()` was the only remaining gate, and it checked
+tier and email but **never `payment_status`**. Any bug or manual edit that flagged
+a row as deliverable would have shipped the paid product for free.
+**Fix:** `deliverReport()` now refuses to send unless `payment_status` is `paid`
+or `founder` (intentional free founder-member reports), logs the refusal, and
+returns `{ skipped: "not_paid" }`. All skip paths now return a `skipped` reason
+for observability.
+
 ### BUG-030: Reconcile sweep reported WEEKS-OLD sales to Meta as new purchases
 **Status:** Fixed
 **Severity:** High (phantom conversions on zero-spend days; corrupts ad optimisation)

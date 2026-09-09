@@ -54,6 +54,56 @@ generates reports + PDFs for up to 50 rows in one invocation) and a 404 on
 
 ---
 
+## 2026-09-09 — Paid customers never received reports (BUG-031, BUG-032)
+
+**Asked:** "why no revenue even though alot of people came" plus "alot reports were
+resent", followed by "fix whatever the issues are and look for and go through the
+code very very thoroughly".
+
+**Interpreted as:** Explain the apparent mass "resend", determine whether the
+product was being given away free, and fix the delivery defects found. The user's
+Razorpay screenshot (only 4 payment attempts in a week, 2 captured) plus a DB query
+of the email recipients proved the recipients were **July 2026 paying customers**
+with valid `payment_id`s whose `email_sent_at` had been NULL for two months. So it
+was not a giveaway and not a resend — it was a two-month-late first delivery.
+
+**Did:**
+- Traced the burst to `cron/reconcile-payments` and found a permanent dead end:
+  `sweepStuckPaidRows()` filters out completed rows, so paid+completed+unemailed
+  rows matched no recovery path at all.
+- Found the cron had no time budget: Gemini generation inline with
+  `maxDuration = 60` over 50 rows, so it 504'd after ~2 rows, draining the backlog
+  at ~2 customers/day.
+- Added `drainUndeliveredPaidReports()` — Gemini-free, email-only, runs first.
+- Added `RUN_BUDGET_MS` (45s) honoured by all three loops; sweep batch 50 → 20.
+- Added a `payment_status` guard to `deliverReport()` and a `notifyOwnerOfSale`
+  option so backlog sends don't fire owner "New Sale" alerts for old money.
+- Confirmed separately that checkout is NOT broken: two Sep 8 attempts reached
+  Razorpay (`Payment Timed Out` / `Gateway – Technical Error` on `test@mail.com`),
+  proving `create-order` and the Razorpay window work. Zero revenue that day was
+  a funnel/ads problem — ~11 real people, zero Pay clicks.
+
+**Files affected:**
+- `app/api/cron/reconcile-payments/route.js`
+- `lib/fulfill-payment.js`
+- `docs/bugs.md` (BUG-031, BUG-032)
+- `commands/cron-and-ops.md`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Paying customers are delivered within one cron run instead of
+potentially never. The cron completes instead of 504-ing, so it stops leaving rows
+stuck in `generating`. The paid deliverable can no longer be emailed for an unpaid
+row. Build and targeted lint pass. Known follow-ups NOT in this PR: nurture emails
+fire per report row instead of per person (one lead created 30+ rows and got 30+
+sequences), no per-email cap on lead creation, `generate-full-report` access-token
+enforcement gap, public `generate-master-deep-dive`, Meta CAPI send/stamp
+atomicity, no fetch timeout on the CAPI call in the payment path, and admin
+analytics undercounting ₹499/₹999 revenue.
+
+**Branch / PR:** `fix/paid-report-delivery-backlog` → PR #213.
+
+---
+
 ## Entry template
 
 ```
