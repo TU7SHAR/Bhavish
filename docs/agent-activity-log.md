@@ -54,6 +54,59 @@ generates reports + PDFs for up to 50 rows in one invocation) and a 404 on
 
 ---
 
+## 2026-09-09 — Sweep was re-sending reports customers already had (BUG-031, BUG-032)
+
+**Asked:** "paying customers always recieved there report they just were resent i
+don't know why look for it also" — correcting my previous conclusion.
+
+**Interpreted as:** My earlier diagnosis was WRONG and had to be reversed. I had
+read `email_sent_at IS NULL` on July rows as "never delivered" and opened PR #213
+with a `drainUndeliveredPaidReports()` that would have re-emailed every historical
+customer in a single run. The user's correction inverted the problem: the customers
+were served in July, so the September emails were DUPLICATES.
+
+**Did:**
+- Verified with git/PR history that PR #193 (sweep) and PR #195 (`email_sent_at`
+  atomic claim) both merged 2026-09-05, so no row paid before that date could ever
+  have been stamped. That proves NULL ≠ undelivered for legacy rows.
+- **Closed PR #213 unmerged** with a comment explaining the inverted diagnosis, to
+  prevent a mass re-send.
+- Traced the actual mechanism: the sweep's `completedEnough` test required
+  `report_status === "completed"`, so July rows (NULL status, sections present)
+  were classified as incomplete, re-claimed via `claim_report_generation` (which
+  accepts NULL), re-run through Gemini, and re-emailed because `email_sent_at` was
+  NULL. The 20-40s generations also caused the 504s and the few-per-day trickle.
+- Switched both the sweep filter and `fulfillPayment` to judge report existence by
+  `sections`, not `report_status`.
+- Added a historical-sale guard that settles old rows (backfills
+  `report_status`/`email_sent_at`, returns `legacy_already_served`) without
+  generating or emailing.
+- Added `RUN_BUDGET_MS` (45s) so the cron defers instead of being killed.
+- Carried over the BUG-032 `payment_status` guard in `deliverReport()`, made
+  non-breaking for callers that pass partial rows.
+
+**Files affected:**
+- `lib/fulfill-payment.js`
+- `app/api/cron/reconcile-payments/route.js`
+- `docs/bugs.md` (BUG-031 rewritten with the correct cause, BUG-032)
+- `commands/cron-and-ops.md`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Stops duplicate report emails to customers who were already served,
+stops pointless Gemini regeneration of existing reports, and removes the cause of
+the daily 504. Legacy rows are self-healed as the cron meets them, so the data
+converges without manual SQL (optional bulk SQL is documented in `docs/bugs.md`).
+Genuine missed payments are unaffected — they reconcile well inside the 7-day
+window, and rows with no `sections` are still generated and delivered.
+
+**Lesson recorded:** any recovery mechanism that reaches into historical rows needs
+an age guard. This is the third instance of the same class of bug (BUG-026 owner
+emails, BUG-030 Meta purchases, BUG-031 report emails).
+
+**Branch / PR:** `fix/sweep-resends-legacy-reports` → PR #215.
+
+---
+
 ## Entry template
 
 ```

@@ -29,6 +29,40 @@ Scheduled jobs and manual operational endpoints, and how to trigger them safely.
 
 All cron endpoints require `verifyCron()` (`CRON_SECRET`).
 
+### Reconcile sweep — legacy rows must never be regenerated (BUG-031)
+
+**`sections` is the source of truth for "does a report exist" — never
+`report_status`.**
+
+Rows paid before **2026-09-05** predate PR #193/#195. Under the older flow the
+customer was emailed, but `report_status` and `email_sent_at` were never set. Those
+rows therefore look like this:
+
+| column | value | reality |
+|--------|-------|---------|
+| `payment_status` | `paid` | really paid |
+| `sections` | full report | report exists |
+| `report_status` | `NULL` | but it IS complete |
+| `email_sent_at` | `NULL` | but the customer WAS emailed |
+
+**`email_sent_at IS NULL` does NOT mean undelivered for these rows.** Any recovery
+logic that assumes otherwise will re-email real customers. That mistake previously
+regenerated July reports through Gemini and emailed them again in September, and
+the 20-40s generations blew the 60s function budget (the 504s).
+
+Both the sweep filter and `fulfillPayment` now use:
+
+```js
+const hasRealReport = Array.isArray(sections) && sections.length > 5;
+```
+
+and `fulfillPayment` additionally settles historical sales: if a row already has a
+report and `paid_at` is older than `DELIVERY_MAX_AGE_MS` (7 days), it backfills
+`report_status`/`email_sent_at` and returns `legacy_already_served` — no Gemini,
+no email.
+
+The whole run is bounded by `RUN_BUDGET_MS` (45s), so it defers instead of dying.
+
 ### Reconcile sweep — Meta Purchase freshness rule (BUG-030)
 
 `reconcile-payments` runs `sweepStuckPaidRows()`, which picks up **every** paid

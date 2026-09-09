@@ -239,6 +239,93 @@ where payment_status = 'paid' and meta_purchase_sent_at is null
   and (paid_at is null or paid_at < now() - interval '12 hours');
 ```
 
+### BUG-031: Reconcile sweep REGENERATED and RE-SENT reports customers already had
+**Status:** Fixed
+**Severity:** CRITICAL (duplicate customer emails, wasted Gemini quota, cron 504s)
+**Fixed in:** PR (fix/sweep-resends-legacy-reports)
+
+**Symptom:** On 2026-09-09 04:19-04:20 UTC a burst of "Your Personalized Vedic
+Astrology Report" emails went to customers who had paid in **July 2026** and had
+**already received their reports at the time**. The daily `reconcile-payments`
+cron also kept returning 504.
+
+**Root Cause:** `report_status` was used as the test for "does a report exist",
+but it is not reliable for historical rows.
+
+Rows paid before **2026-09-05** predate the state-machine work (PR #193 sweep and
+PR #195 delivery orchestrator). Under the older flow the customer was emailed but
+`report_status` was never set to `completed` and `email_sent_at` was never
+stamped — that atomic claim did not exist yet. So those rows sit as
+`report_status = NULL`, `email_sent_at = NULL`, **with a full report already in
+`sections`**.
+
+The sweep's candidate filter was:
+```js
+const completedEnough = r.report_status === "completed" && Array.isArray(r.sections) && r.sections.length > 5;
+if (completedEnough) return false;
+```
+For a July row `report_status !== "completed"`, so `completedEnough` was false and
+the row became a candidate. `fulfillPayment` then used the same faulty test,
+claimed generation via `claim_report_generation` (which accepts `NULL` status),
+**re-ran Gemini**, overwrote `sections`, and called `deliverReport()` — where
+`email_sent_at IS NULL` meant the atomic claim succeeded and the customer was
+emailed a second, newly-generated report two months later.
+
+This also explains the 504s: every one of those rows triggered a full 20-40s
+Gemini generation inside a 60s function, so the run died after about two rows and
+the next day chewed through two more. That trickle is why the resends appeared to
+arrive a few per day.
+
+**Critical corollary:** `email_sent_at IS NULL` does **NOT** mean undelivered for
+any row paid before 2026-09-05. An earlier attempt at this fix assumed it did and
+proposed a "backlog drain" that would have re-emailed every historical customer in
+one run. That PR was closed unmerged.
+
+**Fix:**
+- `sections` is now the source of truth for whether a report exists. Both the
+  sweep filter and `fulfillPayment` use
+  `hasRealReport = Array.isArray(sections) && sections.length > 5`, ignoring
+  `report_status`. A row holding a report is never regenerated.
+- New historical-sale guard in `fulfillPayment`: if the row already has a report
+  and the money is older than `DELIVERY_MAX_AGE_MS` (7 days), it backfills
+  `report_status = 'completed'` + `email_sent_at` and returns
+  `legacy_already_served` without generating or emailing. This self-heals the data
+  so no future sweep can pick the row up again.
+- Added `RUN_BUDGET_MS` (45s) honoured by the Razorpay scan loop and the sweep, so
+  the cron stops cleanly instead of being killed mid-generation (which also left
+  rows stuck in `generating`).
+- Genuinely missed payments still work: they are reconciled far inside the 7-day
+  window, and rows with no `sections` are still generated and delivered normally.
+**Owner action:** none required — the guard self-heals rows as it encounters them.
+To settle every historical row immediately instead of lazily:
+```sql
+update reports
+set report_status = 'completed',
+    email_sent_at = coalesce(email_sent_at, paid_at, created_at)
+where payment_status = 'paid'
+  and sections is not null
+  and coalesce(paid_at, created_at) < now() - interval '7 days'
+  and (report_status is distinct from 'completed' or email_sent_at is null);
+```
+
+### BUG-032: deliverReport() never checked payment_status
+**Status:** Fixed
+**Severity:** High (the paid deliverable could be emailed for free)
+**Fixed in:** PR (fix/sweep-resends-legacy-reports)
+
+**Symptom:** No confirmed incident, but nothing prevented the full report + PDF
+from being emailed for a row that was not paid.
+**Root Cause:** `/api/send-report-email` only verifies payment for EXTERNAL
+callers — `if (!isInternalCall) { ...verify payment_status === "paid"... }`. The
+internal path (`sendReportEmail()` → `getInternalAuthHeaders()`) skips that check
+by design. `deliverReport()` was the only remaining gate and it checked tier and
+email but **never `payment_status`**.
+**Fix:** `deliverReport()` refuses to send unless `payment_status` is `paid` or
+`founder` (intentional free founder reports), logs the refusal, and returns
+`{ skipped: "not_paid" }`. All early-return paths now carry a `skipped` reason for
+observability. The check is skipped when `payment_status` is absent from the passed
+row, so existing callers that build partial row objects are unaffected.
+
 ---
 
 ## Open Bugs
