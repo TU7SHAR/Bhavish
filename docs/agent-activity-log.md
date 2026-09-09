@@ -10,6 +10,56 @@
 
 ---
 
+## 2026-09-09 — Persistent ops logs (Vercel Hobby loses them)
+
+**Asked:** "can we somehow make the logs stay? like vercel needs real pro plan for
+seeing older logs butt no budge"
+
+**Interpreted as:** Get durable logs without paying for Vercel Pro. Verified the
+constraint first: Vercel documents Log Drains as Pro/Enterprise only, so every
+third-party option that plugs in as a drain (Axiom, Better Stack) is unavailable on
+Hobby regardless of that vendor's own free tier. The only zero-cost path is for the
+app to write its own logs somewhere it already owns — Supabase.
+
+**Did:**
+- Added `supabase/migrations/009_ops_logs.sql`: `ops_logs` table with indexes for
+  newest-first browsing, per-`report_id` timelines, event-name filtering and a
+  partial index for warn/error. RLS enabled with no policy (service-role only).
+- Added `lib/ops-log.js` with `logEvent()` / `logWarn()` / `logError()`. Fail-soft
+  by contract (never throws, no-ops when the table is absent), mirrors to
+  `console` so live `vercel logs` still works, strips secret-looking keys and caps
+  `meta` size to protect the 500MB free tier.
+- Instrumented `verify-payment` — the highest-value path — with
+  `payment.verified`, `payment.signature_invalid`, `payment.order_fetch_failed`,
+  `payment.db_update_failed`, `meta.purchase_sent` / `meta.purchase_not_sent` /
+  `meta.purchase_failed`. `payment.db_update_failed` matters most: that branch
+  returns `success:true` to the customer, so it was previously silent.
+- Added `GET /api/admin/logs` (admin-auth, `force-dynamic`) with
+  `reportId`/`event`/`prefix`/`level`/`since`/`limit` filters, and a clear hint
+  when migration 009 hasn't been run.
+
+**Files affected:**
+- `supabase/migrations/009_ops_logs.sql` (new)
+- `lib/ops-log.js` (new)
+- `app/api/admin/logs/route.js` (new)
+- `app/api/verify-payment/route.js`
+- `commands/lib-modules.md`, `commands/cron-and-ops.md`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Payment and Meta-tracking incidents become diagnosable after the fact
+instead of depending on a screenshot taken in time. Every bug this session
+(BUG-026, BUG-030, BUG-031) was slow to find for exactly that reason. Zero added
+cost. Fail-soft, so it cannot break a payment.
+
+**Deliberately scoped:** only `verify-payment` is instrumented here.
+`fulfillPayment`, `deliverReport` and both crons are the other high-value emitters,
+but they are edited by open PRs #215 and #214 — instrumenting them now would create
+merge conflicts. That follows once those merge.
+
+**Branch / PR:** `feat/persistent-ops-logs` → PR #216.
+
+---
+
 ## 2026-09-08 — Stop the reconcile sweep reporting old sales to Meta (BUG-030)
 
 **Asked:** "another fake purchase ... in meta account it is showing new sale

@@ -33,6 +33,7 @@ of truth is the code — correct this file if it drifts.
 | `markdown.js` | Converts AI markdown → safe HTML for report/email rendering. |
 | `report-access.js` | Report access / share-token helpers. |
 | `schema.js` | Schema.org JSON-LD builders (Organization, WebSite, Service, Product+AggregateRating, breadcrumb, article) + `JsonLd` component. |
+| `ops-log.js` | `logEvent()` / `logWarn()` / `logError()` — writes structured ops events to Supabase `ops_logs` so they survive Vercel Hobby's short log retention (Log Drains are Pro-only). Fail-soft: never throws, no-ops if migration 009 hasn't run. Also mirrors to `console` so live `vercel logs` still works. Strips secret-looking keys and caps `meta` size. **Ops events only** — never per-request logging. |
 
 ## Content
 

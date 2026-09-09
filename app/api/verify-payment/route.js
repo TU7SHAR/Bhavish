@@ -8,6 +8,7 @@ import { resolvePlan, resolveLegacyBump } from "../../../lib/plans.js";
 import { classifyFocus } from "../../../lib/deep-dive.js";
 import { ensureAccessToken } from "../../../lib/report-access.js";
 import { sendPurchaseEvent } from "../../../lib/meta-capi.js";
+import { logEvent, logWarn, logError } from "../../../lib/ops-log.js";
 
 // Verifies the Razorpay payment signature, then derives ALL plan metadata from
 // the Razorpay ORDER (server-to-server fetch), NOT from client-supplied values.
@@ -38,6 +39,12 @@ export async function POST(request) {
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
+      await logWarn({
+        event: "payment.signature_invalid",
+        source: "verify-payment",
+        message: "HMAC mismatch — rejected",
+        meta: { orderId: razorpay_order_id, paymentId: razorpay_payment_id },
+      });
       return NextResponse.json(
         { error: "Payment verification failed. Please contact support." },
         { status: 400 }
@@ -61,6 +68,15 @@ export async function POST(request) {
       order = await razorpay.orders.fetch(razorpay_order_id);
     } catch (fetchErr) {
       console.error("Failed to fetch Razorpay order:", fetchErr.message);
+      // Money took, identity unknown. This is exactly the case that used to be
+      // invisible once Vercel dropped the logs.
+      await logError({
+        event: "payment.order_fetch_failed",
+        source: "verify-payment",
+        message: "signature valid but Razorpay order fetch failed — fulfillment deferred",
+        error: fetchErr,
+        meta: { orderId: razorpay_order_id, paymentId: razorpay_payment_id },
+      });
       // Signature IS valid so payment happened. But we cannot determine which
       // report to mark paid or what tier they bought. Return a distinct status
       // so the client shows "payment confirmed, report being prepared" instead
@@ -235,14 +251,68 @@ export async function POST(request) {
                 .update({ meta_purchase_sent_at: null })
                 .eq("report_id", reportId);
             }
+
+            // Durable record of what Meta was actually told, so duplicate /
+            // missing Purchase questions can be answered after the fact.
+            await logEvent({
+              event: result?.sent ? "meta.purchase_sent" : "meta.purchase_not_sent",
+              level: result?.sent ? "info" : "warn",
+              source: "verify-payment",
+              reportId,
+              message: result?.sent
+                ? "server CAPI Purchase accepted"
+                : `not sent (${result?.skipped || result?.error || "unknown"})`,
+              meta: {
+                eventId: `purchase_${reportId}`,
+                skipped: result?.skipped ?? null,
+                sendError: result?.error ?? null,
+                hadFbp: !!fbp,
+                hadFbc: !!fbc,
+              },
+            });
           }
         } catch (capiErr) {
           console.error("Meta CAPI Purchase (verify-payment) error (non-critical):", capiErr.message);
+          await logError({
+            event: "meta.purchase_failed",
+            source: "verify-payment",
+            reportId,
+            message: "server-side CAPI Purchase threw",
+            error: capiErr,
+          });
         }
       }
     } catch (dbError) {
       console.error("DB save error (non-critical):", dbError.message);
+      // The customer still gets success:true here, so without a durable log
+      // this failure was completely silent — a paid row that never got marked
+      // paid, discoverable only by luck.
+      await logError({
+        event: "payment.db_update_failed",
+        source: "verify-payment",
+        message: "payment verified but DB update failed — relying on webhook/reconcile",
+        reportId,
+        error: dbError,
+        meta: { paymentId: razorpay_payment_id },
+      });
     }
+
+    await logEvent({
+      event: "payment.verified",
+      source: "verify-payment",
+      reportId,
+      message: `paid ${resolvedPlan?.tier || "premium"}`,
+      meta: {
+        paymentId: razorpay_payment_id,
+        tier: resolvedPlan?.tier || "premium",
+        price: resolvedPlan?.price ?? null,
+        guidanceMonths: resolvedPlan?.guidanceMonths ?? 0,
+        deepDive: !!resolvedPlan?.deepDive,
+        accessTokenMinted: !!accessToken,
+        hadFbp: !!fbp,
+        hadFbc: !!fbc,
+      },
+    });
 
     return NextResponse.json({
       success: true,
