@@ -98,6 +98,37 @@ zero ad spend, attributed as "direct", with no matching Razorpay payment.
 | `GET /api/admin/reconcile-payments?reportId=&paymentId=&count=` | Admin | Recover a specific/one/N missed payment(s). |
 | `GET /api/admin/diagnose-report?reportId=|email=` | Admin | Read-only: why a row is/isn't in Overview. |
 | `GET /api/admin/export?format=json` | Admin | Full data backup (reports + guidance + blog). |
+| `GET /api/admin/logs` | Admin | Persistent ops log (survives Vercel's retention). See below. |
+
+## Persistent ops logs
+
+Vercel Hobby retains runtime logs only briefly and **Log Drains are Pro/Enterprise
+only**, so the app writes its own events into Supabase `ops_logs`
+(migration `009_ops_logs.sql`).
+
+Read them via `GET /api/admin/logs` with `Authorization: Bearer <ADMIN_SECRET>`:
+
+| Param | Example | Purpose |
+|-------|---------|---------|
+| `reportId` | `RPT-1788...` | Full timeline for ONE report — best for support |
+| `event` | `payment.verified` | Exact event name |
+| `prefix` | `meta` | All `meta.*` events |
+| `level` | `problems` | `warn` + `error` only (or `info`/`warn`/`error`) |
+| `since` | `24h` | `5m`/`3h`/`24h`/`7d`/`30d` (default `7d`) |
+| `limit` | `200` | 1-500, default 100 |
+
+Events currently emitted: `payment.verified`, `payment.signature_invalid`,
+`payment.order_fetch_failed`, `payment.db_update_failed`, `meta.purchase_sent`,
+`meta.purchase_not_sent`, `meta.purchase_failed`.
+
+Retention is manual for now:
+
+```sql
+delete from ops_logs where created_at < now() - interval '90 days';
+```
+
+**Rule:** log ops events (payments, deliveries, Meta sends, cron summaries,
+errors) — never per-request traffic. The Supabase free tier is 500MB.
 | `GET /api/admin/export?format=csv&table=reports\|guidance\|blog` | Admin | Per-table CSV export. |
 
 See [`cli-commands.md`](cli-commands.md) for ready-to-run curl one-liners.
