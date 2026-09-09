@@ -34,7 +34,18 @@ import { fulfillPayment } from "../../../../lib/fulfill-payment.js";
 //   ?count=50   how many recent captured payments to scan (default 30, max 100)
 export const maxDuration = 60;
 
+// Hard wall-clock budget inside maxDuration. A single Gemini report generation
+// can eat 20-40s, so without a budget the run is KILLED mid-generation — which
+// produced the production 504s AND left rows stuck in 'generating'. We now stop
+// cleanly at the deadline and let the next run continue; every step is
+// idempotent, so deferring loses nothing. (BUG-031)
+const RUN_BUDGET_MS = 45000;
+
 export async function GET(request) {
+  const startedAt = Date.now();
+  const deadline = startedAt + RUN_BUDGET_MS;
+  const outOfTime = () => Date.now() > deadline;
+
   const auth = verifyCron(request);
   if (!auth.authorized) return auth.error;
 
@@ -60,6 +71,11 @@ export async function GET(request) {
 
     const results = [];
     for (const payment of captured) {
+      // fulfillPayment can trigger a 20-40s generation; respect the budget.
+      if (outOfTime()) {
+        results.push({ paymentId: payment.id, status: "deferred_no_time" });
+        continue;
+      }
       const details = await orderDetailsFromPayment(razorpay, payment);
       if (!details.reportId) {
         results.push({ paymentId: payment.id, status: "no_report_id" });
@@ -86,11 +102,13 @@ export async function GET(request) {
     // paid-but-undelivered rows directly in the DB and re-runs the SAME
     // idempotent fulfillPayment() on them. claim_report_generation() re-claims
     // 'failed' and stale-'generating' rows, so this genuinely recovers them.
-    const sweep = await sweepStuckPaidRows();
+    const sweep = await sweepStuckPaidRows(deadline);
 
     const summary = {
       scanned: items.length,
       captured: captured.length,
+      legacySettled: results.filter((r) => r.status === "legacy_already_served").length,
+      elapsedMs: Date.now() - startedAt,
       // "fulfilled" = a payment that was actually MISSED and just got recovered.
       fulfilled: results.filter((r) => r.status === "fulfilled").length,
       alreadyDone: results.filter((r) => r.status === "already_done").length,
@@ -123,7 +141,7 @@ export async function GET(request) {
 // "Undelivered" = paid, but the report isn't a completed real report:
 //   report_status is 'failed', or NULL, or 'generating' but stale (>10 min),
 //   OR there are no/too-few sections.
-async function sweepStuckPaidRows() {
+async function sweepStuckPaidRows(deadline) {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -150,17 +168,31 @@ async function sweepStuckPaidRows() {
     // Filter in code: a 'generating' row only counts as stuck if it's been that
     // way for >10 min (a live generation in progress must be left alone).
     const candidates = (rows || []).filter((r) => {
-      const completedEnough = r.report_status === "completed" && Array.isArray(r.sections) && r.sections.length > 5;
-      if (completedEnough) return false;
+      // A row that already HOLDS a report is never a regeneration candidate,
+      // regardless of report_status. Legacy rows (paid before 2026-09-05) have
+      // report_status = NULL with a full report in `sections`; the previous
+      // check required report_status === "completed", so it classified them as
+      // incomplete and pushed them back through Gemini — then re-emailed the
+      // customer a second report months after they were first served.
+      // (BUG-031)
+      const hasRealReport = Array.isArray(r.sections) && r.sections.length > 5;
+      if (hasRealReport) return false;
       if (r.report_status === "generating") {
         return r.generation_started_at && r.generation_started_at < staleGeneratingCutoff;
       }
-      return true; // null or 'failed'
+      return true; // null or 'failed', and genuinely has no report
     });
 
     let recovered = 0;
     let skipped = 0;
+    let deferred = 0;
     for (const r of candidates) {
+      // Each iteration can trigger a 20-40s Gemini generation. Stop cleanly at
+      // the deadline rather than being killed mid-generation. (BUG-031)
+      if (deadline && Date.now() > deadline) {
+        deferred += 1;
+        continue;
+      }
       const includeGuidance = (r.guidance_months || 0) > 0 || r.has_12_month_guidance === true;
       const result = await fulfillPayment({
         reportId: r.report_id,
@@ -173,9 +205,9 @@ async function sweepStuckPaidRows() {
       else skipped++;
     }
 
-    return { attempted: candidates.length, recovered, skipped };
+    return { attempted: candidates.length, recovered, skipped, deferred };
   } catch (e) {
-    return { attempted: 0, recovered: 0, skipped: 0, note: e.message };
+    return { attempted: 0, recovered: 0, skipped: 0, deferred: 0, note: e.message };
   }
 }
 
