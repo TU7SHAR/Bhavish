@@ -2166,6 +2166,45 @@ function DetailCard({ person, expanded, onToggle, password }) {
     setEmailLoading("");
   };
 
+  // SUPER-ADMIN: manually mark this report paid and fully fulfil it (generate +
+  // deliver + notify). Used when a real payment happened but the row is stuck
+  // unpaid, OR when a paid row never got delivered/notified. Idempotent — calls
+  // the same fulfillPayment() orchestrator the webhook/cron use.
+  const markPaid = async (planId) => {
+    const label = planId ? planId.toUpperCase() : "current tier";
+    if (!window.confirm(`Mark ${person.email || person.report_id} as PAID (${label}) and deliver the report? This also fires the owner sale notification and Meta Purchase.`)) {
+      return;
+    }
+    const key = `mark-paid-${planId || "auto"}`;
+    setEmailLoading(key);
+    setEmailAction(null);
+    try {
+      const res = await fetch("/api/admin/mark-paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({
+          reportId: person.report_id,
+          planId: planId || null,
+          includeGuidance: !!person.has_12_month_guidance,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setEmailAction({
+          status: "success",
+          message: `✅ ${person.email || person.report_id} → ${json.outcome}${json.delivered ? " (delivered)" : ""}${json.tier ? ` [${json.tier}]` : ""}`,
+        });
+        person.payment_status = "paid";
+        if (planId) person.plan_tier = planId;
+      } else {
+        setEmailAction({ status: "error", message: `❌ ${json.error}` });
+      }
+    } catch (err) {
+      setEmailAction({ status: "error", message: `❌ ${err.message}` });
+    }
+    setEmailLoading("");
+  };
+
   // Tier-aware regeneration. `tier` is "essential" | "premium" | "master".
   // Essential includes the ₹149 12-month guidance only when includeGuidance=true.
   const regenerateReport = async (tier, includeGuidance = false) => {
@@ -2238,10 +2277,53 @@ function DetailCard({ person, expanded, onToggle, password }) {
           {person.email && person.email.trim() && (
             <div>
               <SectionTitle>Email Actions</SectionTitle>
+
+              {/* === SUPER-ADMIN: MARK PAID + FULFIL === */}
+              {/* Unpaid row that really paid → mark paid, generate, deliver, notify. */}
+              {person.payment_status !== "paid" && person.payment_status !== "founder" && (
+                <div className="mb-3 p-3 rounded-xl border border-red-500/30 bg-red-500/5">
+                  <span className="text-[10px] text-red-300 uppercase tracking-wider block mb-2">
+                    ⚠️ Manual override — mark PAID &amp; deliver (Razorpay received but not marked)
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => markPaid("essential")}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "mark-paid-essential" ? "Marking… (~25s)" : "✅ Mark Paid — Essential ₹299"}
+                    </button>
+                    <button
+                      onClick={() => markPaid("premium")}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "mark-paid-premium" ? "Marking… (~30s)" : "✅ Mark Paid — Premium ₹499"}
+                    </button>
+                    <button
+                      onClick={() => markPaid("master")}
+                      disabled={!!emailLoading}
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "mark-paid-master" ? "Marking… (~50s)" : "✅ Mark Paid — Master ₹999"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2 mb-2">
                 {/* Paid-only actions: resend report + thank you */}
                 {person.payment_status === "paid" && (
                   <>
+                    {/* Paid but delivery/notification may have failed → re-run fulfilment. */}
+                    <button
+                      onClick={() => markPaid(null)}
+                      disabled={!!emailLoading}
+                      title="Re-run fulfilment: ensures the report is generated, the email is delivered, the owner sale notification fired, and the Meta Purchase was sent. Does NOT regenerate an existing report."
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "mark-paid-auto" ? "Fulfilling…" : "🔁 Force Fulfil (fix missing delivery/notification)"}
+                    </button>
                     <button
                       onClick={() => sendAdminAction("resend-report")}
                       disabled={!!emailLoading}
