@@ -9,6 +9,7 @@ import { classifyFocus } from "../../../lib/deep-dive.js";
 import { ensureAccessToken } from "../../../lib/report-access.js";
 import { sendPurchaseEvent } from "../../../lib/meta-capi.js";
 import { logEvent, logWarn, logError } from "../../../lib/ops-log.js";
+import { getInternalAuthHeaders } from "../../../lib/auth.js";
 
 // Verifies the Razorpay payment signature, then derives ALL plan metadata from
 // the Razorpay ORDER (server-to-server fetch), NOT from client-supplied values.
@@ -142,15 +143,22 @@ export async function POST(request) {
       let personalQuestion = "";
       let customerEmail = "";
       let metaAlreadySent = false;
+      // Also needed for the owner "New Sale" email (BUG-034).
+      let reportName = "";
+      let reportPlace = "";
+      let reportDob = "";
       try {
         const { data: existingReport } = await supabase
           .from("reports")
-          .select("personal_question, email, meta_purchase_sent_at")
+          .select("personal_question, email, meta_purchase_sent_at, name, place_of_birth, date_of_birth")
           .eq("report_id", reportId)
           .single();
         personalQuestion = existingReport?.personal_question || "";
         customerEmail = existingReport?.email || "";
         metaAlreadySent = !!existingReport?.meta_purchase_sent_at;
+        reportName = existingReport?.name || "";
+        reportPlace = existingReport?.place_of_birth || "";
+        reportDob = existingReport?.date_of_birth || "";
       } catch {}
 
       const updateData = {
@@ -281,6 +289,77 @@ export async function POST(request) {
             error: capiErr,
           });
         }
+      }
+
+      // Fire the OWNER "New Sale" notification from the browser flow. (BUG-034)
+      //
+      // WHY HERE: this route delivers the report and fires the Meta pixel, but
+      // it NEVER notified the owner. notify-sale was only ever called from
+      // fulfillPayment() (webhook + daily reconcile cron). So on a normal
+      // browser purchase where the webhook didn't fire, the owner got NO sale
+      // email until the next morning's cron swept it up — which is exactly the
+      // "notification missing today, arrived ~9-10am the next day" symptom.
+      //
+      // Idempotent: we atomically claim owner_notified_at (only stamp if NULL),
+      // the same guard fulfillPayment uses (BUG-026). Whichever path runs first
+      // wins the claim and sends; the webhook/cron then see it's already stamped
+      // and skip. No double "New Sale" emails.
+      try {
+        const { data: notifyClaimed } = await supabase
+          .from("reports")
+          .update({ owner_notified_at: now.toISOString() })
+          .eq("report_id", reportId)
+          .is("owner_notified_at", null)
+          .select("report_id");
+
+        if (notifyClaimed && notifyClaimed.length > 0) {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.bhavishai.in";
+          const notifyRes = await fetch(`${baseUrl}/api/notify-sale`, {
+            method: "POST",
+            headers: getInternalAuthHeaders(),
+            body: JSON.stringify({
+              reportId,
+              customerName: reportName,
+              customerEmail,
+              paymentId: razorpay_payment_id,
+              amount: String(plan?.price || Math.round(order.amount / 100)),
+              planTier: plan?.tier || "premium",
+              placeOfBirth: reportPlace,
+              dateOfBirth: reportDob,
+              includeBump: (plan?.guidanceMonths || 0) > 0,
+              reportComplete: true,
+            }),
+          });
+
+          // If the notification call failed, release the claim so the
+          // webhook/cron can retry it (avoids a permanently-missed sale email).
+          if (!notifyRes.ok) {
+            await supabase
+              .from("reports")
+              .update({ owner_notified_at: null })
+              .eq("report_id", reportId);
+          }
+
+          await logEvent({
+            event: notifyRes.ok ? "owner.notified" : "owner.notify_failed",
+            level: notifyRes.ok ? "info" : "warn",
+            source: "verify-payment",
+            reportId,
+            message: notifyRes.ok
+              ? "owner New Sale email sent"
+              : `notify-sale returned ${notifyRes.status} — claim released for retry`,
+            meta: { tier: plan?.tier || "premium", amount: plan?.price || Math.round(order.amount / 100) },
+          });
+        }
+      } catch (notifyErr) {
+        console.error("Owner notification (verify-payment) error (non-critical):", notifyErr.message);
+        await logError({
+          event: "owner.notify_failed",
+          source: "verify-payment",
+          reportId,
+          message: "owner notification threw — webhook/cron will retry",
+          error: notifyErr,
+        });
       }
     } catch (dbError) {
       console.error("DB save error (non-critical):", dbError.message);
