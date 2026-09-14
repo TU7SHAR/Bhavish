@@ -10,6 +10,47 @@
 
 ---
 
+## 2026-09-09 — Super-admin Mark Paid + Force Fulfil
+
+**Asked:** "make super admin access like we could mark user paid and then
+regenearte option is already there fast" — after seeing two failure modes today:
+a payment where the user was marked paid but no sale notification/delivery fired,
+and a Razorpay payment where the user was never marked paid.
+
+**Interpreted as:** Ship a fast, safe manual recovery. Root-cause fixes come
+later; the user explicitly wanted the operator override now. Regenerate already
+exists, so this only needed the mark-paid + fulfil path.
+
+**Did:**
+- Added `POST /api/admin/mark-paid` (admin-auth). It delegates to the existing
+  idempotent `fulfillPayment()` — the same orchestrator the webhook and cron use
+  — so it marks the row paid, resolves the plan (explicit `planId` wins, else the
+  row's tier), generates the report only if missing, delivers the email, fires the
+  owner notification, and sends the Meta Purchase. Logged as `admin.mark_paid`.
+- Added a `markPaid()` handler and buttons in `app/admin/page.js`: unpaid rows get
+  a red "Mark Paid — Essential/Premium/Master" override block (failure mode 2);
+  paid rows get "Force Fulfil" to re-run delivery + notification without
+  regenerating (failure mode 1). Both confirm first.
+
+**Files affected:**
+- `app/api/admin/mark-paid/route.js` (new)
+- `app/admin/page.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Support can recover a stuck customer in one click instead of a manual
+DB edit + reconcile call. Idempotent, so it can't double-fulfil, and it never
+overwrites an existing report. Build passes; lint shows only the pre-existing
+admin-page errors. No migration (uses the ops_logs table from #217).
+
+**Follow-up NOT in this PR (root causes):** why verify-payment marks paid without
+firing the owner notification, and why some Razorpay payments never mark paid at
+all. The new ops-log events (`payment.verified`, `webhook.processed`,
+`report.delivered`) will help pinpoint both once #217 has run for a day.
+
+**Branch / PR:** `feat/admin-mark-paid` → PR #219.
+
+---
+
 ## 2026-09-09 — Instrument the full server surface
 
 **Asked:** "i want all the full logs to lo be logged in table"
