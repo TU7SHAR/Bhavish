@@ -257,7 +257,28 @@ export async function POST(request) {
     // and (b) overwrites plan_price back to 299 — we must keep plan_price = 0.
     if (type === "essential") {
       let delivered = false;
+      let giftEmailSent = false;
       let note = "";
+
+      // 1. Tell the customer they've been GIFTED a free report (the "🎁 your
+      //    free report is on us" message). This is separate from the report
+      //    delivery below — so they know it's a gift, not a normal purchase.
+      try {
+        const giftHtml = buildGiftEmail({ name: report.name, email: report.email, type: "essential" });
+        const resendGift = new Resend(process.env.RESEND_API_KEY);
+        const fromGift = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+        const { error: giftErr } = await resendGift.emails.send({
+          from: `BhavishAI <${fromGift}>`,
+          to: [report.email],
+          subject: `🎁 A free personalized report for you — ${report.name}`,
+          html: giftHtml,
+          reply_to: process.env.GMAIL_USER || fromGift,
+        });
+        giftEmailSent = !giftErr;
+      } catch (giftEmailErr) {
+        console.error("Gift-notification email failed:", giftEmailErr.message);
+      }
+
       try {
         // Need the birth details to (re)build the chart + generate.
         const { data: full } = await supabase
@@ -319,9 +340,10 @@ export async function POST(request) {
         success: true,
         email: report.email,
         message: delivered
-          ? `Gifted a free Essential report to ${report.name} and emailed it. Not counted as revenue, no CAPI, no sale notification.`
-          : `Marked ${report.name} as gifted Essential (payment_status=gifted), but delivery didn't complete (${note}). Use Resend Report to deliver.`,
+          ? `Gifted a free Essential report to ${report.name}: sent the "you've been gifted" email${giftEmailSent ? "" : " (that email failed to send)"} and emailed the report. Not counted as revenue, no CAPI, no sale notification.`
+          : `Marked ${report.name} as gifted Essential (payment_status=gifted). Gift email ${giftEmailSent ? "sent" : "failed"}, but report delivery didn't complete (${note}). Use Resend Report to deliver.`,
         emailSent: delivered,
+        giftEmailSent,
       });
     }
 
