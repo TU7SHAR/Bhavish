@@ -41,8 +41,14 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
+  // Tabs that fetch their OWN data (they don't use /api/admin/data). Calling
+  // fetchData for these hits an unknown ?tab=, which returns an error and blanks
+  // the whole page — which is why the Broadcast tab "wouldn't open". Keep this
+  // list in sync with the self-fetching tab components below.
+  const SELF_FETCHING_TABS = ["actions", "analytics", "economics", "broadcast"];
+
   useEffect(() => {
-    if (authed && tab !== "actions" && tab !== "analytics" && tab !== "economics") fetchData(tab);
+    if (authed && !SELF_FETCHING_TABS.includes(tab)) fetchData(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -214,28 +220,37 @@ export default function AdminDashboard() {
 
       {/* Content */}
       <main className="max-w-7xl mx-auto p-4">
-        {loading && <LoadingState />}
-        {data?.error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400">
-            Error: {data.error}
-          </div>
-        )}
-        {!loading && data && !data.error && (
+        {/* Self-fetching tabs render regardless of the shared /api/admin/data
+            fetch — they load their own data, so they must NOT be gated behind
+            `data && !data.error` (that was blanking the Broadcast tab). */}
+        {tab === "analytics" && <AnalyticsTab password={password} />}
+        {tab === "economics" && <EconomicsTab password={password} />}
+        {tab === "broadcast" && <BroadcastTab password={password} />}
+        {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} password={password} />}
+
+        {/* Data-driven tabs */}
+        {!SELF_FETCHING_TABS.includes(tab) && (
           <>
-            {tab === "overview" && <OverviewTab data={data.overview} />}
-            {tab === "analytics" && <AnalyticsTab password={password} />}
-            {tab === "leads" && <LeadsTab leads={data.leads} />}
-            {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
-            {tab === "founders" && <FoundersTab founders={data.founders} password={password} />}
-            {tab === "guidance-customers" && <GuidanceTab guidance={data.guidanceCustomers} password={password} />}
-            {tab === "test" && <TestTab test={data.test} password={password} />}
-            {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
-            {tab === "payments" && <PaymentsTab payments={data.payments} />}
-            {tab === "emails" && <EmailsTab emails={data.emails} />}
-            {tab === "blog" && <BlogTab blogPosts={data.blogPosts} password={password} onRefresh={() => fetchData("blog")} />}
-            {tab === "broadcast" && <BroadcastTab password={password} />}
-            {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} password={password} />}
-            {tab === "economics" && <EconomicsTab password={password} />}
+            {loading && <LoadingState />}
+            {data?.error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400">
+                Error: {data.error}
+              </div>
+            )}
+            {!loading && data && !data.error && (
+              <>
+                {tab === "overview" && <OverviewTab data={data.overview} />}
+                {tab === "leads" && <LeadsTab leads={data.leads} />}
+                {tab === "paid-details" && <PaidDetailsTab paid={data.paid} password={password} />}
+                {tab === "founders" && <FoundersTab founders={data.founders} password={password} />}
+                {tab === "guidance-customers" && <GuidanceTab guidance={data.guidanceCustomers} password={password} />}
+                {tab === "test" && <TestTab test={data.test} password={password} />}
+                {tab === "all-details" && <AllDetailsTab all={data.all} password={password} />}
+                {tab === "payments" && <PaymentsTab payments={data.payments} />}
+                {tab === "emails" && <EmailsTab emails={data.emails} />}
+                {tab === "blog" && <BlogTab blogPosts={data.blogPosts} password={password} onRefresh={() => fetchData("blog")} />}
+              </>
+            )}
           </>
         )}
       </main>
