@@ -63,6 +63,12 @@ export async function POST(request) {
 
     return NextResponse.json({
       isManglik: !!manglik.isManglik,
+      // New: distinguish traditional Manglik from a secondary Venus-based
+      // indication so the UI never flatly says "You are Manglik" for a
+      // Venus-only chart. category: "none" | "traditional" | "secondary_venus".
+      category: manglik.category || (manglik.isManglik ? "traditional" : "none"),
+      isTraditionalManglik: !!manglik.isTraditionalManglik,
+      isSecondaryOnly: !!manglik.isSecondaryOnly,
       summary: manglik.summary || "",
       // Mars house positions from the three reference points that define the dosha.
       references: manglik.references || null,
