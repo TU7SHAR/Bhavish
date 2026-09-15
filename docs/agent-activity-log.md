@@ -479,3 +479,46 @@ noise and fired 3× on that request; deduping + bot-skipping it is the real
 resource optimisation.
 
 **Branch / PR:** `feat/well-known-traffic-advice` → PR #223.
+
+
+
+## 2026-09-15 — LLM resilience: multi-model fallback in generateWithRetry (BUG-fix for Gemini 503s)
+
+**Asked:** After Gemini 3.1 Flash Lite threw repeated 503 "high demand" errors
+(breaking generate-email-sequence and draft-reply on 2026-09-15), add a fallback.
+User constraints, in order: no money (free only); 3.1 Flash Lite MUST stay
+primary because it has the best astrology "roleplay" voice; prefer a hedged
+parallel-on-failure approach; "don't add new bugs."
+
+**Interpreted as:** Enhance the ONE shared wrapper (`generateWithRetry`) that
+every AI route already calls, so all routes gain fallback with zero call-site
+changes and zero new bug surface. Never switch models to chase quality — only
+on 503/unavailable, ordered by tonal closeness to the primary.
+
+**Did:**
+- Rewrote `lib/gemini-retry.js`, keeping the exact `generateWithRetry(model,
+  prompt, maxRetries)` signature. Behaviour:
+  1. primary model, retried with existing backoff;
+  2. on 503 only → HEDGE: race a fresh primary attempt vs the closest sibling
+     (`gemini-3.5-flash-lite`), preferring the primary's result within a 1.5s
+     grace window so its voice wins when merely slow;
+  3. then sequential remaining fallback (`gemini-3.8-flash`);
+  4. exhausted → throw last error (identical to old behaviour).
+- FAIL-SAFE BY CONSTRUCTION: if the model name can't be introspected, or a
+  non-503 error occurs, it behaves EXACTLY like the old wrapper (no fallback).
+  Verified `m.model` / `m.generationConfig` exist on the installed SDK.
+- Verified with a standalone test (removed after): success passthrough uses only
+  the primary (1 call, voice preserved); non-503 errors throw immediately (real
+  bugs not masked); no-name+503 degrades to a safe throw.
+- No route files changed. No new env keys. All free (same Gemini key).
+
+**Files affected:**
+- `lib/gemini-retry.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** The 2026-09-15 outage class (single-model 503) is now survived by
+falling to a sibling free model, while healthy days still use only 3.1 Flash Lite
+— same voice, same token cost. Build + eslint pass. Fallback order is a config
+array (`FALLBACK_CHAIN`) for easy tuning.
+
+**Branch / PR:** `feat/llm-multi-model-fallback` → PR #224.
