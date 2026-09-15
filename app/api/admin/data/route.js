@@ -98,6 +98,14 @@ export async function GET(request) {
       // Exclude test/QA accounts from every metric
       const reports = excludeTest(allReports, getTestEmails());
       const totalLeads = reports.length;
+      // Unique PEOPLE (de-duplicated by email). totalLeads counts report ROWS,
+      // and one person can create many rows (each /get-report submission = a new
+      // row). This is the real human count — usually well below totalLeads.
+      const uniquePeople = new Set(
+        reports
+          .map((r) => (r.email || "").trim().toLowerCase())
+          .filter(Boolean)
+      ).size;
       const totalPaid = reports.filter((r) => r.payment_status === "paid" && !r.is_founder_free).length;
       const totalUnpaid = reports.filter((r) => r.payment_status === "unpaid").length;
       const totalFounderFree = reports.filter((r) => r.payment_status === "founder" || r.is_founder_free).length;
@@ -216,6 +224,7 @@ export async function GET(request) {
       return NextResponse.json({
         overview: {
           totalLeads: totalLeads || reports.length,
+          uniquePeople,
           totalPaid,
           totalUnpaid,
           totalFounderFree,

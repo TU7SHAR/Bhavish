@@ -558,3 +558,54 @@ including the AI email drafter. Build + eslint pass; object-form forwarding
 verified. Branches off #224, so merge #224 first.
 
 **Branch / PR:** `feat/llm-fallback-emails-analytics` → PR #225.
+
+
+
+## 2026-09-15 — Broadcast email feature + Overview unique-people count
+
+**Asked:** Build a broadcast-email button that sends to filtered segments, with
+AI email generation and filters (date range, paid/free, gender, tier, guidance).
+Mid-build steering: also show unique-people count under the Overview's 1303
+total ("add small bracket like 1100 unique people").
+
+**Interpreted as:** The user confirmed "no money" (Resend free tier) and 1,302
+contacts > Resend's 1,000-contact cap, so native Broadcasts/Audiences can't hold
+everyone. Chose Path B + safety: filter & de-dup in OUR DB, send via the normal
+Resend emails.send in a paced loop with a HARD per-send cap so a blast can never
+starve report-delivery email quota. Every email carries an unsubscribe link;
+unsubscribed users are excluded at the filter layer.
+
+**Did:**
+- `lib/broadcast-filters.js` — shared `selectRecipients()`: paginated fetch,
+  filters (status/tier/gender/guidance/date range), excludes unsubscribed,
+  de-duplicates by email. One source of truth for preview + send.
+- `POST /api/admin/broadcast-preview` — returns unique matched count + sample,
+  no send. Powers the live count.
+- `POST /api/admin/broadcast-generate` — AI subject+body via `generateWithRetry`
+  (same 3.1-flash-lite voice + 503 fallback), editable before send.
+- `POST /api/admin/broadcast-send` — paced send (600ms gap), `MAX_PER_SEND`
+  cap (default 80, env-tunable), unsubscribe link on every email, logs
+  `admin.broadcast_sent` to ops_logs. Requires `confirm:true`.
+- Admin UI: new "📢 Broadcast" tab (filters → live preview → AI/manual compose →
+  send with confirm). Hoisted `BroadcastSelect` to module scope to avoid
+  remount/focus-loss.
+- Overview: added `uniquePeople` (de-dup by email) to the data API and rendered
+  it as "(N unique people)" beside Total Leads — answers the "is 1303 real
+  people or duplicates?" question directly.
+
+**Files affected:**
+- `lib/broadcast-filters.js` (new)
+- `app/api/admin/broadcast-preview/route.js`, `broadcast-generate/route.js`, `broadcast-send/route.js` (new)
+- `app/admin/page.js` (Broadcast tab + BroadcastSelect + Overview unique count)
+- `app/api/admin/data/route.js` (uniquePeople)
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Filtered, de-duplicated broadcast emails with AI generation, safe on
+the free tier (never exceeds a per-send cap, never touches Resend audiences, never
+mails unsubscribers). Overview now shows real human count. Build passes; page.js
+error count went 25 → 21 (hoisting removed some; my code added none). No migration.
+
+**Known limit (by design):** sends >80 per click hold the remainder back — send
+again later or narrow the filter; a true "all 1302 at once" needs a Resend upgrade.
+
+**Branch / PR:** `feat/admin-broadcast` → PR #226.
