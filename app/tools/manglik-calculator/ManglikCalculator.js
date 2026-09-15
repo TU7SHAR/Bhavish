@@ -101,17 +101,35 @@ export default function ManglikCalculator() {
 
       {result && (
         <div className="mt-8 border-t border-border pt-6">
-          <div
-            className={`rounded-xl p-5 text-center ${
-              result.isManglik ? "bg-amber-500/10 border border-amber-500/30" : "bg-emerald-500/10 border border-emerald-500/30"
-            }`}
-          >
-            <p className="text-sm text-muted mb-1">Your result</p>
-            <p className="text-2xl font-bold mb-2">
-              {result.isManglik ? "Manglik (Mangal Dosha present)" : "Not Manglik"}
-            </p>
-            <p className="text-sm text-foreground/90 leading-relaxed">{result.summary}</p>
-          </div>
+          {(() => {
+            // Three outcomes, not two: traditional Manglik (amber),
+            // secondary Venus-based indication (blue, softer), or Not Manglik (green).
+            const cat = result.category || (result.isManglik ? "traditional" : "none");
+            const style =
+              cat === "traditional"
+                ? "bg-amber-500/10 border border-amber-500/30"
+                : cat === "secondary_venus"
+                ? "bg-blue-500/10 border border-blue-500/30"
+                : "bg-emerald-500/10 border border-emerald-500/30";
+            const heading =
+              cat === "traditional"
+                ? "Manglik (Mangal Dosha present)"
+                : cat === "secondary_venus"
+                ? "Secondary Condition — Venus-Manglik indication"
+                : "Not Manglik";
+            return (
+              <div className={`rounded-xl p-5 text-center ${style}`}>
+                <p className="text-sm text-muted mb-1">Your result</p>
+                <p className="text-2xl font-bold mb-2">{heading}</p>
+                {cat === "secondary_venus" && (
+                  <p className="text-xs text-blue-300/90 mb-2">
+                    Not traditional Manglik Dosha — you are clear from both the Ascendant and the Moon.
+                  </p>
+                )}
+                <p className="text-sm text-foreground/90 leading-relaxed">{result.summary}</p>
+              </div>
+            );
+          })()}
 
           {result.context && (
             <div className="grid grid-cols-3 gap-3 mt-4 text-center text-sm">

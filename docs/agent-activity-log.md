@@ -721,3 +721,50 @@ eslint pass. Lesson: don't assume an option exists because an earlier (closed) P
 added it — verify the deployed signature.
 
 **Branch / PR:** `fix/gift-suppress-owner-notify` → PR #229.
+
+
+
+## 2026-09-15 — Manglik: distinguish traditional vs secondary Venus-based condition
+
+**Asked:** A chart clean from Ascendant AND Moon but flagged only by the
+Venus-based rule should NOT say "You are Manglik / should be cautious." Show it as
+a SECONDARY (Venus-Manglik) condition, badge "SECONDARY CONDITION" (not
+"CANCELLED"), and drop the alarming sentence.
+
+**Interpreted as:** Fix at the deterministic source (`computeManglik`) so every
+surface (paid report, founder report, free tool, preview) is corrected at once,
+then reinforce the LLM instruction so the report prose matches.
+
+**Did:**
+- `lib/vedic-calculator.js` `computeManglik`: now classifies three outcomes —
+  `category: "none" | "traditional" | "secondary_venus"`. Traditional = Mars in a
+  dosha house from Lagna OR Moon. Venus-only (clean from Lagna+Moon) =
+  `secondary_venus`. Added `isTraditionalManglik` / `isSecondaryOnly`. The summary
+  the LLM is forced to follow now explicitly says, for the secondary case, "NOT
+  traditional Manglik… present as a secondary condition, do NOT say 'you are
+  Manglik' flatly, do not alarm or demand strict matching/remedies." `isManglik`
+  kept for backward-compat (true for secondary too) but callers should read
+  `category`.
+- `app/api/tools/manglik/route.js`: returns `category` / `isTraditionalManglik` /
+  `isSecondaryOnly`.
+- `app/tools/manglik-calculator/ManglikCalculator.js`: three-way result — amber
+  "Manglik", blue "Secondary Condition — Venus-Manglik indication" (with a "not
+  traditional Manglik — clear from Ascendant and Moon" note), green "Not Manglik".
+- `lib/report-generation.js` + `app/api/founder/generate/route.js`: strengthened
+  the MANGLIK INSTRUCTION to handle the secondary case and forbid the flat
+  "you are Manglik and should be cautious" line.
+
+**Files affected:**
+- `lib/vedic-calculator.js`
+- `app/api/tools/manglik/route.js`
+- `app/tools/manglik-calculator/ManglikCalculator.js`
+- `lib/report-generation.js`
+- `app/api/founder/generate/route.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** A Venus-only chart is now shown as a secondary, less-severe condition
+everywhere, never a flat "you are Manglik." Verified the classifier with a
+standalone test (secondary_venus / traditional / none all correct for the exact
+scenarios). Build + eslint pass. No migration (deterministic compute, no schema).
+
+**Branch / PR:** `feat/manglik-secondary-venus-condition` → PR #232.
