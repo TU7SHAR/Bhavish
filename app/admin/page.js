@@ -2119,6 +2119,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
         "gift-founder": "/api/admin/gift",
         "gift-premium": "/api/admin/gift",
         "gift-master": "/api/admin/gift",
+        "gift-essential": "/api/admin/gift",
       };
       const successMap = {
         "resend-report": (e) => `✅ Report re-sent to ${e}`,
@@ -2130,6 +2131,7 @@ function DetailCard({ person, expanded, onToggle, password }) {
         "gift-founder": (e) => `🎁 Gifted Founder Membership to ${e} + email sent`,
         "gift-premium": (e) => `⭐ Upgraded to Premium for ${e} + email sent`,
         "gift-master": (e) => `★ Upgraded to Master for ${e} + email sent + deep-dive triggered`,
+        "gift-essential": (e) => `🎁 Gifted a free Essential report to ${e} — generating & emailing (no revenue, no CAPI)`,
       };
       const url = urlMap[action] || "/api/admin/send-thankyou";
       const bodyPayload = action === "send-report-link"
@@ -2147,7 +2149,9 @@ function DetailCard({ person, expanded, onToggle, password }) {
             ? { reportId: person.report_id, type: "upgrade_premium" }
             : action === "gift-master"
               ? { reportId: person.report_id, type: "upgrade_master" }
-              : { reportId: person.report_id };
+              : action === "gift-essential"
+                ? { reportId: person.report_id, type: "essential" }
+                : { reportId: person.report_id };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
@@ -2314,6 +2318,20 @@ function DetailCard({ person, expanded, onToggle, password }) {
                       className="px-3 py-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white transition-colors"
                     >
                       {emailLoading === "mark-paid-master" ? "Marking… (~50s)" : "✅ Mark Paid — Master ₹999"}
+                    </button>
+                  </div>
+                  {/* GIFT (not paid): free Essential report — no revenue, no CAPI, no sale email. */}
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <span className="text-[10px] text-green-300 uppercase tracking-wider block mb-2">
+                      🎁 Gift a free report (NOT counted as a sale — no revenue, no Meta Purchase, no sale email)
+                    </span>
+                    <button
+                      onClick={() => sendAdminAction("gift-essential")}
+                      disabled={!!emailLoading}
+                      title="Generates the 10-section Essential report and emails it free. payment_status becomes 'gifted' (excluded from revenue). Does NOT fire Meta CAPI or the owner sale notification."
+                      className="px-3 py-2 rounded-xl text-xs font-medium bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                      {emailLoading === "gift-essential" ? "Gifting… (~25s)" : "🎁 Gift Essential Report (free)"}
                     </button>
                   </div>
                 </div>

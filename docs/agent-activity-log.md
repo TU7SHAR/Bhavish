@@ -609,3 +609,48 @@ error count went 25 → 21 (hoisting removed some; my code added none). No migra
 again later or narrow the filter; a true "all 1302 at once" needs a Resend upgrade.
 
 **Branch / PR:** `feat/admin-broadcast` → PR #226.
+
+
+
+## 2026-09-15 — Gift a free Essential (₹299) report (no revenue / no CAPI / no sale notification)
+
+**Asked:** "add a gift 299 report in manual upgrade section but it shouldn't fire
+CAPI or reflect in payments — since it is gifted, not actually paid."
+
+**Interpreted as:** Add a `gift_essential` path that delivers a real Essential
+report for free while being invisible to revenue, Meta CAPI, and the owner sale
+notification.
+
+**Did:**
+- `app/api/admin/gift/route.js`: new `type: "essential"`. Sets
+  `payment_status: "gifted"` (NOT "paid"), `plan_price: 0`,
+  `is_essential_gifted: true`. Because all revenue is summed only over
+  `payment_status === "paid"` rows, a gifted report is automatically excluded
+  from every revenue/payment metric — no analytics change needed. Then it
+  generates the 10-section Essential report inline (via the shared
+  `generateFullReport`, only if the row doesn't already hold one) and delivers it
+  through `deliverReport(..., { notifyOwnerOfSale: false })`. The path NEVER calls
+  `sendPurchaseEvent` (CAPI) and NEVER calls `notify-sale`. Guards against
+  gifting over a genuinely PAID row. `maxDuration` raised 15 → 60 for generation.
+- `lib/fulfill-payment.js`: `deliverReport` payment guard now also allows
+  `"gifted"` (alongside paid/founder) so the gifted report can be emailed; still
+  excluded from revenue since it isn't "paid".
+- `app/admin/page.js`: added a green "🎁 Gift Essential Report (free)" button in a
+  dedicated block under the (red) Mark-Paid override, shown for unpaid rows, with
+  copy stating it's not a sale / no revenue / no Meta Purchase. Wired
+  `gift-essential` into the action url/success/body maps.
+
+**Files affected:**
+- `app/api/admin/gift/route.js`
+- `lib/fulfill-payment.js`
+- `app/admin/page.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Support can gift a full free report to a lead; it's delivered by email
+but stays out of revenue, Meta, and sale notifications. Build + eslint pass.
+NOTE: `is_essential_gifted` is a new column on `reports` — it is written via the
+progressive pattern, but for it to persist you must add it:
+`ALTER TABLE reports ADD COLUMN IF NOT EXISTS is_essential_gifted BOOLEAN DEFAULT false;`
+(If the column is missing the update will error; see owner action.)
+
+**Branch / PR:** `feat/gift-essential-report` → PR #227.
