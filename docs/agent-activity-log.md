@@ -448,3 +448,34 @@ articles) is now a UI task, not a terminal task. Build passes. Merge order: #221
 first, then this.
 
 **Branch / PR:** `feat/admin-blog-seo-editor` → PR #222.
+
+
+
+## 2026-09-15 — Serve /.well-known/traffic-advice properly
+
+**Asked:** "make .well-known file fully professional one" — the Chrome Private
+Prefetch Proxy was hitting `/.well-known/traffic-advice` and getting a 404.
+
+**Interpreted as:** Turn the 404 into a correct, spec-compliant traffic-advice
+response so Chrome's prefetch proxy is explicitly allowed to prefetch the site.
+
+**Did:**
+- Added `app/.well-known/traffic-advice/route.js` — a `force-static` GET that
+  returns the spec JSON array (`user_agent: "prefetch-proxy"`, `fraction: 1.0`,
+  plus the `google_prefetch_proxy_eap` block) with Content-Type
+  `application/trafficadvice+json` (the proxy rejects generic application/json)
+  and an aggressive immutable cache header.
+- Verified locally: 200, correct content-type, correct body. Build registers it
+  as a static route; the proxy matcher does not block `.well-known`.
+
+**Files affected:**
+- `app/.well-known/traffic-advice/route.js` (new)
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** The 404 becomes a 200; Chrome users may get faster prefetched loads
+(a small Core Web Vitals / UX win). Purely additive. Build passes. NOTE: separate
+follow-up still worth doing — the http_logs logger records bot/`.well-known`
+noise and fired 3× on that request; deduping + bot-skipping it is the real
+resource optimisation.
+
+**Branch / PR:** `feat/well-known-traffic-advice` → PR #223.
