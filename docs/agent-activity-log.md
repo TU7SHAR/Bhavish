@@ -654,3 +654,32 @@ progressive pattern, but for it to persist you must add it:
 (If the column is missing the update will error; see owner action.)
 
 **Branch / PR:** `feat/gift-essential-report` → PR #227.
+
+
+
+## 2026-09-15 — Gifted Essential now sends a "you've been gifted" email
+
+**Asked:** "the gifted person should get the mail that they have been gifted
+something, whatever I gift them."
+
+**Interpreted as:** The gifted Essential path (PR #227) sent only the report, no
+gift framing — so it felt like an ordinary delivery. Send the gift-notification
+email too. (guidance/founder/premium/master already send their gift emails.)
+
+**Did:**
+- `app/api/admin/gift/route.js`: in the `essential` branch, BEFORE generating the
+  report, send the "🎁 A free personalized report for you" notification (using the
+  existing `buildGiftEmail` essential copy), then generate + deliver the report as
+  before. So the customer gets: (1) a gift email telling them it's a gift, then
+  (2) the report itself. Still no revenue, no CAPI, no owner sale notification.
+- Response now reports both `emailSent` (report delivered) and `giftEmailSent`.
+
+**Files affected:**
+- `app/api/admin/gift/route.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Gift recipients are told they've been gifted a free report, not just
+handed a report silently. Build + eslint pass. Branches off #227 (needs the
+essential gift path) — merge #227 first, then this.
+
+**Branch / PR:** `feat/gift-essential-notify-email` → PR #228.
