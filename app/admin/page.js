@@ -454,12 +454,12 @@ function OverviewTab({ data }) {
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Total Leads</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1">
-              {display.leads}
-              {typeof display.uniquePeople === "number" && display.uniquePeople !== display.leads && (
-                <span className="text-sm font-medium text-gray-400 ml-2">({display.uniquePeople} unique people)</span>
-              )}
-            </p>
+            <p className="text-3xl md:text-4xl font-bold mt-1">{display.leads}</p>
+            {typeof display.uniquePeople === "number" && display.uniquePeople !== display.leads && (
+              <p className="text-[11px] font-medium text-gray-500 mt-0.5 whitespace-nowrap">
+                {display.uniquePeople} unique people
+              </p>
+            )}
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Conversion</p>
