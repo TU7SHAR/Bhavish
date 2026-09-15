@@ -40,13 +40,42 @@ export async function generateMetadata({ params }) {
   };
 }
 
+// Score a candidate post's topical relevance to the current post, so "Read
+// next" links to genuinely related articles instead of the first 3 in the file.
+// Shared keywords are worth most; shared title words are a secondary signal.
+// Good internal linking passes ranking equity to the pages that need it and
+// keeps readers on-site — both lift SEO. (Previously this was a blind slice(0,3).)
+function relevanceScore(candidate, current) {
+  const curKw = new Set((current.keywords || []).map((k) => String(k).toLowerCase()));
+  const canKw = (candidate.keywords || []).map((k) => String(k).toLowerCase());
+  let score = 0;
+  for (const k of canKw) if (curKw.has(k)) score += 3;
+
+  const stop = new Set(["what", "is", "the", "a", "to", "in", "your", "of", "and", "for", "how", "vs", "guide", "vedic", "astrology", "kundli"]);
+  const words = (t) => new Set(String(t || "").toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !stop.has(w)));
+  const curWords = words(current.title);
+  for (const w of words(candidate.title)) if (curWords.has(w)) score += 1;
+
+  return score;
+}
+
 export default async function BlogPost({ params }) {
   const { slug } = await params;
   const post = await findPost(slug);
   if (!post) notFound();
 
-  // Related posts from static set (always available, fast).
-  const related = posts.filter((p) => p.slug !== post.slug).slice(0, 3);
+  // Related posts: rank the static set by topical relevance to THIS post, then
+  // fall back to filling with recent posts so we always show 3. Static-only
+  // keeps this fast and avoids an extra DB round-trip per article view.
+  const scored = posts
+    .filter((p) => p.slug !== post.slug)
+    .map((p) => ({ p, score: relevanceScore(p, post) }))
+    .sort((a, b) => b.score - a.score);
+  const relevant = scored.filter((x) => x.score > 0).slice(0, 3).map((x) => x.p);
+  const related =
+    relevant.length >= 3
+      ? relevant
+      : [...relevant, ...scored.filter((x) => x.score === 0).map((x) => x.p)].slice(0, 3);
 
   const articleLd = articleSchema({
     title: post.title,

@@ -372,3 +372,48 @@ Docs-only change — no runtime code touched. Follow-up: BUG-022 (analytics
 
 *This is the first entry. All prior history lives in git and the per-PR notes in
 `docs/bugs.md` / `docs/task.md`.*
+
+
+
+## 2026-09-15 — SEO CTR optimisation round 1
+
+**Asked:** "research on the articles we need to improve or better or add new
+articles" + a Search Console 3-month Pages/Queries export. "do a thorough fix".
+
+**Interpreted as:** Use the real GSC data to find where clicks leak and fix the
+highest-ROI items. Key realisation from the data: the biggest-traffic articles
+(lagna-chart-vs-moon-chart 689 impressions/0.6% CTR, sade-sati 151 impr/0 clicks)
+are DB `blog_posts` rows, and there was NO way to edit an existing DB article's
+title/meta — only to generate new ones.
+
+**Did:**
+- `app/blog/[slug]/page.js`: replaced the blind `related = slice(0,3)` with a
+  relevance-scored "Read next" (shared keywords + title words), so internal links
+  point to genuinely related articles and pass ranking equity where it helps.
+- New `POST /api/admin/update-article`: edit an existing DB article's
+  title/description/keywords/content/published, with SEO length guardrails
+  (title 15-70, description 50-165). This is what makes the click-leak fixes
+  possible on the pages that already rank.
+- `lib/blog-posts.js`: retitled the Chandra Kundli article to lead with "Moon
+  chart" (the English query "what is moon chart" had 50 impressions and wasn't
+  matching the Sanskrit-led title); expanded its keywords.
+- `docs/seo-ctr-action-plan.md`: paste-ready `update-article` commands for the
+  top DB pages (lagna-vs-moon, sade-sati, rashi-vs-lagna, predict-your-future,
+  mesh-rashi), a duplicate-article consolidation list (Saturn, kundli-matching,
+  rashi-vs-lagna cannibalisation), and the next new-article targets (per-rashi
+  love-life cluster, the proven winner).
+
+**Files affected:**
+- `app/blog/[slug]/page.js`
+- `app/api/admin/update-article/route.js` (new)
+- `lib/blog-posts.js`
+- `docs/seo-ctr-action-plan.md` (new)
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Better internal linking now; the ability to fix the highest-traffic
+DB titles/metas (biggest CTR lever); "moon chart" query now matched. Build +
+eslint pass. Note: the largest single win (lagna-vs-moon 689 impr) requires
+running the documented `update-article` command against production, since that
+content lives in the DB, not the repo.
+
+**Branch / PR:** `feat/seo-ctr-optimization-round1` → PR #221.
