@@ -768,3 +768,50 @@ standalone test (secondary_venus / traditional / none all correct for the exact
 scenarios). Build + eslint pass. No migration (deterministic compute, no schema).
 
 **Branch / PR:** `feat/manglik-secondary-venus-condition` → PR #232.
+
+
+
+## 2026-09-15 — Free tools batch 1: Rashi, Nakshatra, Kaal Sarp, Dasha, Lucky Factors
+
+**Asked:** Add a set of free astrology tools under /tools to expand SEO (list of
+~12 provided). Agreed to build the 5 that the existing engine already computes
+accurately first; Gun Milan / Sade Sati / Panchang deferred (need new calc
+logic); love/name compatibility skipped (numerology, off-brand).
+
+**Did:**
+- `lib/lucky-factors.js` (new): extracted the sign→gem/colour/number/day table out
+  of report-generation.js into a shared module (`luckyFactorsForAscendant`), and
+  pointed report-generation.js at it, so the free Lucky tool and the paid report
+  can never drift.
+- `app/api/tools/chart/route.js` (new): ONE shared endpoint — same deterministic
+  engine as the report (geocode → calculateBirthChart) — returning rashi,
+  nakshatra, kaalSarp, current dasha/antardasha, and lucky factors. No Gemini, no
+  saved lead. Zod-validated, rate-limited (previewLimiter).
+- `app/tools/ToolForm.js` (new): shared client birth-details form; posts to
+  /api/tools/chart and renders each tool's slice via a `renderResult` prop, with a
+  built-in funnel CTA to /get-report.
+- `app/tools/ToolPageShell.js` (new): shared SEO page shell (breadcrumb, H1, intro,
+  calculator, educational sections, visible FAQ + FAQPage schema, related-tools
+  links, report CTA).
+- 5 tool pages + client components: rashi-calculator, nakshatra-calculator,
+  kaal-sarp-calculator, dasha-calculator, lucky-factors — each with unique
+  title/description/keywords targeting the requested queries.
+- Wired all 5 into `app/sitemap.js` and the Footer "Free Astrology Tools" list.
+
+**Files affected:**
+- new: lib/lucky-factors.js, app/api/tools/chart/route.js, app/tools/ToolForm.js,
+  app/tools/ToolPageShell.js, and rashi/nakshatra/kaal-sarp/dasha/lucky page.js +
+  client components.
+- edited: lib/report-generation.js, app/sitemap.js, app/components/Footer.js,
+  docs/agent-activity-log.md.
+
+**Impact:** 5 new accurate, SEO-optimised free tools funnelling into /get-report,
+all reusing the report engine so they can never disagree with the paid product.
+Build + eslint pass; verified /api/tools/chart returns correct rashi/nakshatra/
+kaal-sarp/dasha/lucky end-to-end. No migration.
+
+**Deferred (need their own PRs):** Kundli Matching / Gun Milan (needs two charts +
+Ashtakoot scoring), Sade Sati (needs Saturn transit vs natal Moon), Panchang /
+Muhurat (daily-panchang engine). Skipped: love/name compatibility (numerology).
+
+**Branch / PR:** `feat/free-tools-batch1` → PR #233.

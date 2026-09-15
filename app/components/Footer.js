@@ -34,6 +34,11 @@ export default function Footer() {
             <h3 className="text-foreground font-semibold mb-4">Free Astrology Tools</h3>
             <ul className="space-y-2 text-sm">
               <li><Link href="/tools/manglik-calculator" className="text-muted hover:text-primary-light transition-colors">Manglik Dosha Calculator</Link></li>
+              <li><Link href="/tools/rashi-calculator" className="text-muted hover:text-primary-light transition-colors">Moon Sign (Rashi) Calculator</Link></li>
+              <li><Link href="/tools/nakshatra-calculator" className="text-muted hover:text-primary-light transition-colors">Nakshatra Calculator</Link></li>
+              <li><Link href="/tools/dasha-calculator" className="text-muted hover:text-primary-light transition-colors">Vimshottari Dasha Calculator</Link></li>
+              <li><Link href="/tools/kaal-sarp-calculator" className="text-muted hover:text-primary-light transition-colors">Kaal Sarp Dosha Calculator</Link></li>
+              <li><Link href="/tools/lucky-factors" className="text-muted hover:text-primary-light transition-colors">Lucky Number, Colour &amp; Gemstone</Link></li>
               <li><Link href="/kundli/janam-kundli" className="text-muted hover:text-primary-light transition-colors">Janam Kundli</Link></li>
               <li><Link href="/kundli/kundli-by-date-of-birth" className="text-muted hover:text-primary-light transition-colors">Kundli by Date of Birth</Link></li>
             </ul>
