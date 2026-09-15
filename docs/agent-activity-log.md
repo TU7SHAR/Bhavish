@@ -683,3 +683,41 @@ handed a report silently. Build + eslint pass. Branches off #227 (needs the
 essential gift path) — merge #227 first, then this.
 
 **Branch / PR:** `feat/gift-essential-notify-email` → PR #228.
+
+
+
+## 2026-09-15 — FIX: gifted Essential wrongly fired the owner "New Sale" notification
+
+**Asked:** Owner reported (correctly, angrily) that gifting an Essential report
+sent them a sale notification.
+
+**Root cause (my bug):** The gift code called
+`deliverReport(supabase, full, generated, { notifyOwnerOfSale: false })`, but the
+DEPLOYED `deliverReport` signature was `(supabase, report, generated)` — it had NO
+options parameter. The `notifyOwnerOfSale` option originated in PR #213, which was
+CLOSED UNMERGED, so it never actually landed in `deliverReport`. The 4th argument
+was silently ignored and `deliverReport`'s unconditional `notifyOwner()` ran →
+spurious "New Sale" email.
+
+**Confirmed NOT affected:** CAPI did NOT fire (deliverReport contains no
+sendPurchaseEvent — CAPI only fires from verify-payment/fulfillPayment on real
+payments). Revenue NOT affected (payment_status="gifted", plan_price=0). The only
+leak was the owner email — cosmetic, no money/Meta impact.
+
+**Did:**
+- `lib/fulfill-payment.js`: added the missing `options` param to `deliverReport`
+  — `deliverReport(supabase, report, generated, { notifyOwnerOfSale = true } = {})`
+  — and gated the `notifyOwner(...)` call behind it. Defaults true, so every real
+  payment path is unchanged; the gift path (already passing false) now correctly
+  suppresses the sale notification.
+- Verified the gift endpoint already passes `{ notifyOwnerOfSale: false }`.
+
+**Files affected:**
+- `lib/fulfill-payment.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Gifted reports no longer trigger the owner "New Sale" email. Build +
+eslint pass. Lesson: don't assume an option exists because an earlier (closed) PR
+added it — verify the deployed signature.
+
+**Branch / PR:** `fix/gift-suppress-owner-notify` → PR #229.
