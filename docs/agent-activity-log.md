@@ -522,3 +522,39 @@ falling to a sibling free model, while healthy days still use only 3.1 Flash Lit
 array (`FALLBACK_CHAIN`) for easy tuning.
 
 **Branch / PR:** `feat/llm-multi-model-fallback` → PR #224.
+
+
+
+## 2026-09-15 — Extend LLM fallback to draft-reply + analytics categorization
+
+**Asked:** "add same fallback for ai emails as well" — after PR #224 added the
+multi-model fallback to the shared wrapper.
+
+**Interpreted as:** Find AI routes that call Gemini DIRECTLY (bypassing
+generateWithRetry) and route them through the wrapper so they get the same 503
+fallback. Audited with grep: `draft-reply` (the AI email drafter — one of the
+routes that 503'd on 2026-09-15) and `analytics` categorizeWithAI both called
+`model.generateContent()` directly.
+
+**Did:**
+- `draft-reply`: now calls `generateWithRetry(model, {...})`. It passes a full
+  request object with `systemInstruction`, so I first confirmed the wrapper
+  forwards the argument to `generateContent` unchanged (generateContent accepts
+  string OR request object), then documented that in the wrapper. Verified with a
+  test that the `systemInstruction` is preserved byte-for-byte across the
+  fallback → no prompt discrepancy.
+- `analytics` categorizeWithAI: swapped its direct call for `generateWithRetry`.
+- Clarified the wrapper's JSDoc/param to state it accepts a string OR a request
+  object and forwards it identically to every model.
+
+**Files affected:**
+- `lib/gemini-retry.js` (doc/param clarity only — no behaviour change)
+- `app/api/admin/draft-reply/route.js`
+- `app/api/admin/analytics/route.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** Every AI route now has the same voice-preserving 503 fallback,
+including the AI email drafter. Build + eslint pass; object-form forwarding
+verified. Branches off #224, so merge #224 first.
+
+**Branch / PR:** `feat/llm-fallback-emails-analytics` → PR #225.

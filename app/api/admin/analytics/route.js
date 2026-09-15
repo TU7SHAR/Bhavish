@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { verifyAdmin } from "../../../../lib/auth.js";
+import { generateWithRetry } from "../../../../lib/gemini-retry.js";
 
 // Admin analytics API — computes insights from all reports data.
 // Uses Gemini AI to categorize personal questions (cached in DB).
@@ -43,7 +44,8 @@ ${questions.map((q, i) => `${i + 1}. "${q}"`).join("\n")}
 Return ONLY valid JSON array, no markdown:
 [{"index": 1, "category": "Career & Job"}, {"index": 2, "category": "Marriage"}, ...]`;
 
-  const result = await model.generateContent(prompt);
+  // Via generateWithRetry so a Gemini 503 falls over to a sibling model.
+  const result = await generateWithRetry(model, prompt);
   const text = result.response.text();
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) throw new Error("No JSON array in AI response");

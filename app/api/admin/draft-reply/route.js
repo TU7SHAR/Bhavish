@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { verifyAdmin } from "../../../../lib/auth.js";
+import { generateWithRetry } from "../../../../lib/gemini-retry.js";
 
 // Admin endpoint: use Gemini AI to draft an email reply.
 // POST /api/admin/draft-reply
@@ -90,7 +91,11 @@ export async function POST(request) {
 Generate a reply. Return ONLY valid JSON (no markdown, no code fences):
 {"subject": "your subject line here", "body": "your full email body here (use \\n for line breaks)"}`;
 
-    const result = await model.generateContent({
+    // Via generateWithRetry so a Gemini 503 falls over to a sibling model
+    // (this route was one of the endpoints that 503'd on 2026-09-15). The full
+    // request object — including systemInstruction — is forwarded unchanged to
+    // every model, so there's no prompt discrepancy across the fallback.
+    const result = await generateWithRetry(model, {
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       systemInstruction: { parts: [{ text: systemPrompt }] },
     });
