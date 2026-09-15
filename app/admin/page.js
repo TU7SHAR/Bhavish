@@ -152,6 +152,7 @@ export default function AdminDashboard() {
     { id: "payments", label: "Payments", icon: "💰" },
     { id: "emails", label: "Emails", icon: "📧" },
     { id: "blog", label: "Blog", icon: "📝" },
+    { id: "broadcast", label: "Broadcast", icon: "📢" },
     { id: "test", label: "Test", icon: "🧪" },
     { id: "actions", label: "Actions", icon: "⚡" },
     { id: "economics", label: "Economics", icon: "📉" },
@@ -232,6 +233,7 @@ export default function AdminDashboard() {
             {tab === "payments" && <PaymentsTab payments={data.payments} />}
             {tab === "emails" && <EmailsTab emails={data.emails} />}
             {tab === "blog" && <BlogTab blogPosts={data.blogPosts} password={password} onRefresh={() => fetchData("blog")} />}
+            {tab === "broadcast" && <BroadcastTab password={password} />}
             {tab === "actions" && <ActionsTab runAction={runAction} actionResult={actionResult} actionLoading={actionLoading} password={password} />}
             {tab === "economics" && <EconomicsTab password={password} />}
           </>
@@ -376,6 +378,7 @@ function OverviewTab({ data }) {
     fees: data.totalFees || 0,
     paid: data.totalPaid,
     leads: data.totalLeads,
+    uniquePeople: data.uniquePeople,
     conversion: data.conversionRate,
   } : {
     revenue: filtered.gross,
@@ -451,7 +454,12 @@ function OverviewTab({ data }) {
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Total Leads</p>
-            <p className="text-3xl md:text-4xl font-bold mt-1">{display.leads}</p>
+            <p className="text-3xl md:text-4xl font-bold mt-1">
+              {display.leads}
+              {typeof display.uniquePeople === "number" && display.uniquePeople !== display.leads && (
+                <span className="text-sm font-medium text-gray-400 ml-2">({display.uniquePeople} unique people)</span>
+              )}
+            </p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wider">Conversion</p>
@@ -3520,6 +3528,192 @@ function AllDetailsTab({ all, password }) {
   );
 }
 
+
+// ---------- BROADCAST (filtered mass email + AI generation) ----------
+// Hoisted to module scope so it isn't re-created on every BroadcastTab render
+// (an inline component would remount the dropdowns and lose focus).
+function BroadcastSelect({ label, value, onChange, options }) {
+  return (
+    <div>
+      <label className="block text-[11px] text-gray-400 mb-1">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+        {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function BroadcastTab({ password }) {
+  const [filters, setFilters] = useState({
+    status: "all", tier: "any", gender: "any", guidance: "any", dateFrom: "", dateTo: "",
+  });
+  const [preview, setPreview] = useState(null); // { total, sample }
+  const [previewing, setPreviewing] = useState(false);
+
+  const [goal, setGoal] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const setF = (k, v) => { setFilters((p) => ({ ...p, [k]: v })); setPreview(null); };
+
+  const cleanFilters = () => {
+    // Only send non-empty / non-default filters.
+    const f = {};
+    if (filters.status !== "all") f.status = filters.status;
+    if (filters.tier !== "any") f.tier = filters.tier;
+    if (filters.gender !== "any") f.gender = filters.gender;
+    if (filters.guidance !== "any") f.guidance = filters.guidance;
+    if (filters.dateFrom) f.dateFrom = filters.dateFrom;
+    if (filters.dateTo) f.dateTo = filters.dateTo;
+    return f;
+  };
+
+  const runPreview = async () => {
+    setPreviewing(true);
+    setPreview(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/broadcast-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify(cleanFilters()),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) setPreview({ total: json.total, sample: json.sample });
+      else setResult({ status: "error", message: `❌ ${json.error || "Preview failed"}` });
+    } catch (err) {
+      setResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setPreviewing(false);
+  };
+
+  const generate = async () => {
+    if (!goal.trim()) return;
+    setGenerating(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/broadcast-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ goal, audience: filters.status !== "all" ? filters.status : undefined }),
+      });
+      const json = await res.json();
+      if (res.ok && json.subject) { setSubject(json.subject); setEmailBody(json.body); }
+      else setResult({ status: "error", message: `❌ ${json.error || "Generation failed"}` });
+    } catch (err) {
+      setResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setGenerating(false);
+  };
+
+  const send = async () => {
+    if (!subject.trim() || !emailBody.trim()) { setResult({ status: "error", message: "❌ Subject and body are required." }); return; }
+    const count = preview?.total;
+    if (!window.confirm(`Send this broadcast${count ? ` to ${count} people` : ""}? This emails real customers.`)) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/broadcast-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ subject, body: emailBody, filters: cleanFilters(), confirm: true }),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) setResult({ status: "success", message: `✅ ${json.message}` });
+      else setResult({ status: "error", message: `❌ ${json.error || "Send failed"}` });
+    } catch (err) {
+      setResult({ status: "error", message: `❌ ${err.message}` });
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <SectionTitle>1. Choose who receives it</SectionTitle>
+        <p className="text-gray-400 text-sm mb-4">Unsubscribed people are always excluded. Recipients are de-duplicated by email.</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <BroadcastSelect label="Status" value={filters.status} onChange={(v) => setF("status", v)} options={[
+            { v: "all", l: "Everyone" }, { v: "paid", l: "Paid customers" }, { v: "unpaid", l: "Unpaid leads" }, { v: "founder", l: "Founders" },
+          ]} />
+          <BroadcastSelect label="Tier" value={filters.tier} onChange={(v) => setF("tier", v)} options={[
+            { v: "any", l: "Any tier" }, { v: "essential", l: "Essential" }, { v: "premium", l: "Premium" }, { v: "master", l: "Master" },
+          ]} />
+          <BroadcastSelect label="Gender" value={filters.gender} onChange={(v) => setF("gender", v)} options={[
+            { v: "any", l: "Any" }, { v: "male", l: "Male" }, { v: "female", l: "Female" },
+          ]} />
+          <BroadcastSelect label="12-Mo Guidance" value={filters.guidance} onChange={(v) => setF("guidance", v)} options={[
+            { v: "any", l: "Any" }, { v: "yes", l: "Has guidance" }, { v: "no", l: "No guidance" },
+          ]} />
+          <div>
+            <label className="block text-[11px] text-gray-400 mb-1">From date</label>
+            <input type="date" value={filters.dateFrom} onChange={(e) => setF("dateFrom", e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          </div>
+          <div>
+            <label className="block text-[11px] text-gray-400 mb-1">To date</label>
+            <input type="date" value={filters.dateTo} onChange={(e) => setF("dateTo", e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          </div>
+        </div>
+        <button onClick={runPreview} disabled={previewing}
+          className="mt-4 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50">
+          {previewing ? "Counting..." : "🔍 Preview recipients"}
+        </button>
+        {preview && (
+          <div className="mt-3 text-sm bg-purple-500/10 border border-purple-500/20 rounded-lg px-4 py-3">
+            <span className="text-purple-300 font-bold text-lg">{preview.total}</span>
+            <span className="text-gray-300"> unique people match.</span>
+            {preview.sample?.length > 0 && (
+              <p className="text-gray-500 text-[11px] mt-1 truncate">e.g. {preview.sample.map((s) => s.email).join(", ")}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Compose */}
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <SectionTitle>2. Write the email</SectionTitle>
+        <div className="flex gap-2 mb-3">
+          <input value={goal} onChange={(e) => setGoal(e.target.value)}
+            placeholder="AI goal, e.g. 'remind unpaid leads their free preview is waiting'"
+            className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          <button onClick={generate} disabled={generating || !goal.trim()}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+            {generating ? "Writing..." : "✨ AI Generate"}
+          </button>
+        </div>
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject line"
+          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+        <textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={10} placeholder="Email body (plain text — greeting & unsubscribe are added automatically)"
+          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y" />
+      </div>
+
+      {/* Send */}
+      <div className="bg-[#11111f] border border-white/10 rounded-2xl p-5">
+        <SectionTitle>3. Send</SectionTitle>
+        <p className="text-gray-400 text-xs mb-3">
+          Safety cap: at most ~80 sent per click (protects report-delivery email quota). Bigger lists send the rest on later clicks. Every email includes an unsubscribe link.
+        </p>
+        <button onClick={send} disabled={sending || !subject.trim() || !emailBody.trim()}
+          className="bg-gradient-to-r from-pink-600 to-red-600 hover:opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-pink-600/30">
+          {sending ? "Sending..." : preview ? `📢 Send to ${preview.total} people` : "📢 Send broadcast"}
+        </button>
+        {result && (
+          <div className={`mt-3 text-sm px-3 py-2 rounded-lg ${result.status === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+            {result.message}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ---------- BLOG (AI article generator + manager) ----------
 function BlogTab({ blogPosts, password, onRefresh }) {
