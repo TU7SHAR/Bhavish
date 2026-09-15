@@ -3630,22 +3630,126 @@ function BlogTab({ blogPosts, password, onRefresh }) {
         ) : (
           <div className="space-y-2">
             {blogPosts.map((p) => (
-              <div key={p.slug} className="bg-[#11111f] border border-white/10 rounded-xl p-4 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{p.title}</p>
-                  <p className="text-gray-500 text-xs truncate">{p.description}</p>
-                  <p className="text-gray-600 text-[11px] mt-1">
-                    {p.read_minutes} min · {new Date(p.created_at).toLocaleDateString("en-IN")} · {p.published ? "Published" : "Draft"}
-                  </p>
-                </div>
-                <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="shrink-0 text-purple-400 hover:text-purple-300 text-sm font-medium">
-                  View →
-                </a>
-              </div>
+              <BlogRow key={p.slug} post={p} password={password} onRefresh={onRefresh} />
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------- BLOG ROW (view + inline SEO edit of title/description) ----------
+// The highest-CTR wins come from rewriting the title/meta of articles that
+// already rank. This lets you do it from the UI — no curl, no admin secret in a
+// terminal. Calls POST /api/admin/update-article. SEO length hints shown live.
+function BlogRow({ post, password, onRefresh }) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(post.title || "");
+  const [description, setDescription] = useState(post.description || "");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const titleLen = title.trim().length;
+  const descLen = description.trim().length;
+  const titleOk = titleLen >= 15 && titleLen <= 70;
+  const descOk = descLen >= 50 && descLen <= 165;
+
+  const save = async () => {
+    if (!titleOk || !descOk) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/update-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+        body: JSON.stringify({ slug: post.slug, title: title.trim(), description: description.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setMsg({ ok: true, text: "✅ Saved. Google re-indexes titles within a few days." });
+        setEditing(false);
+        if (onRefresh) onRefresh();
+      } else {
+        setMsg({ ok: false, text: `❌ ${json.error || "Update failed"}` });
+      }
+    } catch (err) {
+      setMsg({ ok: false, text: `❌ ${err.message}` });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="bg-[#11111f] border border-white/10 rounded-xl p-4">
+      {!editing ? (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium truncate">{post.title}</p>
+            <p className="text-gray-500 text-xs truncate">{post.description}</p>
+            <p className="text-gray-600 text-[11px] mt-1">
+              {post.read_minutes} min · {new Date(post.created_at).toLocaleDateString("en-IN")} · {post.published ? "Published" : "Draft"}
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-3">
+            <button
+              onClick={() => { setEditing(true); setMsg(null); }}
+              className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
+            >
+              ✏️ Edit SEO
+            </button>
+            <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="text-purple-400 hover:text-purple-300 text-sm font-medium">
+              View →
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider">Editing: {post.slug}</p>
+          <div>
+            <label className="block text-[11px] text-gray-400 mb-1">
+              Title{" "}
+              <span className={titleOk ? "text-green-400" : "text-amber-400"}>({titleLen}/70 — aim 15-70)</span>
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-gray-400 mb-1">
+              Meta description{" "}
+              <span className={descOk ? "text-green-400" : "text-amber-400"}>({descLen}/165 — aim 50-165)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={save}
+              disabled={saving || !titleOk || !descOk}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            >
+              {saving ? "Saving..." : "💾 Save"}
+            </button>
+            <button
+              onClick={() => { setEditing(false); setTitle(post.title || ""); setDescription(post.description || ""); setMsg(null); }}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {msg && (
+        <div className={`mt-2 text-xs px-3 py-2 rounded-lg ${msg.ok ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+          {msg.text}
+        </div>
+      )}
     </div>
   );
 }

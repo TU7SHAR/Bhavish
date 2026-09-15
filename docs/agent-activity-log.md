@@ -417,3 +417,34 @@ running the documented `update-article` command against production, since that
 content lives in the DB, not the repo.
 
 **Branch / PR:** `feat/seo-ctr-optimization-round1` → PR #221.
+
+
+
+## 2026-09-15 — Admin UI: inline SEO editor for blog articles
+
+**Asked:** After PR #221 added the update-article endpoint, the user chose "build
+the admin UI editor first (no terminal ever)" over running curl.
+
+**Interpreted as:** Give the Blog tab an inline editor so DB article titles/metas
+(the biggest CTR lever — lagna-vs-moon 689 impr, sade-sati 151 impr) can be
+rewritten from the admin panel without curl or exposing the admin secret.
+
+**Did:**
+- Refactored each blog row in `BlogTab` into a new `BlogRow` component with an
+  "✏️ Edit SEO" button that reveals inline title + meta-description fields.
+- Live SEO length hints (title 15-70, description 50-165) turn green/amber; Save
+  is disabled until both are in range — matching the endpoint's guardrails.
+- Save calls `POST /api/admin/update-article` with the admin bearer token already
+  in the panel; refreshes the list on success.
+- Branched off `feat/seo-ctr-optimization-round1` (#221) because it needs that
+  endpoint, so this PR is self-contained.
+
+**Files affected:**
+- `app/admin/page.js`
+- `docs/agent-activity-log.md` (this entry)
+
+**Impact:** The highest-ROI SEO action (rewriting titles/metas of ranking DB
+articles) is now a UI task, not a terminal task. Build passes. Merge order: #221
+first, then this.
+
+**Branch / PR:** `feat/admin-blog-seo-editor` → PR #222.
